@@ -10,6 +10,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+RUN python -c "from app.vendor_assets import ensure_vendor; ensure_vendor()"
 
 ENV PORT=8000
 EXPOSE 8000

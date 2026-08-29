@@ -9,3 +9,6 @@ __pycache__/
 *.log
 app/data/
 models/
+app/static/vendor/mediapipe/package/
+app/static/vendor/mediapipe/*.task
+app/static/vendor/*.tgz

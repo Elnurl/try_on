@@ -10,12 +10,11 @@
  * Swapping MediaPipe for DeepAR / GlassOn / Fittingbox later means rewriting
  * ONLY this file — live.js, catalogs, and the admin panel stay untouched.
  */
-const CDN_MODULE =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm";
-const WASM_BASE =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm";
-const MODEL_URL =
-  "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+// Served from THIS origin — never jsDelivr/Google from the user's browser
+// (those CDNs are often blocked in Azerbaijan).
+const MODULE = "/static/vendor/mediapipe/vision_bundle.mjs";
+const WASM_BASE = "/static/vendor/mediapipe/wasm";
+const MODEL_URL = "/static/vendor/mediapipe/face_landmarker.task";
 
 // Eye corner landmarks: midpoint of outer+inner corner ≈ pupil center.
 const LEFT_OUTER = 33;
@@ -54,9 +53,9 @@ export async function createTryonEngine() {
   // the catalog UI (which doesn't need the engine) keeps working.
   let mp;
   try {
-    mp = await import(CDN_MODULE);
+    mp = await import(MODULE);
   } catch (err) {
-    throw new Error("AR modulu yüklənmədi (şəbəkə). İnterneti yoxlayıb yenidən cəhd edin.");
+    throw new Error("AR modulu yüklənmədi. Səhifəni yeniləyin — əgər yenə olmasa, adminə yazın.");
   }
   let landmarker;
   try {

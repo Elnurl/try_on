@@ -278,6 +278,10 @@ body.embed main {
   margin-bottom: 0;
 }
 
+html.embed-mode .admin-link {
+  display: none;
+}
+
 html.embed-mode body.tryon main {
   max-width: 520px;
   padding: 12px;

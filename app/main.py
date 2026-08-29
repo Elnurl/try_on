@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import mimetypes
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
@@ -23,6 +24,7 @@ from app.brands import brand_payload, get_brand, list_brands
 from app.catalog import get_catalog, get_frame
 from app.frames import FRAMES_DIR, ensure_frame_assets
 from app.overlay import NoFaceError, overlay_bytes
+from app.vendor_assets import ensure_vendor
 from app.store import (
     add_angle,
     bump_stat,
@@ -38,7 +40,11 @@ from app.store import (
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
 
+mimetypes.add_type("application/javascript", ".mjs")
+mimetypes.add_type("application/wasm", ".wasm")
+
 ensure_frame_assets()
+ensure_vendor()
 
 app = FastAPI(title="tryon-wa", version="0.6.0")
 app.add_middleware(
