@@ -103,10 +103,13 @@
         const list = document.querySelector("#list");
         list.innerHTML = data.frames
           .map((f) => {
+            const angleCount = (f.angles || []).length;
             const custom = f.custom
               ? `<label>Ölçü <input type="range" min="1.6" max="3.4" step="0.05" value="${f.scale}" data-cal="scale" /></label>
                  <label>Sol/sağ <input type="range" min="-0.25" max="0.25" step="0.01" value="${f.offset_x}" data-cal="offset_x" /></label>
                  <label>Yuxarı/aşağı <input type="range" min="-0.4" max="0.3" step="0.02" value="${f.offset_y}" data-cal="offset_y" /></label>
+                 <label class="angle-upload">Əlavə görünüş (yan/bucaq şəkli${angleCount ? ` · ${angleCount} var` : ""}):
+                   <input type="file" accept="image/png,image/jpeg" data-angle="${f.id}" /></label>
                  <button type="button" class="ghost-btn" data-del="${f.id}">Sil</button>`
               : `<small>Demo model</small>`;
             return `<article class="panel" data-sku="${f.id}" data-ox="${f.offset_x}" data-oy="${f.offset_y}">
@@ -130,6 +133,29 @@
               headers: { "Content-Type": "application/x-www-form-urlencoded" },
               body,
             });
+          });
+        });
+        list.querySelectorAll("[data-angle]").forEach((input) => {
+          input.addEventListener("change", async () => {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            const fd = new FormData();
+            fd.append("file", file);
+            const res = await fetch(
+              "/api/brand/" + slug + "/frames/" + input.dataset.angle + "/angles",
+              { method: "POST", body: fd }
+            );
+            const msg = document.querySelector("#msg");
+            msg.hidden = false;
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({ detail: "Xəta" }));
+              msg.style.color = "";
+              msg.textContent = err.detail || "Şəkil əlavə olunmadı";
+              return;
+            }
+            msg.style.color = "var(--accent)";
+            msg.textContent = "Görünüş şəkli əlavə olundu.";
+            refresh();
           });
         });
         list.querySelectorAll("[data-del]").forEach((btn) => {

@@ -105,6 +105,7 @@ def save_uploaded_frame(
         "lenses": ["#eef2f4", "#6b4f2a", "#2f4a3a", "#3b2d5c"],
         "custom": True,
         "image_url": f"/media/{slug}/{sku}.png",
+        "angles": list(existing.get("angles", [])) if existing else [],
     }
     items = [row for row in extra_catalog(slug) if row["id"] != sku]
     items.append(item)
@@ -128,15 +129,40 @@ def update_calibration(slug: str, sku: str, scale: float, offset_x: float, offse
     return found
 
 
+MAX_ANGLES = 6
+
+
+def add_angle(slug: str, sku: str, image_bytes: bytes) -> dict:
+    """Extra product photos (side/angle views) shown in the try-on rail."""
+    items = extra_catalog(slug)
+    item = next((row for row in items if row["id"] == sku), None)
+    if item is None:
+        raise ValueError("SKU tapılmadı (bucaq şəkli yalnız yüklənmiş eynəyə əlavə olunur).")
+    angles = item.setdefault("angles", [])
+    if len(angles) >= MAX_ANGLES:
+        raise ValueError(f"Maksimum {MAX_ANGLES} əlavə şəkil olar.")
+    img = Image.open(BytesIO(image_bytes)).convert("RGBA")
+    n = 1
+    frames = store_dir(slug) / "frames"
+    while (frames / f"{sku}--a{n}.png").exists():
+        n += 1
+    filename = f"{sku}--a{n}.png"
+    img.save(frames / filename)
+    angles.append(f"/media/{slug}/{filename}")
+    _write_catalog(slug, items)
+    return item
+
+
 def delete_frame(slug: str, sku: str) -> None:
     items = extra_catalog(slug)
     nxt = [row for row in items if row["id"] != sku]
     if len(nxt) == len(items):
         raise ValueError("SKU tapılmadı.")
     _write_catalog(slug, nxt)
-    path = store_dir(slug) / "frames" / f"{sku}.png"
-    if path.exists():
-        path.unlink()
+    frames = store_dir(slug) / "frames"
+    for path in [frames / f"{sku}.png", *frames.glob(f"{sku}--a*.png")]:
+        if path.exists():
+            path.unlink()
 
 
 def update_domains(slug: str, domains: str) -> list[str]:

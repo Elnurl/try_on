@@ -10,11 +10,8 @@
  * Swapping MediaPipe for DeepAR / GlassOn / Fittingbox later means rewriting
  * ONLY this file — live.js, catalogs, and the admin panel stay untouched.
  */
-import {
-  FaceLandmarker,
-  FilesetResolver,
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm";
-
+const CDN_MODULE =
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm";
 const WASM_BASE =
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm";
 const MODEL_URL =
@@ -41,9 +38,9 @@ function toPose(result) {
   };
 }
 
-async function build(delegate) {
-  const vision = await FilesetResolver.forVisionTasks(WASM_BASE);
-  return FaceLandmarker.createFromOptions(vision, {
+async function build(mp, delegate) {
+  const vision = await mp.FilesetResolver.forVisionTasks(WASM_BASE);
+  return mp.FaceLandmarker.createFromOptions(vision, {
     baseOptions: { modelAssetPath: MODEL_URL, delegate },
     runningMode: "VIDEO",
     numFaces: 1,
@@ -53,12 +50,20 @@ async function build(delegate) {
 }
 
 export async function createTryonEngine() {
+  // Dynamic import: if the CDN is unreachable, only try-on fails —
+  // the catalog UI (which doesn't need the engine) keeps working.
+  let mp;
+  try {
+    mp = await import(CDN_MODULE);
+  } catch (err) {
+    throw new Error("AR modulu yüklənmədi (şəbəkə). İnterneti yoxlayıb yenidən cəhd edin.");
+  }
   let landmarker;
   try {
-    landmarker = await build("GPU");
+    landmarker = await build(mp, "GPU");
   } catch (err) {
     console.warn("GPU delegate failed, falling back to CPU", err);
-    landmarker = await build("CPU");
+    landmarker = await build(mp, "CPU");
   }
   let mode = "VIDEO";
 

@@ -24,6 +24,7 @@ from app.catalog import get_catalog, get_frame
 from app.frames import FRAMES_DIR, ensure_frame_assets
 from app.overlay import NoFaceError, overlay_bytes
 from app.store import (
+    add_angle,
     bump_stat,
     create_brand,
     delete_frame,
@@ -185,7 +186,10 @@ async def upload_frame(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=400, detail=f"Fayl oxunmadı: {exc}") from exc
+        raise HTTPException(
+            status_code=400,
+            detail="Şəkil açılmadı — şəffaf fonlu PNG və ya JPG yükləyin.",
+        ) from exc
 
 
 @app.get("/media/{slug}/{filename}")
@@ -231,6 +235,28 @@ def api_calibrate(
         return update_calibration(slug, sku, scale, offset_x, offset_y)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/brand/{slug}/frames/{sku}/angles")
+async def api_add_angle(
+    request: Request,
+    slug: str,
+    sku: str,
+    file: UploadFile = File(...),
+) -> dict:
+    require_admin_api(request)
+    if get_brand(slug) is None:
+        raise HTTPException(status_code=404, detail="Brend tapılmadı.")
+    data = await file.read()
+    try:
+        return add_angle(slug, sku, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=400,
+            detail="Şəkil açılmadı — PNG və ya JPG yükləyin.",
+        ) from exc
 
 
 @app.delete("/api/brand/{slug}/frames/{sku}")

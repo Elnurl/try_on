@@ -57,7 +57,11 @@ function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
-function smoothPose(pose, next, t) {
+// Adaptive smoothing: tiny movements get heavy smoothing (kills jitter),
+// fast head turns get light smoothing (kills lag).
+function smoothPose(pose, next) {
+  const move = Math.hypot(next.left.x - pose.left.x, next.left.y - pose.left.y);
+  const t = Math.min(0.85, Math.max(0.18, move / 14));
   return {
     left: { x: lerp(pose.left.x, next.left.x, t), y: lerp(pose.left.y, next.left.y, t) },
     right: { x: lerp(pose.right.x, next.right.x, t), y: lerp(pose.right.y, next.right.y, t) },
@@ -87,6 +91,7 @@ function syncProduct() {
   if (!selected) return;
   productModel.textContent = selected.model || selected.name;
   productBrand.textContent = selected.brand || "";
+  renderAngles();
   lensesEl.innerHTML = "";
   (selected.lenses || []).forEach((color) => {
     const sw = document.createElement("button");
@@ -100,6 +105,41 @@ function syncProduct() {
       if (view === "photo") renderPhoto();
     });
     lensesEl.appendChild(sw);
+  });
+}
+
+function showAngle(url) {
+  stopCamera();
+  view = "gallery";
+  setIdle(false);
+  setStatus("");
+  const img = new Image();
+  img.onload = () => {
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    ctx.fillStyle = "#f5f5f5";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+  };
+  img.onerror = () => setStatus("Şəkil açılmadı.");
+  img.src = url;
+}
+
+function renderAngles() {
+  const box = document.querySelector("#angles");
+  const label = document.querySelector("#angles-label");
+  if (!box || !label) return;
+  const angles = (selected && selected.angles) || [];
+  box.innerHTML = "";
+  label.hidden = angles.length === 0;
+  box.hidden = angles.length === 0;
+  angles.forEach((url) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "angle-item";
+    btn.innerHTML = `<img alt="Məhsul görünüşü" src="${url}" loading="lazy" />`;
+    btn.addEventListener("click", () => showAngle(url));
+    box.appendChild(btn);
   });
 }
 
@@ -137,7 +177,10 @@ async function loadBrand() {
         if (view === "photo") renderPhoto();
       });
       framesEl.appendChild(btn);
-      return waitPng(img);
+      // Non-fatal: one broken image must not take the whole catalog down.
+      return waitPng(img).catch(() => {
+        console.warn("Frame image failed to load:", item.image_url);
+      });
     })
   );
   syncProduct();
@@ -242,7 +285,7 @@ function loop() {
   }
   setStatus("");
   const eyes = poseToPixels(pose, w, h, true);
-  smooth = smooth ? smoothPose(smooth, eyes, 0.4) : eyes;
+  smooth = smooth ? smoothPose(smooth, eyes) : eyes;
   drawGlasses(smooth.left, smooth.right);
 }
 
@@ -316,7 +359,16 @@ async function tryPhoto(file) {
 function onCameraClick() {
   startCamera().catch((err) => {
     console.error(err);
-    setStatus("Kamera açılmadı. Chrome-da icazə verin və HTTPS/localhost istifadə edin.");
+    setIdle(true);
+    if (err && (err.name === "NotAllowedError" || err.name === "PermissionDeniedError")) {
+      setStatus("Kameraya icazə verilmədi. Brauzerin ünvan sətrindəki kamera işarəsindən icazə verin və yenidən cəhd edin.");
+    } else if (err && err.name === "NotFoundError") {
+      setStatus("Kamera tapılmadı. Bu cihazda kamera yoxdur — 'Şəkil' düyməsi ilə selfie yükləyin.");
+    } else if (err && err.message && err.message.includes("AR modulu")) {
+      setStatus(err.message);
+    } else {
+      setStatus("Kamera açılmadı. HTTPS və ya localhost lazımdır, sonra yenidən cəhd edin.");
+    }
   });
 }
 
@@ -331,9 +383,21 @@ photoInput.addEventListener("change", () => {
   if (!file) return;
   tryPhoto(file).catch((err) => {
     console.error(err);
-    setStatus("Şəkil oxunmadı: " + (err && err.message ? err.message : "xəta"));
+    setIdle(true);
+    if (err && err.message && err.message.includes("AR modulu")) {
+      setStatus(err.message);
+    } else {
+      setStatus("Şəkil oxunmadı — başqa format (JPG/PNG) və ya başqa şəkil sınayın.");
+    }
+    photoInput.value = "";
   });
 });
 
-loadBrand().catch((err) => setStatus(String(err)));
+loadBrand().catch((err) => {
+  console.error(err);
+  productModel.textContent = "Kataloq yüklənmədi";
+  productBrand.textContent = "";
+  setStatus("Kataloq yüklənmədi. İnterneti yoxlayıb səhifəni yeniləyin.");
+});
 if (mode === "embed") document.documentElement.classList.add("embed-mode");
+if (mode !== "embed" && closeBtn) closeBtn.hidden = true;
