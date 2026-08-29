@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Virtual Try-On</title>
+    <link rel="stylesheet" href="/static/styles.css?v=2" />
+  </head>
+  <body data-slug="{{SLUG}}" data-mode="{{MODE}}" data-sku="{{SKU}}" class="studio">
+    <div class="studio-shell">
+      <section class="studio-stage">
+        <span class="studio-mark" id="studio-mark">VTO</span>
+        <video id="camera" playsinline muted autoplay></video>
+        <canvas id="stage"></canvas>
+        <div class="face-guide" aria-hidden="true"></div>
+        <div id="idle-hint" class="idle-hint">
+          <p>Üzü çərçivəyə gətirin</p>
+          <button id="start" type="button" class="copy">Kameranı aç</button>
+        </div>
+        <p id="status" class="status mirror-status" hidden></p>
+        <div class="stage-tools">
+          <button id="live-btn" type="button" class="ghost-btn">Canlı</button>
+          <label class="ghost-btn file-btn">
+            <input id="photo" type="file" accept="image/*" />
+            Şəkil
+          </label>
+        </div>
+        <button id="add-cart" type="button" class="cart-btn">Səbətə at</button>
+      </section>
+
+      <aside class="studio-rail">
+        <header class="rail-head">
+          <div>
+            <h1 id="product-model">—</h1>
+            <p id="product-brand">—</p>
+          </div>
+          <button id="close" type="button" class="icon-x" aria-label="Bağla">×</button>
+        </header>
+
+        <p class="rail-label">Linza rəngi</p>
+        <div id="lenses" class="lenses"></div>
+
+        <p class="rail-label">Bəyənə bilərsiniz</p>
+        <div id="frames" class="related"></div>
+
+        <p class="rail-foot" id="privacy">Brend öz eynəklərini yükləyir. Video serverə getmir.</p>
+      </aside>
+    </div>
+    <p class="studio-copy">White-label VTO · brend kataloqu</p>
+    <script type="module" src="/static/live.js?v=5"></script>
+  </body>
+</html>

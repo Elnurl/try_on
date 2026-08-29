@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Brendə quraşdırma — tryon-wa</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Real məhsul · iki kanal</p>
+        <h1>Zenni / SmartBuyGlasses kimi try-on, yerli brendə</h1>
+        <p class="lede">
+          Əsas təcrübə canlı kameradır. Müştəri eynəyi üzdə görür, video
+          serverə getmir. Brend bunu iki yolla verir — eyni kataloq.
+        </p>
+        <p><a href="/admin">Brend paneli</a> · <a href="/shop-demo">Mağaza saytı</a> · <a href="/t/demo">Bio səhifə</a></p>
+      </header>
+
+      <section class="split">
+        <article class="panel">
+          <p class="eyebrow">Kanal 1 · indi</p>
+          <h2 class="h2">Sayt və ya Instagram bio</h2>
+          <p class="lede">
+            Öz səhifələrinə iframe, ya bio-ya hazır link:
+            <code>/t/brend-adi</code>
+          </p>
+          <label class="eyebrow" for="web-snippet">Web / bio kodu</label>
+          <textarea id="web-snippet" readonly rows="9"></textarea>
+          <button id="copy-web" type="button" class="copy">Web kodunu kopyala</button>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">Kanal 2 · növbəti</p>
+          <h2 class="h2">WhatsApp və Instagram DM</h2>
+          <p class="lede">
+            Şəkil atmaq istəyənlər üçün eyni eynək kataloqu, server overlay.
+            Çata şəkil düşür — ona görə birinci kanal web-dir.
+          </p>
+          <p class="lede">
+            Texniki hazırlıq: mövcud <code>POST /api/tryon</code>. Cloud API
+            webhook sonra qoşulur, overlay yenidən yazılmır.
+          </p>
+        </article>
+      </section>
+
+      <section>
+        <h2 class="h2">Canlı önizləmə (kamera)</h2>
+        <iframe
+          id="preview"
+          title="Live try-on"
+          width="100%"
+          height="760"
+          style="border: 1px solid var(--line); border-radius: 12px; background: #111"
+          allow="camera; microphone"
+        ></iframe>
+        <p id="copied" class="status" hidden style="color: var(--accent)"></p>
+      </section>
+    </main>
+    <script>
+      const origin = window.location.origin;
+      const web = `1 sətir (sayt / Shopify custom HTML):
+<script src="${origin}/vto-widget.js" data-store-id="demo"></script>
+
+Məhsul düyməsi:
+<button class="try-on-btn" data-sku="round-black">Virtual sına</button>
+
+Instagram bio / Taplink:
+${origin}/t/demo`;
+      document.querySelector("#web-snippet").value = web;
+      document.querySelector("#preview").src = origin + "/embed?brand=demo";
+      document.querySelector("#copy-web").addEventListener("click", async () => {
+        await navigator.clipboard.writeText(web);
+        const el = document.querySelector("#copied");
+        el.hidden = false;
+        el.textContent = "Kopyalandı.";
+      });
+    </script>
+  </body>
+</html>

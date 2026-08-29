@@ -1,0 +1,14 @@
+# Render.com blueprint: web service + persistent disk for brand catalogs/uploads.
+services:
+  - type: web
+    name: tryon-wa
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: ADMIN_PASSWORD
+        sync: false # set manually in Render dashboard, never commit it
+    disk:
+      name: tryon-data
+      mountPath: /srv/app/data
+      sizeGB: 1

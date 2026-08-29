@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Eynəyi üzdə yoxla</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body class="embed">
+    <main>
+      <header>
+        <p class="eyebrow">Brend saytı · widget</p>
+        <h1>Eynəyi üzdə yoxla</h1>
+        <p class="lede">Şəkil WhatsApp-a getmir. Yalnız bu səhifədə yoxlanır.</p>
+      </header>
+
+      <section class="panel">
+        <label class="upload">
+          <input id="photo" type="file" accept="image/*" capture="user" />
+          <span>Selfie seç və ya çək</span>
+        </label>
+        <div id="frames" class="frames"></div>
+        <p id="status" class="status" hidden></p>
+      </section>
+
+      <section class="preview preview-single">
+        <figure>
+          <figcaption>Nəticə</figcaption>
+          <img id="result" alt="Try-on nəticəsi" hidden />
+          <div id="result-empty" class="empty">Eynək burada görünəcək</div>
+        </figure>
+      </section>
+    </main>
+    <script src="/static/widget.js"></script>
+  </body>
+</html>

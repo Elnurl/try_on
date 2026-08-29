@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Giriş — VTO Admin</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main style="max-width: 420px">
+      <header>
+        <p class="eyebrow">VTO Platform</p>
+        <h1>Admin girişi</h1>
+        <p class="lede">Brend panellərinə giriş üçün admin şifrəsini yazın.</p>
+      </header>
+      <section class="panel">
+        <form id="login" class="admin-form">
+          <label>Şifrə <input name="password" type="password" required autofocus /></label>
+          <button class="copy" type="submit">Daxil ol</button>
+        </form>
+        <p id="msg" class="status" hidden></p>
+      </section>
+    </main>
+    <script>
+      document.querySelector("#login").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const body = new URLSearchParams(new FormData(e.target));
+        const res = await fetch("/api/admin/login", { method: "POST", body });
+        if (res.ok) {
+          location.href = "/admin";
+          return;
+        }
+        const msg = document.querySelector("#msg");
+        msg.hidden = false;
+        msg.textContent = res.status === 401 ? "Şifrə yanlışdır." : "Xəta baş verdi.";
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VTO — brendlər</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">White-label panel</p>
+        <h1>Brendlər</h1>
+        <p class="lede">
+          Hər optika üçün ayrı mağaza. Onlar eynək yükləyir, siz widget verirsiniz.
+        </p>
+      </header>
+      <section class="panel">
+        <form id="create" class="admin-form">
+          <label>Slug <input name="slug" required placeholder="baku-optik" /></label>
+          <label>Ad <input name="name" required placeholder="Baku Optik" /></label>
+          <button class="copy" type="submit">Brend yarat</button>
+        </form>
+        <p id="msg" class="status" hidden></p>
+      </section>
+      <section>
+        <h2 class="h2">Mağazalar</h2>
+        <div id="list"></div>
+      </section>
+    </main>
+    <script>
+      async function refresh() {
+        const brands = await (await fetch("/api/brands")).json();
+        document.querySelector("#list").innerHTML = brands
+          .map(
+            (b) =>
+              `<article class="panel"><strong>${b.name}</strong> · <code>${b.slug}</code><p><a href="/admin/${b.slug}">Kataloq</a> · <a href="/t/${b.slug}">Try-on</a></p></article>`
+          )
+          .join("");
+      }
+      document.querySelector("#create").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const res = await fetch("/api/brands", { method: "POST", body: fd });
+        const msg = document.querySelector("#msg");
+        msg.hidden = false;
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: "Xəta" }));
+          msg.textContent = err.detail || "Yaradılmadı";
+          return;
+        }
+        const brand = await res.json();
+        msg.style.color = "var(--accent)";
+        msg.textContent = brand.slug + " yaradıldı.";
+        e.target.reset();
+        refresh();
+      });
+      refresh();
+    </script>
+  </body>
+</html>
