@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import secrets
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 
@@ -25,6 +26,8 @@ DEFAULT_BRANDS: dict[str, dict] = {
         "tagline": "Eynəyi üzdə yoxla",
         "privacy": "Kamera yalnız brauzerdə işləyir. Video serverə göndərilmir.",
         "seed": True,
+        "accent": "#1f4d3a",
+        "cart_mode": "platform",
     }
 }
 
@@ -59,6 +62,8 @@ def create_brand(slug: str, name: str) -> dict:
         "seed": False,
         "embed_key": secrets.token_hex(8),
         "allowed_domains": [],
+        "accent": "#1f4d3a",
+        "cart_mode": "platform",
     }
     store_dir(slug)
     others = {k: v for k, v in brands.items() if k != "demo"}
@@ -106,6 +111,8 @@ def save_uploaded_frame(
         "custom": True,
         "image_url": f"/media/{slug}/{sku}.png",
         "angles": list(existing.get("angles", [])) if existing else [],
+        "price": float(existing.get("price") or 0) if existing else 0,
+        "buy_url": (existing.get("buy_url") or "").strip() if existing else "",
     }
     items = [row for row in extra_catalog(slug) if row["id"] != sku]
     items.append(item)
@@ -202,6 +209,60 @@ def get_stats(slug: str) -> dict:
     path = store_dir(slug) / "stats.json"
     data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     return {event: int(data.get(event, 0)) for event in STAT_EVENTS}
+
+
+def update_product_sale(slug: str, sku: str, price: str, buy_url: str) -> dict:
+    items = extra_catalog(slug)
+    found = None
+    for row in items:
+        if row["id"] == sku:
+            try:
+                row["price"] = max(0.0, float(price or 0))
+            except ValueError:
+                row["price"] = 0.0
+            row["buy_url"] = (buy_url or "").strip()
+            found = row
+            break
+    if found is None:
+        raise ValueError("SKU tapılmadı.")
+    _write_catalog(slug, items)
+    return found
+
+
+def save_brand_settings(slug: str, accent: str, cart_mode: str) -> dict:
+    if slug == "demo":
+        raise ValueError("Demo brendin ayarları sabitdir.")
+    brands = load_brands()
+    if slug not in brands:
+        raise ValueError("Brend tapılmadı.")
+    color = (accent or "").strip() or "#1f4d3a"
+    if not re.match(r"^#[0-9a-fA-F]{6}$", color):
+        raise ValueError("Rəng #RRGGBB formatında olmalıdır.")
+    mode = "external" if cart_mode == "external" else "platform"
+    others = {k: v for k, v in brands.items() if k != "demo"}
+    others[slug]["accent"] = color
+    others[slug]["cart_mode"] = mode
+    BRANDS_FILE.write_text(json.dumps(others, ensure_ascii=False, indent=2), encoding="utf-8")
+    return others[slug]
+
+
+def save_order(slug: str, name: str, phone: str, items: list) -> dict:
+    path = store_dir(slug) / "orders.json"
+    orders = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+    order = {
+        "id": secrets.token_hex(4),
+        "name": (name or "").strip(),
+        "phone": (phone or "").strip(),
+        "items": items,
+        "created": datetime.now().isoformat(timespec="seconds"),
+    }
+    if not order["name"] or not order["phone"]:
+        raise ValueError("Ad və telefon yazın.")
+    if not items:
+        raise ValueError("Səbət boşdur.")
+    orders.append(order)
+    path.write_text(json.dumps(orders, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"ok": True, "id": order["id"]}
 
 
 def media_path(slug: str, filename: str) -> Path | None:

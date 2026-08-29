@@ -40,6 +40,8 @@ let view = "idle";
 let catalog = [];
 let trackedTryon = false;
 let tryonConfig = { engine: "overlay" };
+let brandMeta = {};
+let consented = false;
 
 function track(event) {
   const body = new URLSearchParams({ event });
@@ -160,6 +162,10 @@ async function loadBrand() {
   if (!res.ok) throw new Error("Brend tapılmadı");
   const data = await res.json();
   catalog = data.frames;
+  brandMeta = data;
+  if (data.accent) {
+    document.documentElement.style.setProperty("--accent", data.accent);
+  }
   if (!catalog.length) {
     setStatus("Bu mağazada hələ eynək yoxdur. Brend paneldən yükləsin.");
     return;
@@ -347,19 +353,43 @@ function snapshot() {
 }
 
 function addToCart() {
+  if (!selected) return;
   track("click");
-  const payload = { type: "vto-add-to-cart", sku: selected && selected.id, brand: slug };
+  const buyUrl = (selected.buy_url || "").trim();
+  const payload = {
+    type: "vto-add-to-cart",
+    sku: selected.id,
+    brand: slug,
+    name: selected.name,
+    price: selected.price || 0,
+    buy_url: buyUrl,
+  };
   window.parent.postMessage(payload, "*");
-  if (engine && engine.kind === "deepar" && engine.screenshot) {
-    engine.screenshot().then((dataUrl) => {
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = `${slug}-tryon.jpg`;
-      a.click();
-    });
+  if (buyUrl) {
+    if (mode === "embed") return;
+    location.href = buyUrl;
     return;
   }
-  snapshot();
+  const key = "tryon-cart-" + slug;
+  let items = [];
+  try {
+    items = JSON.parse(localStorage.getItem(key) || "[]");
+  } catch {
+    items = [];
+  }
+  const found = items.find((row) => row.id === selected.id);
+  if (found) found.qty += 1;
+  else {
+    items.push({
+      id: selected.id,
+      name: selected.model || selected.name,
+      price: selected.price || 0,
+      qty: 1,
+    });
+  }
+  localStorage.setItem(key, JSON.stringify(items));
+  if (mode === "embed") return;
+  location.href = "/t/" + slug + "/cart";
 }
 
 async function renderPhoto() {
@@ -410,6 +440,11 @@ async function tryPhoto(file) {
 }
 
 function onCameraClick() {
+  if (!consented) {
+    const box = document.querySelector("#consent");
+    if (box) box.hidden = false;
+    return;
+  }
   startCamera().catch((err) => {
     console.error(err);
     setIdle(true);
@@ -431,6 +466,22 @@ addCart.addEventListener("click", addToCart);
 closeBtn.addEventListener("click", () => {
   window.parent.postMessage({ type: "vto-close" }, "*");
 });
+const consentYes = document.querySelector("#consent-yes");
+const consentNo = document.querySelector("#consent-no");
+const consentBox = document.querySelector("#consent");
+if (consentYes) {
+  consentYes.addEventListener("click", () => {
+    consented = true;
+    if (consentBox) consentBox.hidden = true;
+    onCameraClick();
+  });
+}
+if (consentNo) {
+  consentNo.addEventListener("click", () => {
+    if (consentBox) consentBox.hidden = true;
+    setStatus("Kamera üçün razılıq verilmədi. Şəkil yükləməklə də yoxlaya bilərsiniz.");
+  });
+}
 photoInput.addEventListener("change", () => {
   const file = photoInput.files && photoInput.files[0];
   if (!file) return;

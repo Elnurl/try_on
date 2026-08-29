@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Səbət</title>
+    <link rel="stylesheet" href="/static/styles.css?v=6" />
+  </head>
+  <body data-slug="{{SLUG}}">
+    <main>
+      <header>
+        <p class="eyebrow"><a id="back" href="/t/{{SLUG}}">← Try-on</a></p>
+        <h1>Səbət</h1>
+        <p class="lede">Saytı olmayan mağaza üçün sifariş. Mağaza sizinlə əlaqə saxlayır.</p>
+      </header>
+      <section class="panel" id="list"></section>
+      <section class="panel">
+        <form id="order" class="admin-form">
+          <label>Ad <input name="name" required /></label>
+          <label>Telefon <input name="phone" required placeholder="050..." /></label>
+          <button class="copy" type="submit">Sifarişi göndər</button>
+        </form>
+        <p id="msg" class="status" hidden></p>
+      </section>
+    </main>
+    <script>
+      const slug = document.body.dataset.slug;
+      const key = "tryon-cart-" + slug;
+      document.querySelector("#back").href = "/t/" + slug;
+      function cart() {
+        try {
+          return JSON.parse(localStorage.getItem(key) || "[]");
+        } catch {
+          return [];
+        }
+      }
+      function render() {
+        const items = cart();
+        const box = document.querySelector("#list");
+        if (!items.length) {
+          box.innerHTML = "<p class='lede'>Səbət boşdur.</p>";
+          return;
+        }
+        box.innerHTML = items
+          .map(
+            (it) =>
+              `<p><strong>${it.name}</strong> × ${it.qty}${
+                it.price ? " · " + it.price + " AZN" : ""
+              }</p>`
+          )
+          .join("");
+      }
+      document.querySelector("#order").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const items = cart();
+        const msg = document.querySelector("#msg");
+        msg.hidden = false;
+        if (!items.length) {
+          msg.textContent = "Səbət boşdur.";
+          return;
+        }
+        const fd = new FormData(e.target);
+        fd.append("items", JSON.stringify(items));
+        const res = await fetch("/api/brand/" + slug + "/orders", { method: "POST", body: fd });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: "Xəta" }));
+          msg.textContent = err.detail || "Göndərilmədi";
+          return;
+        }
+        localStorage.removeItem(key);
+        msg.style.color = "var(--accent)";
+        msg.textContent = "Sifariş qəbul olundu. Mağaza zəng edəcək.";
+        render();
+        e.target.reset();
+      });
+      render();
+    </script>
+  </body>
+</html>

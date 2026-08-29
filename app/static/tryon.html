@@ -47,10 +47,20 @@
         <p class="rail-label">Bəyənə bilərsiniz</p>
         <div id="frames" class="related"></div>
 
-        <p class="rail-foot" id="privacy">Brend öz eynəklərini yükləyir. Video serverə getmir.</p>
-        <p class="rail-foot admin-link"><a href="/admin">Brend paneli — eynək əlavə et</a></p>
+        <p class="rail-foot" id="privacy">Kamera yalnız brauzerdə işləyir. Video serverə getmir.</p>
       </aside>
     </div>
-    <script type="module" src="/static/live.js?v=8"></script>
+
+    <div id="consent" class="consent">
+      <div class="consent-card">
+        <h2>Virtual yoxlama</h2>
+        <p>Üzdə ümumi nöqtələr tapılır — şəxsiyyət tanınmır. Şəkil və video saxlanılmır, serverə göndərilmir.</p>
+        <div class="consent-actions">
+          <button type="button" id="consent-no" class="ghost-btn">Razı deyiləm</button>
+          <button type="button" id="consent-yes" class="copy">Razıyam</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/static/live.js?v=9"></script>
   </body>
 </html>

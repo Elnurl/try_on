@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import mimetypes
 import os
 from io import BytesIO
@@ -33,9 +34,12 @@ from app.store import (
     delete_frame,
     get_stats,
     media_path,
+    save_brand_settings,
+    save_order,
     save_uploaded_frame,
     update_calibration,
     update_domains,
+    update_product_sale,
 )
 
 ROOT = Path(__file__).resolve().parent
@@ -90,6 +94,13 @@ def home() -> str:
 def brand_page(slug: str) -> str:
     """Instagram bio / Taplink landing page."""
     return render_tryon(slug, "page")
+
+
+@app.get("/t/{slug}/cart", response_class=HTMLResponse)
+def brand_cart(slug: str) -> str:
+    if get_brand(slug) is None:
+        raise HTTPException(status_code=404, detail="Brend tapılmadı.")
+    return (STATIC / "cart.html").read_text(encoding="utf-8").replace("{{SLUG}}", slug)
 
 
 @app.get("/embed", response_class=HTMLResponse)
@@ -321,7 +332,55 @@ def api_stats(request: Request, slug: str) -> dict:
     return get_stats(slug)
 
 
-@app.post("/api/brand/{slug}/domains")
+@app.post("/api/brand/{slug}/settings")
+def api_brand_settings(
+    request: Request,
+    slug: str,
+    accent: str = Form("#1f4d3a"),
+    cart_mode: str = Form("platform"),
+) -> dict:
+    require_admin_api(request)
+    try:
+        return save_brand_settings(slug, accent, cart_mode)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/brand/{slug}/frames/{sku}/sale")
+def api_product_sale(
+    request: Request,
+    slug: str,
+    sku: str,
+    price: str = Form("0"),
+    buy_url: str = Form(""),
+) -> dict:
+    require_admin_api(request)
+    if get_brand(slug) is None:
+        raise HTTPException(status_code=404, detail="Brend tapılmadı.")
+    try:
+        return update_product_sale(slug, sku, price, buy_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/brand/{slug}/orders")
+def api_order(
+    slug: str,
+    name: str = Form(...),
+    phone: str = Form(...),
+    items: str = Form("[]"),
+) -> dict:
+    if get_brand(slug) is None:
+        raise HTTPException(status_code=404, detail="Brend tapılmadı.")
+    try:
+        parsed = json.loads(items)
+        if not isinstance(parsed, list):
+            raise ValueError("Səbət formatı yanlışdır.")
+        return save_order(slug, name, phone, parsed)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Səbət oxunmadı.") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 def api_domains(request: Request, slug: str, domains: str = Form("")) -> dict:
     require_admin_api(request)
     try:
