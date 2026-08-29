@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Virtual Try-On</title>
-    <link rel="stylesheet" href="/static/styles.css?v=4" />
+    <link rel="stylesheet" href="/static/styles.css?v=5" />
   </head>
   <body data-slug="{{SLUG}}" data-mode="{{MODE}}" data-sku="{{SKU}}" class="studio">
     <div class="studio-shell">
@@ -12,8 +12,8 @@
         <span class="studio-mark" id="studio-mark">VTO</span>
         <video id="camera" playsinline muted autoplay></video>
         <canvas id="stage"></canvas>
-        <div class="face-guide" aria-hidden="true"></div>
         <div id="idle-hint" class="idle-hint">
+          <div class="face-guide" aria-hidden="true"></div>
           <p>Üzü çərçivəyə gətirin</p>
           <button id="start" type="button" class="copy">Kameranı aç</button>
         </div>
