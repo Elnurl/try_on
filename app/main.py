@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import mimetypes
+import os
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
@@ -211,9 +212,22 @@ def api_brands() -> list[dict]:
     return list_brands()
 
 
+@app.get("/api/tryon-config")
+def tryon_config() -> dict:
+    """Client reads this before starting AR. License key is domain-locked by DeepAR."""
+    key = os.environ.get("DEEPAR_LICENSE_KEY", "").strip()
+    return {
+        "engine": "deepar" if key else "overlay",
+        "licenseKey": key or None,
+        "rootPath": "/static/vendor/deepar/",
+        "defaultEffect": "/static/vendor/deepar/effects/aviators",
+    }
+
+
 @app.get("/api/health")
 def health() -> dict:
-    return {"ok": True, "product": "white-label-vto"}
+    key = bool(os.environ.get("DEEPAR_LICENSE_KEY", "").strip())
+    return {"ok": True, "product": "white-label-vto", "engine": "deepar" if key else "overlay"}
 
 
 @app.post("/api/brands")

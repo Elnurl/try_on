@@ -22,6 +22,7 @@ CATALOG: list[dict] = [
         "offset_x": 0.0,
         "offset_y": -0.12,
         "lenses": ["#eef2f4", "#5c4033", "#1f4d3a", "#3b2d5c"],
+        "effect_url": "/static/vendor/deepar/effects/aviators",
     },
     {
         "id": "square-tortoise",
@@ -33,6 +34,7 @@ CATALOG: list[dict] = [
         "offset_x": 0.0,
         "offset_y": -0.08,
         "lenses": ["#eef2f4", "#8a5a2b", "#2c2c2c"],
+        "effect_url": "/static/vendor/deepar/effects/aviators",
     },
     {
         "id": "aviator-gold",
@@ -44,6 +46,7 @@ CATALOG: list[dict] = [
         "offset_x": 0.0,
         "offset_y": 0.02,
         "lenses": ["#8eb8c8", "#6b4f2a", "#2f4a3a", "#1c1916"],
+        "effect_url": "/static/vendor/deepar/effects/aviators",
     },
     {
         "id": "cat-eye",
@@ -55,6 +58,7 @@ CATALOG: list[dict] = [
         "offset_x": 0.0,
         "offset_y": -0.18,
         "lenses": ["#eef2f4", "#c45c7a", "#2f4a3a"],
+        "effect_url": "/static/vendor/deepar/effects/aviators",
     },
     {
         "id": "slim-metal",
@@ -66,6 +70,7 @@ CATALOG: list[dict] = [
         "offset_x": 0.0,
         "offset_y": -0.05,
         "lenses": ["#eef2f4", "#9aa3ad", "#2f4a3a"],
+        "effect_url": "/static/vendor/deepar/effects/aviators",
     },
 ]
 

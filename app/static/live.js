@@ -3,7 +3,7 @@
  * Face tracking goes through tryon-adapter.js (engine-agnostic interface).
  * Video/photos stay on-device; only anonymous usage counters hit the server.
  */
-import { createTryonEngine } from "./tryon-adapter.js?v=1";
+import { createTryonEngine } from "./tryon-adapter.js?v=2";
 
 const body = document.body;
 const slug = body.dataset.slug || "demo";
@@ -25,6 +25,7 @@ const lensesEl = document.querySelector("#lenses");
 const addCart = document.querySelector("#add-cart");
 const closeBtn = document.querySelector("#close");
 const markEl = document.querySelector("#studio-mark");
+const arPreview = document.querySelector("#ar-preview");
 
 let engine = null;
 let selected = null;
@@ -38,6 +39,7 @@ let photoBitmap = null;
 let view = "idle";
 let catalog = [];
 let trackedTryon = false;
+let tryonConfig = { engine: "overlay" };
 
 function track(event) {
   const body = new URLSearchParams({ event });
@@ -83,7 +85,17 @@ async function waitPng(img) {
 async function loadEngine() {
   if (engine) return engine;
   setStatus("Model yüklənir…");
-  engine = await createTryonEngine();
+  if (!tryonConfig.engine) {
+    tryonConfig = await (await fetch("/api/tryon-config")).json();
+  }
+  engine = await createTryonEngine({
+    config: tryonConfig,
+    preview: arPreview,
+  });
+  if (engine.kind === "deepar") {
+    document.body.classList.add("engine-deepar");
+    if (arPreview) arPreview.hidden = false;
+  }
   return engine;
 }
 
@@ -174,6 +186,9 @@ async function loadBrand() {
         framesEl.querySelectorAll(".related-item").forEach((el) => el.classList.remove("on"));
         btn.classList.add("on");
         syncProduct();
+        if (engine && engine.kind === "deepar") {
+          engine.setItem(item).catch((err) => console.warn(err));
+        }
         if (view === "photo") renderPhoto();
       });
       framesEl.appendChild(btn);
@@ -250,6 +265,9 @@ function poseToPixels(pose, width, height, mirror) {
 function stopCamera() {
   cancelAnimationFrame(anim);
   anim = 0;
+  if (engine && engine.kind === "deepar" && engine.stopLive) {
+    engine.stopLive();
+  }
   if (stream) {
     stream.getTracks().forEach((t) => t.stop());
     stream = null;
@@ -292,6 +310,20 @@ function loop() {
 async function startCamera() {
   setStatus("Kamera açılır…");
   await loadEngine();
+  if (engine.kind === "deepar") {
+    photoBitmap = null;
+    setIdle(false);
+    if (arPreview) arPreview.hidden = false;
+    await engine.startLive();
+    await engine.setItem(selected);
+    view = "live";
+    setStatus("");
+    if (!trackedTryon) {
+      trackedTryon = true;
+      track("tryon");
+    }
+    return;
+  }
   await engine.setMode("VIDEO");
   photoBitmap = null;
   stopCamera();
@@ -318,6 +350,15 @@ function addToCart() {
   track("click");
   const payload = { type: "vto-add-to-cart", sku: selected && selected.id, brand: slug };
   window.parent.postMessage(payload, "*");
+  if (engine && engine.kind === "deepar" && engine.screenshot) {
+    engine.screenshot().then((dataUrl) => {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `${slug}-tryon.jpg`;
+      a.click();
+    });
+    return;
+  }
   snapshot();
 }
 
@@ -345,6 +386,18 @@ async function tryPhoto(file) {
   setStatus("Şəkil hazırlanır…");
   stopCamera();
   await loadEngine();
+  if (engine.kind === "deepar") {
+    const img = new Image();
+    img.onload = () => {
+      view = "photo";
+      setIdle(false);
+      if (arPreview) arPreview.hidden = false;
+      engine.setItem(selected).then(() => engine.showPhoto(img));
+      setStatus("");
+    };
+    img.src = URL.createObjectURL(file);
+    return;
+  }
   await engine.setMode("IMAGE");
   try {
     photoBitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
@@ -399,5 +452,11 @@ loadBrand().catch((err) => {
   productBrand.textContent = "";
   setStatus("Kataloq yüklənmədi. İnterneti yoxlayıb səhifəni yeniləyin.");
 });
+fetch("/api/tryon-config")
+  .then((res) => res.json())
+  .then((cfg) => {
+    tryonConfig = cfg;
+  })
+  .catch(() => {});
 if (mode === "embed") document.documentElement.classList.add("embed-mode");
 if (mode !== "embed" && closeBtn) closeBtn.hidden = true;

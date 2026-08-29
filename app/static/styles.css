@@ -329,6 +329,23 @@ body.studio {
   object-fit: cover;
 }
 
+.ar-preview {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.ar-preview canvas {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+
+body.engine-deepar #stage,
+body.engine-deepar #camera {
+  visibility: hidden;
+}
+
 .studio-mark {
   position: absolute;
   left: 10px;

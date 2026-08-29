@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Virtual Try-On</title>
-    <link rel="stylesheet" href="/static/styles.css?v=5" />
+    <link rel="stylesheet" href="/static/styles.css?v=6" />
   </head>
   <body data-slug="{{SLUG}}" data-mode="{{MODE}}" data-sku="{{SKU}}" class="studio">
     <div class="studio-shell">
@@ -12,6 +12,7 @@
         <span class="studio-mark" id="studio-mark">VTO</span>
         <video id="camera" playsinline muted autoplay></video>
         <canvas id="stage"></canvas>
+        <div id="ar-preview" class="ar-preview" hidden></div>
         <div id="idle-hint" class="idle-hint">
           <div class="face-guide" aria-hidden="true"></div>
           <p>Üzü çərçivəyə gətirin</p>
@@ -50,6 +51,6 @@
         <p class="rail-foot admin-link"><a href="/admin">Brend paneli — eynək əlavə et</a></p>
       </aside>
     </div>
-    <script type="module" src="/static/live.js?v=7"></script>
+    <script type="module" src="/static/live.js?v=8"></script>
   </body>
 </html>

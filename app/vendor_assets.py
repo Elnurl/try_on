@@ -8,13 +8,18 @@ first boot) from a machine that can reach npm/Google.
 from __future__ import annotations
 
 import logging
+import tarfile
+import tempfile
 import urllib.request
 from pathlib import Path
 
 log = logging.getLogger("tryon")
 
-VENDOR = Path(__file__).resolve().parent / "static" / "vendor" / "mediapipe"
+STATIC_VENDOR = Path(__file__).resolve().parent / "static" / "vendor"
+VENDOR = STATIC_VENDOR / "mediapipe"
 WASM = VENDOR / "wasm"
+DEEPAR = STATIC_VENDOR / "deepar"
+DEEPAR_TGZ = "https://registry.npmjs.org/deepar/-/deepar-5.6.22.tgz"
 VERSION = "0.10.21"
 UNPKG = f"https://unpkg.com/@mediapipe/tasks-vision@{VERSION}"
 MODEL_URL = (
@@ -57,3 +62,51 @@ def ensure_vendor() -> None:
             if not dest.exists():
                 raise
     log.info("MediaPipe vendor assets ready in %s", VENDOR)
+    ensure_deepar()
+
+
+def ensure_deepar() -> None:
+    """Host DeepAR SDK on our origin (jsDelivr is often blocked)."""
+    marker = DEEPAR / "js" / "deepar.esm.js"
+    nested = DEEPAR / "package" / "js" / "deepar.esm.js"
+    if marker.exists() and marker.stat().st_size > 10_000:
+        return
+    if nested.exists():
+        log.info("Flattening DeepAR package/ layout")
+        for name in (
+            "js",
+            "wasm",
+            "models",
+            "effects",
+            "mediaPipe",
+            "default_envmap.webp",
+            "split_sum.webp",
+            "package.json",
+        ):
+            src = DEEPAR / "package" / name
+            dest = DEEPAR / name
+            if src.exists() and not dest.exists():
+                if src.is_dir():
+                    dest.mkdir(parents=True, exist_ok=True)
+                    for item in src.rglob("*"):
+                        rel = item.relative_to(src)
+                        target = dest / rel
+                        if item.is_dir():
+                            target.mkdir(parents=True, exist_ok=True)
+                        else:
+                            target.parent.mkdir(parents=True, exist_ok=True)
+                            target.write_bytes(item.read_bytes())
+                else:
+                    dest.write_bytes(src.read_bytes())
+        if marker.exists():
+            return
+    DEEPAR.mkdir(parents=True, exist_ok=True)
+    tgz = DEEPAR / "deepar.tgz"
+    log.info("Downloading DeepAR SDK")
+    _fetch(DEEPAR_TGZ, tgz)
+    with tarfile.open(tgz, "r:gz") as tar:
+        tar.extractall(DEEPAR)
+    tgz.unlink(missing_ok=True)
+    if nested.exists() and not marker.exists():
+        ensure_deepar()
+    log.info("DeepAR vendor assets ready in %s", DEEPAR)
