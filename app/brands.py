@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from app.catalog import get_catalog
-from app.store import extra_catalog, load_brands
+from app.store import extra_catalog, load_brands, public_brand
 
 
 def get_brand(slug: str) -> dict | None:
@@ -11,7 +11,12 @@ def get_brand(slug: str) -> dict | None:
 
 
 def list_brands() -> list[dict]:
-    return list(load_brands().values())
+    out = []
+    for row in load_brands().values():
+        item = public_brand(row)
+        item["has_partner"] = bool(row.get("partner_hash"))
+        out.append(item)
+    return out
 
 
 def _with_image(slug: str, item: dict) -> dict:
@@ -30,4 +35,4 @@ def brand_payload(slug: str) -> dict | None:
             by_id[item["id"]] = _with_image(slug, item)
     for item in extra_catalog(slug):
         by_id[item["id"]] = _with_image(slug, item)
-    return {**brand, "frames": list(by_id.values())}
+    return {**public_brand(brand), "frames": list(by_id.values())}

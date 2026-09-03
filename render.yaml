@@ -10,6 +10,8 @@ services:
         sync: false
       - key: DEEPAR_LICENSE_KEY
         sync: false # DeepAR web key for tryon-wa.onrender.com + localhost
+      - key: FITTINGBOX_API_KEY
+        sync: false # Public Fittingbox browser key for Glassify /shop
     disk:
       name: tryon-data
       mountPath: /srv/app/data

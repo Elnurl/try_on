@@ -55,12 +55,8 @@
   window.addEventListener("message", function (e) {
     if (!e.data) return;
     if (e.data.type === "vto-close") close();
-    if (e.data.type === "vto-add-to-cart") {
-      if (e.data.buy_url) {
-        window.location.href = e.data.buy_url;
-        return;
-      }
-      close();
+    if (e.data.type === "vto-add-to-cart" && e.data.cart_url) {
+      window.location.href = e.data.cart_url;
     }
   });
   document.addEventListener("keydown", function (e) {

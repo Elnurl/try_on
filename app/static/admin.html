@@ -16,6 +16,7 @@
         </p>
         <p>
           <a id="try-link" href="/t/demo">Try-on</a> ·
+          <a id="store-link" href="/s/demo">Mağaza səhifəsi</a> ·
           <a id="shop-link" href="/shop-demo">Widget sınağı</a>
         </p>
       </header>
@@ -36,16 +37,11 @@
       <section class="panel">
         <h2 class="h2">Mağaza ayarları</h2>
         <p class="lede">
-          Saytın yoxdursa səbət bizim platformadadır. Saytın varsa hər eynəyə Shopify/Woo məhsul linkini yaz.
+          Öz saytın varsa — məhsul/səbət səhifəsinin linkini yaz. Boş saxlasan «Səbətə at» görünməz.
         </p>
         <form id="settings" class="admin-form">
-          <label>Əsas rəng <input name="accent" id="accent" type="color" value="#1f4d3a" /></label>
-          <label>Səbət
-            <select name="cart_mode" id="cart_mode">
-              <option value="platform">Platforma səbəti (sayt yoxdur)</option>
-              <option value="external">Brendin öz saytı (məhsul linki)</option>
-            </select>
-          </label>
+          <label>Əsas rəng <input name="accent" id="accent" type="color" value="#0a6e74" /></label>
+          <label>Səbət linki <input name="cart_url" id="cart_url" placeholder="https://optika.az/cart" /></label>
           <button class="copy" type="submit">Ayarları saxla</button>
         </form>
         <p id="settings-msg" class="status" hidden></p>
@@ -80,6 +76,7 @@
       const slug = location.pathname.split("/").pop() || "demo";
       const origin = location.origin;
       document.querySelector("#try-link").href = "/t/" + slug;
+      document.querySelector("#store-link").href = "/s/" + slug;
       document.querySelector("#snippet").value =
         `<script src="${origin}/vto-widget.js" data-store-id="${slug}"><\/script>\n` +
         `<button class="try-on-btn" data-sku="SKU">Virtual sına</button>\n\n` +
@@ -118,7 +115,7 @@
           document.querySelector("#domains").value = data.allowed_domains.join(", ");
         }
         if (data.accent) document.querySelector("#accent").value = data.accent;
-        if (data.cart_mode) document.querySelector("#cart_mode").value = data.cart_mode;
+        if (data.cart_url) document.querySelector("#cart_url").value = data.cart_url;
         const list = document.querySelector("#list");
         list.innerHTML = data.frames
           .map((f) => {
@@ -127,9 +124,6 @@
               ? `<label>Ölçü <input type="range" min="1.6" max="3.4" step="0.05" value="${f.scale}" data-cal="scale" /></label>
                  <label>Sol/sağ <input type="range" min="-0.25" max="0.25" step="0.01" value="${f.offset_x}" data-cal="offset_x" /></label>
                  <label>Yuxarı/aşağı <input type="range" min="-0.4" max="0.3" step="0.02" value="${f.offset_y}" data-cal="offset_y" /></label>
-                 <label>Qiymət (AZN) <input data-sale="price" value="${f.price || 0}" /></label>
-                 <label>Saytdakı məhsul linki <input data-sale="buy_url" placeholder="https://shop.az/products/..." value="${f.buy_url || ""}" /></label>
-                 <button type="button" class="copy" data-sale-save="${f.id}">Linki saxla</button>
                  <label class="angle-upload">Əlavə görünüş (yan/bucaq şəkli${angleCount ? ` · ${angleCount} var` : ""}):
                    <input type="file" accept="image/png,image/jpeg" data-angle="${f.id}" /></label>
                  <button type="button" class="ghost-btn" data-del="${f.id}">Sil</button>`
@@ -155,24 +149,6 @@
               headers: { "Content-Type": "application/x-www-form-urlencoded" },
               body,
             });
-          });
-        });
-        list.querySelectorAll("[data-sale-save]").forEach((btn) => {
-          btn.addEventListener("click", async () => {
-            const card = btn.closest("[data-sku]");
-            const body = new URLSearchParams({
-              price: card.querySelector('[data-sale="price"]').value,
-              buy_url: card.querySelector('[data-sale="buy_url"]').value,
-            });
-            const res = await fetch("/api/brand/" + slug + "/frames/" + btn.dataset.saleSave + "/sale", {
-              method: "POST",
-              headers: { "Content-Type": "application/x-www-form-urlencoded" },
-              body,
-            });
-            const msg = document.querySelector("#msg");
-            msg.hidden = false;
-            msg.style.color = res.ok ? "var(--accent)" : "";
-            msg.textContent = res.ok ? "Məhsul linki saxlanıldı." : "Saxlanmadı";
           });
         });
         list.querySelectorAll("[data-angle]").forEach((input) => {
@@ -209,7 +185,7 @@
         e.preventDefault();
         const body = new URLSearchParams({
           accent: document.querySelector("#accent").value,
-          cart_mode: document.querySelector("#cart_mode").value,
+          cart_url: document.querySelector("#cart_url").value,
         });
         const res = await fetch("/api/brand/" + slug + "/settings", { method: "POST", body });
         const msg = document.querySelector("#settings-msg");

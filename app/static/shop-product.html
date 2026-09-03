@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{PAGE_TITLE}}</title>
+    <link rel="stylesheet" href="/static/shop.css?v=1" />
+  </head>
+  <body class="g-body">
+    <header class="g-header">
+      <div class="g-header-inner">
+        <a class="g-logo" href="/shop">Glassify<span>.az</span></a>
+        <nav class="g-nav">
+          <a href="/shop">Kataloq</a>
+        </nav>
+        <a class="g-cart-link" href="/cart" aria-label="Səbət">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+          </svg>
+          Səbət
+          <span class="g-cart-count" data-cart-count>0</span>
+        </a>
+      </div>
+    </header>
+    <main class="g-main">
+      <div class="g-wrap">
+        <nav class="g-crumb">
+          <a href="/shop">Kataloq</a>
+          <span>/</span>
+          <span>{{PRODUCT_NAME}}</span>
+        </nav>
+        <div class="g-product">
+          <div>
+            <div class="g-art-lg">
+              <svg viewBox="0 0 240 96" width="256" height="128" fill="none" stroke="#3f3f46" stroke-width="5" stroke-linecap="round" aria-hidden="true">
+                <rect x="12" y="22" width="84" height="52" rx="22"></rect>
+                <rect x="144" y="22" width="84" height="52" rx="22"></rect>
+                <path d="M96 46h48"></path>
+                <path d="M12 42H4"></path>
+                <path d="M228 42h8"></path>
+              </svg>
+            </div>
+            <button type="button" class="g-btn" data-start-vto disabled>Üzümdə yoxla</button>
+            <p class="g-hint" data-vto-status>Virtual Try-On hazırlanır…</p>
+            <p class="g-error" data-vto-error hidden></p>
+          </div>
+          <div>
+            <p class="g-brand">{{PRODUCT_BRAND}}</p>
+            <h1>{{PRODUCT_NAME}}</h1>
+            <p class="g-meta">{{PRODUCT_CATEGORY}}</p>
+            <p class="g-price">{{PRODUCT_PRICE}} <span>{{PRODUCT_CURRENCY}}</span></p>
+            <p class="g-desc">{{PRODUCT_DESCRIPTION}}</p>
+            <ul class="g-tags">{{PRODUCT_FEATURES}}</ul>
+            <button type="button" class="g-btn" data-add-cart>Səbətə əlavə et</button>
+            <a class="g-btn g-btn-ghost" href="/cart" data-view-cart hidden>Səbətə bax →</a>
+            <div class="g-trust">
+              <div>🔄<br />30 gün geri qaytarma</div>
+              <div>🚚<br />Pulsuz çatdırılma</div>
+              <div>✅<br />Orijinal marka</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    <footer class="g-footer">
+      <strong>Glassify.az</strong>
+      <p>Virtual Try-On texnologiyası ilə eynəyinizi evdən seçin.</p>
+    </footer>
+    <div id="vto-overlay" aria-hidden="true">
+      <div class="vto-shell">
+        <header class="vto-bar">
+          <div>
+            <p>Virtual Try-On</p>
+            <p class="sub">Kameraya icazə verin</p>
+          </div>
+          <button type="button" data-stop-vto>Bağla</button>
+        </header>
+        <div class="vto-stage">
+          <div id="fitmix-container"></div>
+          <p class="vto-wait" data-vto-wait hidden>Fittingbox şərtlərini qəbul edin, kamera açıq qalacaq</p>
+        </div>
+      </div>
+    </div>
+    <script>
+      window.SHOP_PRODUCT = {{PRODUCT_JSON}};
+      window.FITTINGBOX = { apiKey: {{FITTINGBOX_API_KEY_JSON}}, frameId: {{FRAME_ID_JSON}} };
+    </script>
+    <script src="/static/shop.js?v=1"></script>
+    <script src="/static/fittingbox-vto.js?v=1"></script>
+  </body>
+</html>

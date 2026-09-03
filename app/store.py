@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import re
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 
@@ -18,6 +20,27 @@ STORES = ROOT / "data" / "stores"
 SKU_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,40}$")
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,30}$")
 BRANDS_FILE = STORES / "brands.json"
+LEADS_FILE = STORES / "leads.json"
+APPLICATIONS_FILE = STORES / "applications.json"
+AZ_SLUG = str.maketrans(
+    {
+        "ə": "e",
+        "Ə": "e",
+        "ı": "i",
+        "I": "i",
+        "İ": "i",
+        "ö": "o",
+        "Ö": "o",
+        "ü": "u",
+        "Ü": "u",
+        "ş": "s",
+        "Ş": "s",
+        "ç": "c",
+        "Ç": "c",
+        "ğ": "g",
+        "Ğ": "g",
+    }
+)
 
 DEFAULT_BRANDS: dict[str, dict] = {
     "demo": {
@@ -26,8 +49,9 @@ DEFAULT_BRANDS: dict[str, dict] = {
         "tagline": "Eynəyi üzdə yoxla",
         "privacy": "Kamera yalnız brauzerdə işləyir. Video serverə göndərilmir.",
         "seed": True,
-        "accent": "#1f4d3a",
-        "cart_mode": "platform",
+        "accent": "#0a6e74",
+        "cart_url": "",
+        "store_mode": "hosted",
     }
 }
 
@@ -62,15 +86,12 @@ def create_brand(slug: str, name: str) -> dict:
         "seed": False,
         "embed_key": secrets.token_hex(8),
         "allowed_domains": [],
-        "accent": "#1f4d3a",
-        "cart_mode": "platform",
+        "accent": "#0a6e74",
+        "cart_url": "",
+        "store_mode": "",
     }
     store_dir(slug)
-    others = {k: v for k, v in brands.items() if k != "demo"}
-    others[slug] = meta
-    STORES.mkdir(parents=True, exist_ok=True)
-    BRANDS_FILE.write_text(json.dumps(others, ensure_ascii=False, indent=2), encoding="utf-8")
-    return meta
+    return persist_brand(slug, meta)
 
 
 def extra_catalog(slug: str) -> list[dict]:
@@ -111,8 +132,6 @@ def save_uploaded_frame(
         "custom": True,
         "image_url": f"/media/{slug}/{sku}.png",
         "angles": list(existing.get("angles", [])) if existing else [],
-        "price": float(existing.get("price") or 0) if existing else 0,
-        "buy_url": (existing.get("buy_url") or "").strip() if existing else "",
     }
     items = [row for row in extra_catalog(slug) if row["id"] != sku]
     items.append(item)
@@ -181,14 +200,11 @@ def update_domains(slug: str, domains: str) -> list[str]:
         host = raw.lower().removeprefix("https://").removeprefix("http://").split("/")[0]
         if host and host not in parsed:
             parsed.append(host)
-    brands = load_brands()
-    if slug not in brands:
-        raise ValueError("Brend tapılmadı.")
-    others = {k: v for k, v in brands.items() if k != "demo"}
     if slug == "demo":
         raise ValueError("Demo brendə domen qoyulmur.")
-    others[slug]["allowed_domains"] = parsed
-    BRANDS_FILE.write_text(json.dumps(others, ensure_ascii=False, indent=2), encoding="utf-8")
+    if slug not in load_brands():
+        raise ValueError("Brend tapılmadı.")
+    update_brand(slug, allowed_domains=parsed)
     return parsed
 
 
@@ -211,58 +227,157 @@ def get_stats(slug: str) -> dict:
     return {event: int(data.get(event, 0)) for event in STAT_EVENTS}
 
 
-def update_product_sale(slug: str, sku: str, price: str, buy_url: str) -> dict:
-    items = extra_catalog(slug)
-    found = None
-    for row in items:
-        if row["id"] == sku:
-            try:
-                row["price"] = max(0.0, float(price or 0))
-            except ValueError:
-                row["price"] = 0.0
-            row["buy_url"] = (buy_url or "").strip()
-            found = row
-            break
-    if found is None:
-        raise ValueError("SKU tapılmadı.")
-    _write_catalog(slug, items)
-    return found
-
-
-def save_brand_settings(slug: str, accent: str, cart_mode: str) -> dict:
-    if slug == "demo":
-        raise ValueError("Demo brendin ayarları sabitdir.")
+def save_brand_settings(slug: str, accent: str, cart_url: str) -> dict:
     brands = load_brands()
     if slug not in brands:
         raise ValueError("Brend tapılmadı.")
-    color = (accent or "").strip() or "#1f4d3a"
+    color = (accent or "").strip() or "#0a6e74"
     if not re.match(r"^#[0-9a-fA-F]{6}$", color):
         raise ValueError("Rəng #RRGGBB formatında olmalıdır.")
-    mode = "external" if cart_mode == "external" else "platform"
-    others = {k: v for k, v in brands.items() if k != "demo"}
-    others[slug]["accent"] = color
-    others[slug]["cart_mode"] = mode
-    BRANDS_FILE.write_text(json.dumps(others, ensure_ascii=False, indent=2), encoding="utf-8")
-    return others[slug]
+    url = (cart_url or "").strip()
+    if url and not url.startswith(("http://", "https://")):
+        raise ValueError("Səbət linki http:// və ya https:// ilə başlamalıdır.")
+    return update_brand(slug, accent=color, cart_url=url)
 
 
-def save_order(slug: str, name: str, phone: str, items: list) -> dict:
-    path = store_dir(slug) / "orders.json"
-    orders = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
-    order = {
-        "id": secrets.token_hex(4),
-        "name": (name or "").strip(),
-        "phone": (phone or "").strip(),
-        "items": items,
-        "created": datetime.now().isoformat(timespec="seconds"),
+def persist_brand(slug: str, row: dict) -> dict:
+    saved = json.loads(BRANDS_FILE.read_text(encoding="utf-8")) if BRANDS_FILE.exists() else {}
+    saved[slug] = row
+    STORES.mkdir(parents=True, exist_ok=True)
+    BRANDS_FILE.write_text(json.dumps(saved, ensure_ascii=False, indent=2), encoding="utf-8")
+    return row
+
+
+def update_brand(slug: str, **fields) -> dict:
+    brands = load_brands()
+    if slug not in brands:
+        raise ValueError("Brend tapılmadı.")
+    saved = json.loads(BRANDS_FILE.read_text(encoding="utf-8")) if BRANDS_FILE.exists() else {}
+    row = {**brands[slug], **saved.get(slug, {}), **fields}
+    return persist_brand(slug, row)
+
+
+def public_brand(row: dict) -> dict:
+    return {key: value for key, value in row.items() if key != "partner_hash"}
+
+
+def hash_partner_password(password: str) -> str:
+    salt = secrets.token_hex(8)
+    digest = hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
+    return f"{salt}${digest}"
+
+
+def check_partner_password(slug: str, password: str) -> bool:
+    brand = load_brands().get(slug)
+    stored = (brand or {}).get("partner_hash") or ""
+    if not stored or "$" not in stored:
+        return False
+    salt, digest = stored.split("$", 1)
+    guess = hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
+    return hmac.compare_digest(guess, digest)
+
+
+def suggest_slug(name: str) -> str:
+    raw = (name or "").translate(AZ_SLUG).lower()
+    raw = re.sub(r"[^a-z0-9]+", "-", raw).strip("-")[:28] or "magaza"
+    if not SLUG_RE.match(raw):
+        raw = "magaza"
+    brands = load_brands()
+    base = raw
+    n = 2
+    while raw in brands:
+        raw = f"{base}-{n}"
+        n += 1
+    return raw
+
+
+def load_applications() -> list[dict]:
+    if not APPLICATIONS_FILE.exists():
+        return []
+    return json.loads(APPLICATIONS_FILE.read_text(encoding="utf-8"))
+
+
+def save_application(
+    name: str,
+    store: str,
+    contact: str,
+    has_site: bool,
+    message: str = "",
+) -> dict:
+    name = (name or "").strip()
+    store_name = (store or "").strip()
+    contact = (contact or "").strip()
+    note = (message or "").strip()
+    if not name or not store_name or not contact:
+        raise ValueError("Ad, mağaza adı və əlaqə doldurulmalıdır.")
+    if len(name) > 80 or len(store_name) > 80 or len(contact) > 80 or len(note) > 800:
+        raise ValueError("Mətn çox uzundur.")
+    STORES.mkdir(parents=True, exist_ok=True)
+    rows = load_applications()
+    row = {
+        "id": secrets.token_hex(6),
+        "name": name,
+        "store": store_name,
+        "contact": contact,
+        "has_site": bool(has_site),
+        "message": note,
+        "status": "pending",
+        "slug": "",
+        "suggested_slug": suggest_slug(store_name),
+        "at": datetime.now(timezone.utc).isoformat(),
     }
-    if not order["name"] or not order["phone"]:
-        raise ValueError("Ad və telefon yazın.")
-    if not items:
-        raise ValueError("Səbət boşdur.")
-    orders.append(order)
-    path.write_text(json.dumps(orders, ensure_ascii=False, indent=2), encoding="utf-8")
-    return {"ok": True, "id": order["id"]}
+    rows.append(row)
+    APPLICATIONS_FILE.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    return row
+
+
+def approve_application(app_id: str, slug: str, password: str) -> dict:
+    password = (password or "").strip()
+    if len(password) < 6:
+        raise ValueError("Partnyor şifrəsi ən azı 6 simvol olmalıdır.")
+    rows = load_applications()
+    found = next((row for row in rows if row["id"] == app_id), None)
+    if found is None:
+        raise ValueError("Müraciət tapılmadı.")
+    if found["status"] == "approved":
+        raise ValueError("Bu müraciət artıq təsdiqlənib.")
+    meta = create_brand(slug, found["store"])
+    mode = "own_site" if found.get("has_site") else "hosted"
+    update_brand(
+        slug,
+        partner_hash=hash_partner_password(password),
+        store_mode=mode,
+        contact=found["contact"],
+        owner_name=found["name"],
+    )
+    found["status"] = "approved"
+    found["slug"] = slug
+    APPLICATIONS_FILE.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"slug": slug, "name": meta["name"], "password": password, "store_mode": mode}
+
+
+def save_lead(name: str, store: str, contact: str, message: str = "") -> dict:
+    name = (name or "").strip()
+    store_name = (store or "").strip()
+    contact = (contact or "").strip()
+    note = (message or "").strip()
+    if not name or not store_name or not contact:
+        raise ValueError("Ad, mağaza və əlaqə doldurulmalıdır.")
+    if len(name) > 80 or len(store_name) > 80 or len(contact) > 80 or len(note) > 800:
+        raise ValueError("Mətn çox uzundur.")
+    STORES.mkdir(parents=True, exist_ok=True)
+    rows = json.loads(LEADS_FILE.read_text(encoding="utf-8")) if LEADS_FILE.exists() else []
+    rows.append(
+        {
+            "name": name,
+            "store": store_name,
+            "contact": contact,
+            "message": note,
+            "at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    LEADS_FILE.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"ok": True}
 
 
 def media_path(slug: str, filename: str) -> Path | None:

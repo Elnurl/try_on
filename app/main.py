@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import mimetypes
 import os
 from io import BytesIO
@@ -21,25 +20,39 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
-from app.auth import COOKIE_NAME, check_password, is_authed, session_token
+from app.auth import (
+    COOKIE_NAME,
+    PARTNER_COOKIE,
+    check_password,
+    is_authed,
+    partner_cookie_value,
+    partner_slug,
+    session_token,
+)
 from app.brands import brand_payload, get_brand, list_brands
 from app.catalog import get_catalog, get_frame
 from app.frames import FRAMES_DIR, ensure_frame_assets
 from app.overlay import NoFaceError, overlay_bytes
 from app.vendor_assets import ensure_vendor
+from app.shop import get_product, render_catalog, render_product_page
 from app.store import (
     add_angle,
+    approve_application,
     bump_stat,
+    check_partner_password,
     create_brand,
     delete_frame,
     get_stats,
+    load_applications,
     media_path,
+    public_brand,
+    save_application,
     save_brand_settings,
-    save_order,
+    save_lead,
     save_uploaded_frame,
+    update_brand,
     update_calibration,
     update_domains,
-    update_product_sale,
 )
 
 ROOT = Path(__file__).resolve().parent
@@ -47,6 +60,10 @@ STATIC = ROOT / "static"
 
 mimetypes.add_type("application/javascript", ".mjs")
 mimetypes.add_type("application/wasm", ".wasm")
+mimetypes.add_type("application/octet-stream", ".deepar")
+
+QL2009_EXPORT = ROOT.parent / "assets" / "ql2009" / "export"
+QL2009_PUBLIC = {"QL2009_C1.deepar", "QL2009_C1.glb", "QL2009_C1.fbx"}
 
 ensure_frame_assets()
 ensure_vendor()
@@ -66,12 +83,19 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 async def allow_brand_iframe(request, call_next):
     response = await call_next(request)
     response.headers["Content-Security-Policy"] = "frame-ancestors *"
+    response.headers["Permissions-Policy"] = "camera=*, microphone=*"
     return response
 
 
 def require_admin_api(request: Request) -> None:
     if not is_authed(request):
         raise HTTPException(status_code=401, detail="Giriş tələb olunur: /admin/login")
+
+
+def require_store_access(request: Request, slug: str) -> None:
+    if is_authed(request) or partner_slug(request) == slug:
+        return
+    raise HTTPException(status_code=401, detail="Giriş tələb olunur.")
 
 
 def render_tryon(slug: str, mode: str, sku: str = "") -> str:
@@ -87,20 +111,21 @@ def render_tryon(slug: str, mode: str, sku: str = "") -> str:
 
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
-    return render_tryon("demo", "page")
+    return (STATIC / "landing.html").read_text(encoding="utf-8")
 
 
 @app.get("/t/{slug}", response_class=HTMLResponse)
 def brand_page(slug: str) -> str:
-    """Instagram bio / Taplink landing page."""
+    """Instagram bio / Taplink try-on page."""
     return render_tryon(slug, "page")
 
 
-@app.get("/t/{slug}/cart", response_class=HTMLResponse)
-def brand_cart(slug: str) -> str:
+@app.get("/s/{slug}", response_class=HTMLResponse)
+def storefront(slug: str) -> str:
+    """Hosted catalog for brands without their own website."""
     if get_brand(slug) is None:
         raise HTTPException(status_code=404, detail="Brend tapılmadı.")
-    return (STATIC / "cart.html").read_text(encoding="utf-8").replace("{{SLUG}}", slug)
+    return (STATIC / "storefront.html").read_text(encoding="utf-8").replace("{{SLUG}}", slug)
 
 
 @app.get("/embed", response_class=HTMLResponse)
@@ -130,6 +155,38 @@ def vto_widget() -> FileResponse:
     )
 
 
+@app.get("/shop", response_class=HTMLResponse)
+def glassify_shop() -> str:
+    """Glassify Fittingbox demo catalog. Partner landing stays at /."""
+    return render_catalog((STATIC / "shop.html").read_text(encoding="utf-8"))
+
+
+@app.get("/shop/product/{product_id}", response_class=HTMLResponse)
+def glassify_product_alias(product_id: str) -> RedirectResponse:
+    return RedirectResponse(f"/product/{product_id}", status_code=307)
+
+
+@app.get("/shop/cart", response_class=HTMLResponse)
+def glassify_cart_alias() -> RedirectResponse:
+    return RedirectResponse("/cart", status_code=307)
+
+
+@app.get("/product/{product_id}", response_class=HTMLResponse)
+def glassify_product(product_id: str) -> str:
+    product = get_product(product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Məhsul tapılmadı.")
+    return render_product_page(
+        (STATIC / "shop-product.html").read_text(encoding="utf-8"),
+        product,
+    )
+
+
+@app.get("/cart", response_class=HTMLResponse)
+def glassify_cart() -> str:
+    return (STATIC / "shop-cart.html").read_text(encoding="utf-8")
+
+
 @app.get("/shop-demo", response_class=HTMLResponse)
 def shop_demo() -> str:
     """Fake merchant storefront: one script + SKU buttons."""
@@ -137,8 +194,8 @@ def shop_demo() -> str:
 
 
 @app.get("/for-brands", response_class=HTMLResponse)
-def for_brands() -> str:
-    return (STATIC / "brands.html").read_text(encoding="utf-8")
+def for_brands() -> RedirectResponse:
+    return RedirectResponse("/")
 
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -177,6 +234,102 @@ def api_logout() -> Response:
     return resp
 
 
+@app.get("/partner/login", response_class=HTMLResponse)
+def partner_login_page(request: Request):
+    if partner_slug(request):
+        return RedirectResponse("/partner")
+    return (STATIC / "partner-login.html").read_text(encoding="utf-8")
+
+
+@app.get("/partner", response_class=HTMLResponse)
+def partner_home(request: Request):
+    if not partner_slug(request):
+        return RedirectResponse("/partner/login")
+    return (STATIC / "partner.html").read_text(encoding="utf-8")
+
+
+@app.post("/api/partner/login")
+def api_partner_login(slug: str = Form(...), password: str = Form(...)) -> Response:
+    slug = slug.strip().lower()
+    if get_brand(slug) is None or not check_partner_password(slug, password):
+        raise HTTPException(status_code=401, detail="Mağaza kodu və ya şifrə yanlışdır.")
+    resp = JSONResponse({"ok": True, "slug": slug})
+    resp.set_cookie(
+        PARTNER_COOKIE,
+        partner_cookie_value(slug),
+        httponly=True,
+        samesite="lax",
+        max_age=7 * 24 * 3600,
+    )
+    return resp
+
+
+@app.post("/api/partner/logout")
+def api_partner_logout() -> Response:
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(PARTNER_COOKIE)
+    return resp
+
+
+@app.get("/api/partner/me")
+def api_partner_me(request: Request) -> dict:
+    slug = partner_slug(request)
+    if not slug:
+        raise HTTPException(status_code=401, detail="Giriş tələb olunur.")
+    brand = get_brand(slug)
+    if brand is None:
+        raise HTTPException(status_code=404, detail="Mağaza tapılmadı.")
+    return {
+        "slug": slug,
+        "name": brand["name"],
+        "store_mode": brand.get("store_mode") or "",
+    }
+
+
+@app.post("/api/partner/mode")
+def api_partner_mode(request: Request, store_mode: str = Form(...)) -> dict:
+    slug = partner_slug(request)
+    if not slug:
+        raise HTTPException(status_code=401, detail="Giriş tələb olunur.")
+    if store_mode not in ("own_site", "hosted"):
+        raise HTTPException(status_code=400, detail="Yanlış seçim.")
+    return public_brand(update_brand(slug, store_mode=store_mode))
+
+
+@app.post("/api/applications")
+def api_apply(
+    name: str = Form(...),
+    store: str = Form(...),
+    contact: str = Form(...),
+    has_site: str = Form("no"),
+    message: str = Form(""),
+) -> dict:
+    try:
+        return save_application(name, store, contact, has_site in ("yes", "true", "1"), message)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/applications")
+def api_list_applications(request: Request) -> list[dict]:
+    require_admin_api(request)
+    return load_applications()
+
+
+@app.post("/api/applications/{app_id}/approve")
+def api_approve_application(
+    request: Request,
+    app_id: str,
+    slug: str = Form(...),
+    password: str = Form(...),
+) -> dict:
+    require_admin_api(request)
+    try:
+        return approve_application(app_id, slug, password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.get("/admin/{slug}", response_class=HTMLResponse)
 def admin(slug: str, request: Request):
     if not is_authed(request):
@@ -195,7 +348,7 @@ async def upload_frame(
     brand: str = Form(""),
     file: UploadFile = File(...),
 ) -> dict:
-    require_admin_api(request)
+    require_store_access(request, slug)
     if get_brand(slug) is None:
         raise HTTPException(status_code=404, detail="Brend tapılmadı.")
     data = await file.read()
@@ -223,6 +376,18 @@ def api_brands() -> list[dict]:
     return list_brands()
 
 
+@app.get("/ql2009/{filename}")
+def ql2009_asset(filename: str) -> FileResponse:
+    """Serve the QL2009 C1 production-test 3D / DeepAR files only."""
+    if filename not in QL2009_PUBLIC:
+        raise HTTPException(status_code=404, detail="Fayl yoxdur.")
+    path = QL2009_EXPORT / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="DeepAR effekti hələ export olunmayıb.")
+    media = "model/gltf-binary" if filename.endswith(".glb") else "application/octet-stream"
+    return FileResponse(path, media_type=media, filename=filename)
+
+
 @app.get("/api/tryon-config")
 def tryon_config() -> dict:
     """Client reads this before starting AR. License key is domain-locked by DeepAR."""
@@ -239,6 +404,19 @@ def tryon_config() -> dict:
 def health() -> dict:
     key = bool(os.environ.get("DEEPAR_LICENSE_KEY", "").strip())
     return {"ok": True, "product": "white-label-vto", "engine": "deepar" if key else "overlay"}
+
+
+@app.post("/api/leads")
+def api_leads(
+    name: str = Form(...),
+    store: str = Form(...),
+    contact: str = Form(...),
+    message: str = Form(""),
+) -> dict:
+    try:
+        return save_lead(name, store, contact, message)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/brands")
@@ -259,7 +437,7 @@ def api_calibrate(
     offset_x: float = Form(0.0),
     offset_y: float = Form(-0.1),
 ) -> dict:
-    require_admin_api(request)
+    require_store_access(request, slug)
     if get_brand(slug) is None:
         raise HTTPException(status_code=404, detail="Brend tapılmadı.")
     try:
@@ -275,7 +453,7 @@ async def api_add_angle(
     sku: str,
     file: UploadFile = File(...),
 ) -> dict:
-    require_admin_api(request)
+    require_store_access(request, slug)
     if get_brand(slug) is None:
         raise HTTPException(status_code=404, detail="Brend tapılmadı.")
     data = await file.read()
@@ -292,7 +470,7 @@ async def api_add_angle(
 
 @app.delete("/api/brand/{slug}/frames/{sku}")
 def api_delete_frame(request: Request, slug: str, sku: str) -> dict:
-    require_admin_api(request)
+    require_store_access(request, slug)
     if get_brand(slug) is None:
         raise HTTPException(status_code=404, detail="Brend tapılmadı.")
     try:
@@ -326,7 +504,7 @@ def api_track(slug: str, event: str = Form(...)) -> dict:
 
 @app.get("/api/brand/{slug}/stats")
 def api_stats(request: Request, slug: str) -> dict:
-    require_admin_api(request)
+    require_store_access(request, slug)
     if get_brand(slug) is None:
         raise HTTPException(status_code=404, detail="Brend tapılmadı.")
     return get_stats(slug)
@@ -337,52 +515,18 @@ def api_brand_settings(
     request: Request,
     slug: str,
     accent: str = Form("#1f4d3a"),
-    cart_mode: str = Form("platform"),
+    cart_url: str = Form(""),
 ) -> dict:
-    require_admin_api(request)
+    require_store_access(request, slug)
     try:
-        return save_brand_settings(slug, accent, cart_mode)
+        return save_brand_settings(slug, accent, cart_url)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.post("/api/brand/{slug}/frames/{sku}/sale")
-def api_product_sale(
-    request: Request,
-    slug: str,
-    sku: str,
-    price: str = Form("0"),
-    buy_url: str = Form(""),
-) -> dict:
-    require_admin_api(request)
-    if get_brand(slug) is None:
-        raise HTTPException(status_code=404, detail="Brend tapılmadı.")
-    try:
-        return update_product_sale(slug, sku, price, buy_url)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@app.post("/api/brand/{slug}/orders")
-def api_order(
-    slug: str,
-    name: str = Form(...),
-    phone: str = Form(...),
-    items: str = Form("[]"),
-) -> dict:
-    if get_brand(slug) is None:
-        raise HTTPException(status_code=404, detail="Brend tapılmadı.")
-    try:
-        parsed = json.loads(items)
-        if not isinstance(parsed, list):
-            raise ValueError("Səbət formatı yanlışdır.")
-        return save_order(slug, name, phone, parsed)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=400, detail="Səbət oxunmadı.") from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+@app.post("/api/brand/{slug}/domains")
 def api_domains(request: Request, slug: str, domains: str = Form("")) -> dict:
-    require_admin_api(request)
+    require_store_access(request, slug)
     try:
         return {"allowed_domains": update_domains(slug, domains)}
     except ValueError as exc:

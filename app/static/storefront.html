@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mağaza</title>
+    <link rel="stylesheet" href="/static/site.css?v=2" />
+  </head>
+  <body class="site" data-slug="{{SLUG}}">
+    <header class="topbar">
+      <a class="brand-lockup" href="/s/{{SLUG}}">
+        <span class="brand-mark" aria-hidden="true">✦</span>
+        <span id="brand-name">Mağaza</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#catalog">Eynəklər</a>
+        <a href="/t/{{SLUG}}">Virtual sına</a>
+      </nav>
+      <a class="pill pill-dark" id="cart-link" hidden href="#">Səbət</a>
+    </header>
+
+    <section class="store-hero wrap">
+      <h1 id="hero-title">Eynəklər</h1>
+      <p id="hero-tag">Üzündə sınayın — kamera yalnız brauzerdə işləyir.</p>
+      <div class="chips">
+        <span class="chip">Hamısı</span>
+        <span class="chip">Virtual sına</span>
+      </div>
+    </section>
+
+    <section class="wrap grid-shop" id="catalog"></section>
+
+    <script src="/static/storefront.js?v=1"></script>
+  </body>
+</html>

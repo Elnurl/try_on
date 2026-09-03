@@ -4,12 +4,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Virtual Try-On</title>
-    <link rel="stylesheet" href="/static/styles.css?v=6" />
+    <link rel="stylesheet" href="/static/styles.css?v=8" />
   </head>
   <body data-slug="{{SLUG}}" data-mode="{{MODE}}" data-sku="{{SKU}}" class="studio">
     <div class="studio-shell">
       <section class="studio-stage">
-        <span class="studio-mark" id="studio-mark">VTO</span>
+        <span class="studio-mark">VTO Studio</span>
         <video id="camera" playsinline muted autoplay></video>
         <canvas id="stage"></canvas>
         <div id="ar-preview" class="ar-preview" hidden></div>
@@ -26,7 +26,7 @@
             Şəkil
           </label>
         </div>
-        <button id="add-cart" type="button" class="cart-btn">Səbətə at</button>
+        <button id="add-cart" type="button" class="cart-btn" hidden>Səbətə at</button>
       </section>
 
       <aside class="studio-rail">
@@ -61,6 +61,6 @@
         </div>
       </div>
     </div>
-    <script type="module" src="/static/live.js?v=9"></script>
+    <script type="module" src="/static/live.js?v=10"></script>
   </body>
 </html>

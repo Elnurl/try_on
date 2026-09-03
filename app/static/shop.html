@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kataloq | Glassify.az</title>
+    <link rel="stylesheet" href="/static/shop.css?v=1" />
+  </head>
+  <body class="g-body">
+    <header class="g-header">
+      <div class="g-header-inner">
+        <a class="g-logo" href="/shop">Glassify<span>.az</span></a>
+        <nav class="g-nav">
+          <a href="/shop">Kataloq</a>
+        </nav>
+        <a class="g-cart-link" href="/cart" aria-label="Səbət">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+          </svg>
+          Səbət
+          <span class="g-cart-count" data-cart-count>0</span>
+        </a>
+      </div>
+    </header>
+    <main class="g-main">
+      <div class="g-wrap">
+        <section class="g-hero">
+          <p class="kicker">Virtual Try-On</p>
+          <h1>Eynəyi üzünüzdə görün — <span>evdən çıxmadan.</span></h1>
+          <p class="lede">Kameranız vasitəsilə istənilən çərçivəni real vaxtda sınayın. Satın almadan əvvəl.</p>
+          <a href="#catalog">Kataloqa bax</a>
+        </section>
+        <section id="catalog">
+          <h2 class="g-section-title">Məhsullar</h2>
+          <div class="g-grid">{{PRODUCT_CARDS}}</div>
+        </section>
+        <section class="g-how">
+          <h3>Virtual Try-On necə işləyir?</h3>
+          <p>Məhsulun üzərinə klikləyin → <strong>Üzümdə yoxla</strong> düyməsini basın → kameraya icazə verin → eynəyi üzünüzdə görün.</p>
+        </section>
+      </div>
+    </main>
+    <footer class="g-footer">
+      <strong>Glassify.az</strong>
+      <p>Virtual Try-On texnologiyası ilə eynəyinizi evdən seçin.</p>
+      <p style="margin-top:12px;font-size:12px;color:#a1a1aa">© 2026 Glassify. Bütün hüquqlar qorunur.</p>
+    </footer>
+    <script src="/static/shop.js?v=1"></script>
+  </body>
+</html>

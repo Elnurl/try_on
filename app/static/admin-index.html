@@ -3,59 +3,104 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>VTO — brendlər</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <title>Platforma — VTO Studio</title>
+    <link rel="stylesheet" href="/static/styles.css?v=9" />
   </head>
   <body>
     <main>
       <header>
-        <p class="eyebrow">White-label panel</p>
-        <h1>Brendlər</h1>
+        <p class="eyebrow">VTO Studio · sizin paneliniz</p>
+        <h1>Müraciətlər və mağazalar</h1>
         <p class="lede">
-          1) Aşağıda brend yaradın. 2) «Kataloq»a girin. 3) Eynək PNG-sini yükləyin.
-          Müştəri try-on: <a href="/t/demo">/t/demo</a>
+          Partnyor müraciət göndərir. Siz mağazanı açır və ona kod ilə şifrə
+          verirsiniz.
         </p>
       </header>
-      <section class="panel">
-        <form id="create" class="admin-form">
-          <label>Slug <input name="slug" required placeholder="baku-optik" /></label>
-          <label>Ad <input name="name" required placeholder="Baku Optik" /></label>
-          <button class="copy" type="submit">Brend yarat</button>
-        </form>
-        <p id="msg" class="status" hidden></p>
-      </section>
+
       <section>
-        <h2 class="h2">Mağazalar</h2>
+        <h2 class="h2">Gözləyən müraciətlər</h2>
+        <p id="ok" class="status" hidden></p>
+        <div id="apps"></div>
+      </section>
+
+      <section>
+        <h2 class="h2">Açıq mağazalar</h2>
         <div id="list"></div>
       </section>
     </main>
     <script>
+      function escapeHtml(text) {
+        return String(text)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;");
+      }
       async function refresh() {
+        const apps = await (await fetch("/api/applications")).json();
+        const pending = apps.filter((row) => row.status === "pending");
+        document.querySelector("#apps").innerHTML = pending.length
+          ? pending
+              .map(
+                (row) => `
+          <article class="panel" data-id="${row.id}">
+            <strong>${escapeHtml(row.store)}</strong>
+            <p>${escapeHtml(row.name)} · ${escapeHtml(row.contact)}</p>
+            <p>${row.has_site ? "Öz saytı var" : "Saytı yoxdur"}</p>
+            <p>${escapeHtml(row.message || "")}</p>
+            <form class="admin-form approve">
+              <label>Mağaza kodu <input name="slug" required value="${escapeHtml(row.suggested_slug)}" /></label>
+              <label>Partnyor şifrəsi <input name="password" required minlength="6" placeholder="ən azı 6 simvol" /></label>
+              <button class="copy" type="submit">Mağazanı aç</button>
+            </form>
+            <p class="status" hidden></p>
+          </article>`
+              )
+              .join("")
+          : "<p class='lede'>Gözləyən müraciət yoxdur.</p>";
+        document.querySelectorAll(".approve").forEach((form) => {
+          form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const card = form.closest("[data-id]");
+            const fd = new FormData(form);
+            const body = new URLSearchParams({
+              slug: fd.get("slug"),
+              password: fd.get("password"),
+            });
+            const res = await fetch("/api/applications/" + card.dataset.id + "/approve", {
+              method: "POST",
+              body,
+            });
+            const msg = card.querySelector(".status");
+            msg.hidden = false;
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({ detail: "Açılmadı" }));
+              msg.textContent = err.detail || "Açılmadı.";
+              return;
+            }
+            const data = await res.json();
+            const ok = document.querySelector("#ok");
+            ok.hidden = false;
+            ok.style.color = "var(--accent)";
+            ok.textContent =
+              data.name +
+              " açıldı. Partnyora deyin: mağaza kodu «" +
+              data.slug +
+              "», şifrə «" +
+              data.password +
+              "». Giriş ünvanı: /partner/login";
+            refresh();
+          });
+        });
         const brands = await (await fetch("/api/brands")).json();
         document.querySelector("#list").innerHTML = brands
           .map(
             (b) =>
-              `<article class="panel"><strong>${b.name}</strong> · <code>${b.slug}</code><p><a href="/admin/${b.slug}">Kataloq</a> · <a href="/t/${b.slug}">Try-on</a></p></article>`
+              `<article class="panel"><strong>${escapeHtml(b.name)}</strong> · <code>${escapeHtml(b.slug)}</code>
+              <p>${b.store_mode === "own_site" ? "Öz saytı var" : b.store_mode === "hosted" ? "Saytı yoxdur" : "Yol seçilməyib"}</p>
+              <p><a href="/t/${encodeURIComponent(b.slug)}">Try-on</a> · <a href="/admin/${encodeURIComponent(b.slug)}">Ətraflı kataloq</a></p></article>`
           )
           .join("");
       }
-      document.querySelector("#create").addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const fd = new FormData(e.target);
-        const res = await fetch("/api/brands", { method: "POST", body: fd });
-        const msg = document.querySelector("#msg");
-        msg.hidden = false;
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ detail: "Xəta" }));
-          msg.textContent = err.detail || "Yaradılmadı";
-          return;
-        }
-        const brand = await res.json();
-        msg.style.color = "var(--accent)";
-        msg.textContent = brand.slug + " yaradıldı.";
-        e.target.reset();
-        refresh();
-      });
       refresh();
     </script>
   </body>

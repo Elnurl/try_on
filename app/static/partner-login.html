@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mağaza girişi — VTO Studio</title>
+    <link rel="stylesheet" href="/static/styles.css?v=9" />
+  </head>
+  <body>
+    <main style="max-width: 420px">
+      <header>
+        <p class="eyebrow"><a href="/">VTO Studio</a></p>
+        <h1>Mağaza paneli</h1>
+        <p class="lede">
+          Sizə göndərilən mağaza kodunu və şifrəni yazın.
+        </p>
+      </header>
+      <section class="panel">
+        <form id="login" class="admin-form">
+          <label>Mağaza kodu <input name="slug" required placeholder="baku-optik" /></label>
+          <label>Şifrə <input name="password" type="password" required /></label>
+          <button class="copy" type="submit">Daxil ol</button>
+        </form>
+        <p id="msg" class="status" hidden></p>
+      </section>
+    </main>
+    <script>
+      document.querySelector("#login").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const body = new URLSearchParams(new FormData(e.target));
+        const res = await fetch("/api/partner/login", { method: "POST", body });
+        if (res.ok) {
+          location.href = "/partner";
+          return;
+        }
+        const msg = document.querySelector("#msg");
+        msg.hidden = false;
+        msg.textContent = "Mağaza kodu və ya şifrə yanlışdır.";
+      });
+    </script>
+  </body>
+</html>

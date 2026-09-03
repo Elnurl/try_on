@@ -24,7 +24,6 @@ const productBrand = document.querySelector("#product-brand");
 const lensesEl = document.querySelector("#lenses");
 const addCart = document.querySelector("#add-cart");
 const closeBtn = document.querySelector("#close");
-const markEl = document.querySelector("#studio-mark");
 const arPreview = document.querySelector("#ar-preview");
 
 let engine = null;
@@ -166,12 +165,14 @@ async function loadBrand() {
   if (data.accent) {
     document.documentElement.style.setProperty("--accent", data.accent);
   }
+  if (addCart) {
+    addCart.hidden = !(data.cart_url || "").trim();
+  }
   if (!catalog.length) {
     setStatus("Bu mağazada hələ eynək yoxdur. Brend paneldən yükləsin.");
     return;
   }
   if (privacyEl) privacyEl.textContent = data.privacy;
-  if (markEl) markEl.textContent = (data.name || "VTO").slice(0, 18);
   const wanted = body.dataset.sku || new URLSearchParams(location.search).get("sku");
   selected = catalog.find((item) => item.id === wanted) || catalog[0];
   lensColor = null;
@@ -353,43 +354,12 @@ function snapshot() {
 }
 
 function addToCart() {
-  if (!selected) return;
+  const url = ((brandMeta && brandMeta.cart_url) || "").trim();
+  if (!url) return;
   track("click");
-  const buyUrl = (selected.buy_url || "").trim();
-  const payload = {
-    type: "vto-add-to-cart",
-    sku: selected.id,
-    brand: slug,
-    name: selected.name,
-    price: selected.price || 0,
-    buy_url: buyUrl,
-  };
-  window.parent.postMessage(payload, "*");
-  if (buyUrl) {
-    if (mode === "embed") return;
-    location.href = buyUrl;
-    return;
-  }
-  const key = "tryon-cart-" + slug;
-  let items = [];
-  try {
-    items = JSON.parse(localStorage.getItem(key) || "[]");
-  } catch {
-    items = [];
-  }
-  const found = items.find((row) => row.id === selected.id);
-  if (found) found.qty += 1;
-  else {
-    items.push({
-      id: selected.id,
-      name: selected.model || selected.name,
-      price: selected.price || 0,
-      qty: 1,
-    });
-  }
-  localStorage.setItem(key, JSON.stringify(items));
+  window.parent.postMessage({ type: "vto-add-to-cart", cart_url: url, brand: slug }, "*");
   if (mode === "embed") return;
-  location.href = "/t/" + slug + "/cart";
+  location.href = url;
 }
 
 async function renderPhoto() {

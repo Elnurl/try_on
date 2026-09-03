@@ -18,6 +18,7 @@ from fastapi import Request
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 COOKIE_NAME = "vto_admin"
+PARTNER_COOKIE = "vto_partner"
 _SESSION_SECRET = secrets.token_bytes(32)
 
 if not ADMIN_PASSWORD:
@@ -42,3 +43,21 @@ def is_authed(request: Request) -> bool:
     if not auth_enabled():
         return True
     return hmac.compare_digest(request.cookies.get(COOKIE_NAME, ""), session_token())
+
+
+def partner_token(slug: str) -> str:
+    return hmac.new(_SESSION_SECRET, f"partner:{slug}".encode(), sha256).hexdigest()
+
+
+def partner_cookie_value(slug: str) -> str:
+    return f"{slug}.{partner_token(slug)}"
+
+
+def partner_slug(request: Request) -> str | None:
+    raw = request.cookies.get(PARTNER_COOKIE, "")
+    if "." not in raw:
+        return None
+    slug, token = raw.rsplit(".", 1)
+    if not slug or not hmac.compare_digest(token, partner_token(slug)):
+        return None
+    return slug

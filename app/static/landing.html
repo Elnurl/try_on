@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VTO Studio — optika mağazaları üçün virtual sınaq</title>
+    <link rel="stylesheet" href="/static/styles.css?v=9" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">VTO Studio</p>
+        <h1>Müştəriniz eynəyi üzdə görsün</h1>
+        <p class="lede">
+          Biz optika mağazalarına virtual eynək sınağı veririk. Siz partnyor
+          olursunuz. Müştəri kameraya baxır və seçdiyi çərçivə üzündə görünür.
+        </p>
+      </header>
+
+      <section class="split">
+        <article class="panel">
+          <h2 class="h2">Öz saytınız varsa</h2>
+          <p class="lede">
+            Sizə bir sətir kod veririk. Kodu öz saytınıza qoyursunuz. Səbət və
+            əlaqə sizin saytınızda qalır. Bizim işimiz yalnız sınaqdır.
+          </p>
+        </article>
+        <article class="panel">
+          <h2 class="h2">Saytınız yoxdursa</h2>
+          <p class="lede">
+            Eynək şəkillərinizi buraya yükləyirsiniz. Biz sizə hazır sınaq
+            səhifəsi və QR kod veririk. Müştəri o linkdən eynəyi sınayır.
+          </p>
+        </article>
+      </section>
+
+      <section class="panel" id="partnyor">
+        <h2 class="h2">Partnyor ol</h2>
+        <p class="lede">
+          Müraciəti bizə göndərin. Biz mağazanızı açırıq və sizə giriş
+          məlumatını göndəririk. Özünüz qeydiyyatdan keçmirsiniz.
+        </p>
+        <form id="apply" class="admin-form">
+          <label>Adınız <input name="name" required placeholder="Elnur" /></label>
+          <label>Mağaza adı <input name="store" required placeholder="Baku Optik" /></label>
+          <label>Telefon və ya Instagram <input name="contact" required placeholder="+994 50 123 45 67" /></label>
+          <label>
+            Mağazanızın saytı varmı?
+            <select name="has_site" required>
+              <option value="no">Xeyr, saytım yoxdur</option>
+              <option value="yes">Bəli, öz saytım var</option>
+            </select>
+          </label>
+          <label>Qısa qeyd (istəyə bağlı) <textarea name="message" rows="3" placeholder="Neçə eynəyiniz var, harada yerləşirsiniz..."></textarea></label>
+          <button class="copy" type="submit">Müraciəti göndər</button>
+        </form>
+        <p id="msg" class="status" hidden></p>
+      </section>
+
+      <p class="lede">Partnyorsunuzsa: <a href="/partner/login">mağaza panelinə giriş</a></p>
+      <p class="lede">Fittingbox demo mağaza: <a href="/shop">Glassify kataloqu</a></p>
+    </main>
+    <script>
+      document.querySelector("#apply").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const body = new URLSearchParams({
+          name: fd.get("name"),
+          store: fd.get("store"),
+          contact: fd.get("contact"),
+          has_site: fd.get("has_site"),
+          message: fd.get("message") || "",
+        });
+        const res = await fetch("/api/applications", { method: "POST", body });
+        const msg = document.querySelector("#msg");
+        msg.hidden = false;
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: "Göndərilmədi" }));
+          msg.style.color = "";
+          msg.textContent = err.detail || "Göndərilmədi.";
+          return;
+        }
+        msg.style.color = "var(--accent)";
+        msg.textContent = "Müraciətiniz çatdı. Tezliklə sizinlə əlaqə saxlayacağıq.";
+        e.target.reset();
+      });
+    </script>
+  </body>
+</html>

@@ -3,94 +3,50 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Demo Optika — mağaza saytı</title>
-    <style>
-      body {
-        margin: 0;
-        font-family: "Segoe UI", system-ui, sans-serif;
-        background: #f7f4ee;
-        color: #1c1916;
-      }
-      header {
-        padding: 24px 20px 8px;
-        max-width: 960px;
-        margin: 0 auto;
-      }
-      h1 {
-        margin: 0 0 8px;
-        font-size: 28px;
-      }
-      p {
-        color: #6b645c;
-      }
-      .grid {
-        max-width: 960px;
-        margin: 0 auto;
-        padding: 12px 20px 48px;
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 16px;
-      }
-      article {
-        background: #fff;
-        border: 1px solid #ddd6cb;
-        border-radius: 12px;
-        padding: 16px;
-      }
-      article img {
-        width: 100%;
-        height: 72px;
-        object-fit: contain;
-      }
-      button.try-on-btn {
-        margin-top: 12px;
-        width: 100%;
-        border: 0;
-        background: #1f4d3a;
-        color: #fff;
-        padding: 10px;
-        border-radius: 8px;
-        font-weight: 600;
-        cursor: pointer;
-      }
-    </style>
+    <title>Demo Optika — brendin öz saytı</title>
+    <link rel="stylesheet" href="/static/site.css?v=2" />
     <script src="/vto-widget.js" data-store-id="demo"></script>
   </head>
-  <body>
-    <header>
-      <p style="letter-spacing: 0.08em; font-size: 12px; text-transform: uppercase">
-        Brendin öz saytı (simulyasiya)
-      </p>
-      <h1>Demo Optika</h1>
-      <p>
-        Bu, sizin platformanız deyil — müştərinin WooCommerce/Shopify səhifəsidir.
-        Yalnız 1 skript + düymə əlavə olunub.
-      </p>
+  <body class="site">
+    <header class="topbar">
+      <span class="brand-lockup"><span class="brand-mark">✦</span> Demo Optika</span>
+      <nav class="nav-links">
+        <a href="#catalog">Eynəklər</a>
+        <span>Bu səhifə brendin öz saytının simulyasiyasıdır</span>
+      </nav>
     </header>
-    <section class="grid">
-      <article>
+    <section class="store-hero wrap">
+      <h1>Eynəklər</h1>
+      <p>Yalnız 1 skript + «Virtual sına» düyməsi əlavə olunub. Səbət bu saytındadır — bizim işimiz deyil.</p>
+      <div class="chips">
+        <span class="chip">Eyeglasses</span>
+        <span class="chip">Virtual sına</span>
+      </div>
+    </section>
+    <section class="wrap grid-shop" id="catalog">
+      <article class="sku-card">
         <img src="/frames/round-black.png" alt="" />
-        <h2>Round Black</h2>
-        <p>89 AZN</p>
-        <button class="try-on-btn" data-sku="round-black">Virtual sına</button>
+        <h2>RB-01</h2>
+        <p>Demo Optika</p>
+        <button class="pill pill-dark try-on-btn" data-sku="round-black">Virtual sına</button>
       </article>
-      <article>
+      <article class="sku-card">
         <img src="/frames/aviator-gold.png" alt="" />
-        <h2>Aviator Gold</h2>
-        <p>120 AZN</p>
-        <button class="try-on-btn" data-sku="aviator-gold">Virtual sına</button>
+        <h2>AV-3025</h2>
+        <p>Demo Optika</p>
+        <button class="pill pill-dark try-on-btn" data-sku="aviator-gold">Virtual sına</button>
       </article>
-      <article>
+      <article class="sku-card">
         <img src="/frames/cat-eye.png" alt="" />
-        <h2>Cat Eye</h2>
-        <p>95 AZN</p>
-        <button class="try-on-btn" data-sku="cat-eye">Virtual sına</button>
+        <h2>CE-08</h2>
+        <p>Demo Optika</p>
+        <button class="pill pill-dark try-on-btn" data-sku="cat-eye">Virtual sına</button>
       </article>
-      <article>
+      <article class="sku-card">
         <img src="/frames/slim-metal.png" alt="" />
-        <h2>Slim Metal</h2>
-        <p>75 AZN</p>
-        <button class="try-on-btn" data-sku="slim-metal">Virtual sına</button>
+        <h2>SM-7</h2>
+        <p>Demo Optika</p>
+        <button class="pill pill-dark try-on-btn" data-sku="slim-metal">Virtual sına</button>
       </article>
     </section>
   </body>
