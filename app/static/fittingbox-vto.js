@@ -4,6 +4,8 @@
   const CONTAINER_ID = "fitmix-container";
   const INIT_ERROR =
     "Virtual Try-On yüklənmədi. Browser-i yeniləyib yenidən cəhd edin.";
+  const MISSING_KEY_ERROR =
+    "Fittingbox açarı serverdə yoxdur. Render Dashboard → tryon-wa → Environment → FITTINGBOX_API_KEY əlavə edin. Dəyər lokal vto-test/.env.local faylındakı NEXT_PUBLIC_FITTINGBOX_API_KEY ilə eyni olmalıdır.";
   const CAMERA_ERROR =
     "Kamera icazəsi verilmədi. Virtual Try-On üçün kamera icazəsi lazımdır.";
 
@@ -186,7 +188,7 @@
 
   async function initWidget() {
     if (!apiKey) {
-      setError(INIT_ERROR);
+      setError(MISSING_KEY_ERROR);
       setStatus("");
       startBtn.disabled = true;
       console.error("[Fittingbox] API key is missing.");
