@@ -541,11 +541,13 @@ button {
   display: flex;
   flex-direction: column;
   background: #000;
+  opacity: 0;
+  pointer-events: none;
 }
 
-#vto-overlay[aria-hidden="true"] {
-  visibility: hidden;
-  pointer-events: none;
+#vto-overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .vto-shell {
@@ -588,14 +590,17 @@ button {
 
 .vto-stage {
   position: relative;
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 auto;
+  width: 100%;
+  height: calc(100dvh - 72px);
+  min-height: 640px;
 }
 
 #fitmix-container,
 #fitmix-container iframe {
+  display: block;
   width: 100%;
-  height: 100%;
+  height: 640px;
   min-height: 640px;
   border: 0;
 }
