@@ -10,17 +10,16 @@
   const cfg = window.FITTINGBOX || {};
   const apiKey = cfg.apiKey || "";
   const frameId = cfg.frameId || "";
-  const destinationUrl = cfg.destinationUrl || "";
 
   const startBtn = document.querySelector("[data-start-vto]");
   const statusEl = document.querySelector("[data-vto-status]");
   const errorEl = document.querySelector("[data-vto-error]");
   const overlay = document.getElementById("vto-overlay");
   const closeBtn = document.querySelector("[data-stop-vto]");
-  const standardFrame = document.getElementById("vto-standard-frame");
+  const waitEl = document.querySelector("[data-vto-wait]");
   const container = document.getElementById(CONTAINER_ID);
 
-  if (!startBtn) return;
+  if (!startBtn || !overlay || !container) return;
 
   let instance = null;
   let ready = false;
@@ -39,21 +38,20 @@
   }
 
   function showOverlay() {
-    if (!overlay) return;
+    overlay.hidden = false;
     overlay.style.visibility = "visible";
     overlay.setAttribute("aria-hidden", "false");
   }
 
   function hideOverlay() {
-    if (!overlay) return;
     overlay.style.visibility = "hidden";
     overlay.setAttribute("aria-hidden", "true");
-    startBtn.disabled = !ready && !destinationUrl;
+    if (waitEl) waitEl.hidden = true;
+    startBtn.disabled = !ready;
   }
 
-  function allowCameraOnIframe(root) {
-    if (!root) return;
-    const iframe = root.querySelector("iframe");
+  function allowCameraOnIframe() {
+    const iframe = container.querySelector("iframe");
     if (!iframe) return;
     iframe.setAttribute("allow", "camera; microphone; autoplay");
     iframe.setAttribute("allowfullscreen", "true");
@@ -86,41 +84,70 @@
     }
   }
 
-  function initStandard() {
-    if (!standardFrame || !overlay) {
+  async function requestPageCameraAccess() {
+    if (!navigator.mediaDevices?.getUserMedia) return false;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream.getTracks().forEach((track) => track.stop());
+      return true;
+    } catch (err) {
+      console.warn("[Fittingbox] page camera request failed", err);
+      return false;
+    }
+  }
+
+  async function startVto() {
+    setError("");
+    userClosing = false;
+    if (!ready || !instance) {
       setError(INIT_ERROR);
       return;
     }
-    standardFrame.hidden = false;
-    standardFrame.src = destinationUrl;
-    if (container) container.hidden = true;
-    startBtn.disabled = false;
-    setStatus("Üzümdə yoxla — canlı kamera açılacaq.");
-    startBtn.addEventListener("click", () => {
-      setError("");
-      showOverlay();
-    });
-    closeBtn?.addEventListener("click", () => {
+    showOverlay();
+    allowCameraOnIframe();
+    startBtn.disabled = true;
+    if (waitEl) waitEl.hidden = false;
+    await requestPageCameraAccess();
+    try {
+      if (frameId) instance.setFrame(frameId);
+      instance.startVto("live");
+    } catch (err) {
+      console.error("[Fittingbox] startVto failed", err);
       hideOverlay();
-    });
+      setError(INIT_ERROR);
+    }
   }
 
-  function initAdvanced() {
+  function stopVto() {
+    userClosing = true;
+    if (!instance) {
+      hideOverlay();
+      return;
+    }
+    try {
+      instance.stopVto();
+    } catch (err) {
+      console.error("[Fittingbox] stopVto failed", err);
+      hideOverlay();
+    }
+  }
+
+  function initWidget() {
     if (!apiKey) {
       setError(MISSING_KEY_ERROR);
       setStatus("");
       startBtn.disabled = true;
       return;
     }
-    if (!window.FitMix || !container) {
+    if (!window.FitMix) {
       setError(INIT_ERROR);
       setStatus("");
       startBtn.disabled = true;
       return;
     }
-    if (standardFrame) standardFrame.hidden = true;
+
     setStatus("Canlı kamera hazırlanır…");
-    const observer = new MutationObserver(() => allowCameraOnIframe(container));
+    const observer = new MutationObserver(allowCameraOnIframe);
     observer.observe(container, { childList: true, subtree: true });
 
     instance = window.FitMix.createWidget(
@@ -130,12 +157,6 @@
         frame: frameId,
         width: 400,
         height: 640,
-        popupIntegration: {
-          centeredHorizontal: true,
-          centeredVertical: true,
-          width: 400,
-          height: 640,
-        },
         uiConfiguration: {
           cameraPermissionScreen: true,
           liveCameraAccessDenied: true,
@@ -143,9 +164,13 @@
         },
         onIssue: handleIssue,
         onOpenStream: (value) => {
+          if (waitEl) waitEl.hidden = true;
+          startBtn.disabled = false;
           if (!value.success) setError(CAMERA_ERROR);
         },
         onStopVto: () => {
+          if (waitEl) waitEl.hidden = true;
+          startBtn.disabled = false;
           if (userClosing) {
             userClosing = false;
             hideOverlay();
@@ -154,38 +179,17 @@
       },
       () => {
         if (frameId) instance.setFrame(frameId);
-        allowCameraOnIframe(container);
+        allowCameraOnIframe();
         ready = true;
         startBtn.disabled = false;
         setStatus("Üzümdə yoxla — canlı kamera açılacaq.");
       },
     );
-
-    startBtn.addEventListener("click", () => {
-      setError("");
-      userClosing = false;
-      if (!ready || !instance) {
-        setError(INIT_ERROR);
-        return;
-      }
-      allowCameraOnIframe(container);
-      if (frameId) instance.setFrame(frameId);
-      instance.startVto("live");
-    });
-
-    closeBtn?.addEventListener("click", () => {
-      userClosing = true;
-      if (!instance) {
-        hideOverlay();
-        return;
-      }
-      instance.stopVto();
-    });
   }
 
-  if (destinationUrl) {
-    initStandard();
-    return;
-  }
-  initAdvanced();
+  startBtn.addEventListener("click", () => {
+    void startVto();
+  });
+  closeBtn?.addEventListener("click", stopVto);
+  initWidget();
 })();
