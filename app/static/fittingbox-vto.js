@@ -57,8 +57,8 @@
     iframe.setAttribute("allow", "camera; microphone; autoplay");
     iframe.setAttribute("allowfullscreen", "true");
     iframe.style.width = "100%";
-    iframe.style.height = "640px";
-    iframe.style.minHeight = "640px";
+    iframe.style.height = "100%";
+    iframe.style.minHeight = "100%";
     iframe.style.border = "0";
     return true;
   }
@@ -115,8 +115,6 @@
       {
         apiKey,
         frame: frameId,
-        width: 400,
-        height: 640,
         uiConfiguration: {
           cameraPermissionScreen: true,
           liveCameraAccessDenied: true,
@@ -147,10 +145,11 @@
       },
       () => {
         ready = true;
-        if (frameId) instance.setFrame(frameId);
+        if (frameId) widget.setFrame(frameId);
         allowCameraOnIframe();
       },
     );
+    return widget;
   }
 
   function waitUntilReady() {
