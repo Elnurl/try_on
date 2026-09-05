@@ -534,8 +534,16 @@ button {
   color: var(--g-ink);
 }
 
-#fitmix-container {
-  display: none;
+#vto-layer {
+  position: fixed;
+  z-index: 1000;
+  top: 50%;
+  left: 50%;
+  width: min(960px, 94vw);
+  height: min(640px, 86vh);
+  transform: translate(-50%, -50%);
+  visibility: hidden;
+  pointer-events: none;
 }
 
 body.vto-open::before {
@@ -546,9 +554,39 @@ body.vto-open::before {
   background: rgba(8, 12, 28, 0.72);
 }
 
-.frameContainer {
-  background: #fff !important;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35) !important;
+body.vto-open #vto-layer {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+#fitmix-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
+#fitmix-container iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: 0;
+}
+
+.vto-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1001;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: #18181b;
+  font-size: 22px;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 @media (min-width: 640px) {

@@ -1,5 +1,7 @@
 (() => {
   const startBtn = document.querySelector("[data-start-vto]");
+  const closeBtn = document.querySelector("[data-close-vto]");
+  const layer = document.querySelector("#vto-layer");
   const statusEl = document.querySelector("[data-vto-status]");
   const errorEl = document.querySelector("[data-vto-error]");
   const cfg = window.FITTINGBOX || {};
@@ -23,22 +25,17 @@
     statusEl.textContent = message || "";
   }
 
-  function popupSize() {
-    const widthPx = Math.max(
-      400,
-      Math.round(Math.min(window.innerWidth * 0.72, window.innerWidth - 32)),
-    );
-    const heightPx = Math.max(
-      480,
-      Math.round(Math.min(window.innerHeight * 0.82, window.innerHeight - 32)),
-    );
-    return { width: `${widthPx}px`, height: `${heightPx}px` };
+  function setOpen(open) {
+    document.body.classList.toggle("vto-open", open);
+    if (layer) layer.setAttribute("aria-hidden", open ? "false" : "true");
+    startBtn.disabled = open;
   }
 
-  function resetPrivacy() {
-    if (widget && typeof widget.resetDisclaimer === "function") {
-      widget.resetDisclaimer();
-    }
+  function allowCamera() {
+    const iframe = document.querySelector("#fitmix-container iframe");
+    if (!iframe) return;
+    iframe.setAttribute("allow", "camera; microphone; autoplay; fullscreen");
+    iframe.setAttribute("allowfullscreen", "true");
   }
 
   if (!apiKey) {
@@ -55,20 +52,12 @@
     return;
   }
 
-  const size = popupSize();
-
   widget = window.FitMix.createWidget(
     "fitmix-container",
     {
       apiKey,
       frame: frameId,
       lang: "en",
-      popupIntegration: {
-        centeredHorizontal: true,
-        centeredVertical: true,
-        width: size.width,
-        height: size.height,
-      },
       uiConfiguration: {
         cameraPermissionScreen: true,
         liveCameraAccessDenied: true,
@@ -82,13 +71,14 @@
         setStatus("Şərtlər qəbul edildi. Kamera açılacaq.");
       },
       onDisagreePrivacyTerms: () => {
-        document.body.classList.remove("vto-open");
-        startBtn.disabled = false;
+        setOpen(false);
         setStatus("Şərtlər qəbul edilmədi. Yenidən Üzümdə yoxla basın.");
       },
       onOpenStream: (value) => {
         if (value && value.success) {
           setStatus("Kamera açıqdır.");
+        } else {
+          setError("Kamera açıla bilmədi.");
         }
       },
       onIssue: (data) => {
@@ -99,20 +89,30 @@
           setError("Fittingbox lisenziyası bu domen üçün keçərli deyil.");
         } else if (data.frameNotFound) {
           setError("Bu eynək Fittingbox kataloqunda tapılmadı.");
+        } else if (data.liveIncompatibleBrowser || data.liveIncompatibleOS) {
+          setError("Bu brauzer Fittingbox canlı kamera ilə uyğun deyil.");
+        } else if (data.serverNotResponding || data.protocolFailed) {
+          setError("Fittingbox serverə qoşula bilmədi.");
         }
       },
       onStopVto: () => {
-        document.body.classList.remove("vto-open");
-        startBtn.disabled = false;
+        setOpen(false);
         setStatus("Üzümdə yoxla — canlı kamera açılacaq.");
       },
     },
-    () => {
+    (liveSupported) => {
       ready = true;
-      resetPrivacy();
+      allowCamera();
       if (frameId) widget.setFrame(frameId);
+      if (typeof widget.resetDisclaimer === "function") {
+        widget.resetDisclaimer();
+      }
       startBtn.disabled = false;
-      setStatus("Üzümdə yoxla — canlı kamera açılacaq.");
+      if (liveSupported === false) {
+        setError("Fittingbox bu brauzerdə canlı kameranı dəstəkləmir.");
+      } else {
+        setStatus("Üzümdə yoxla — canlı kamera açılacaq.");
+      }
     },
   );
 
@@ -122,10 +122,17 @@
       return;
     }
     setError("");
-    resetPrivacy();
-    document.body.classList.add("vto-open");
+    setOpen(true);
     setStatus("Pəncərə açılır. Ağ şərtlər ekranını gözləyin.");
+    allowCamera();
     if (frameId) widget.setFrame(frameId);
     widget.startVto("live");
   });
+
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      if (widget) widget.stopVto();
+      setOpen(false);
+    });
+  }
 })();
