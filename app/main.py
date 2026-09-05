@@ -34,7 +34,15 @@ from app.catalog import get_catalog, get_frame
 from app.frames import FRAMES_DIR, ensure_frame_assets
 from app.overlay import NoFaceError, overlay_bytes
 from app.vendor_assets import ensure_vendor
-from app.shop import get_product, render_catalog, render_product_page
+from app.shop import (
+    garment_path,
+    get_product,
+    render_catalog,
+    render_product_page,
+    tryoncloud_api_key,
+    tryoncloud_configured,
+)
+from app.tryoncloud import TryOnCloudError, generate_tryon
 from app.store import (
     add_angle,
     approve_application,
@@ -386,6 +394,39 @@ def ql2009_asset(filename: str) -> FileResponse:
         raise HTTPException(status_code=404, detail="DeepAR effekti hələ export olunmayıb.")
     media = "model/gltf-binary" if filename.endswith(".glb") else "application/octet-stream"
     return FileResponse(path, media_type=media, filename=filename)
+
+
+@app.get("/api/vto/status")
+def vto_status() -> dict:
+    return {"configured": tryoncloud_configured(), "provider": "tryoncloud"}
+
+
+@app.post("/api/vto/try")
+async def vto_try(
+    photo: UploadFile = File(...),
+    product_id: str = Form(...),
+) -> Response:
+    """Photo try-on via TryOnCloud. The provider key never leaves this server."""
+    product = get_product(product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Məhsul tapılmadı.")
+    garment = garment_path(product)
+    if garment is None:
+        raise HTTPException(status_code=500, detail="Eynək şəkli tapılmadı.")
+    person = await photo.read()
+    if not person:
+        raise HTTPException(status_code=400, detail="Şəkil boşdur.")
+    try:
+        result = generate_tryon(
+            tryoncloud_api_key(),
+            person,
+            garment.read_bytes(),
+            photo.filename or "person.jpg",
+            garment.name,
+        )
+    except TryOnCloudError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    return Response(content=result, media_type="image/png")
 
 
 @app.get("/api/tryon-config")

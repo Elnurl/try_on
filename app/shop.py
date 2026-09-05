@@ -1,7 +1,6 @@
-"""Glassify demo catalog + Fittingbox client config.
+"""Glassify demo catalog + TryOnCloud server config.
 
-The Fittingbox key is a public browser key (same as NEXT_PUBLIC_ in vto-test).
-Never commit the value; read it from the environment or local .env.local.
+The TryOnCloud key stays on the server. Never inject it into HTML or JS.
 """
 
 from __future__ import annotations
@@ -10,6 +9,8 @@ import html
 import json
 import os
 from pathlib import Path
+
+from app.frames import FRAMES_DIR
 
 ROOT = Path(__file__).resolve().parent.parent
 ENV_LOCAL = ROOT / "vto-test" / ".env.local"
@@ -22,6 +23,7 @@ PRODUCTS: list[dict] = [
         "price": 259,
         "currency": "AZN",
         "frameId": "00192950009483",
+        "garment_sku": "aviator-gold",
         "category": "Günəş eynəyi",
         "description": (
             "Ray-Ban Aviator Classic — 1937-ci ildən gələn ikonik dizayn. "
@@ -44,6 +46,7 @@ PRODUCTS: list[dict] = [
         "price": 229,
         "currency": "AZN",
         "frameId": "00889652315713",
+        "garment_sku": "square-tortoise",
         "category": "Günəş eynəyi",
         "description": (
             "Ray-Ban New Wayfarer — zamanın sınağından çıxmış ikonik forma. "
@@ -77,20 +80,24 @@ def _read_env_local(name: str) -> str:
     return ""
 
 
-def fittingbox_api_key() -> str:
-    for name in ("FITTINGBOX_API_KEY", "NEXT_PUBLIC_FITTINGBOX_API_KEY"):
+def tryoncloud_api_key() -> str:
+    for name in ("TRYONCLOUD_API_KEY", "TRYON_API_KEY"):
         value = os.environ.get(name, "").strip()
         if value:
             return value
-    return _read_env_local("NEXT_PUBLIC_FITTINGBOX_API_KEY")
+    return _read_env_local("TRYONCLOUD_API_KEY") or _read_env_local("TRYON_API_KEY")
 
 
-def fittingbox_default_frame_id() -> str:
-    for name in ("FITTINGBOX_FRAME_ID", "NEXT_PUBLIC_FITTINGBOX_FRAME_ID"):
-        value = os.environ.get(name, "").strip()
-        if value:
-            return value
-    return _read_env_local("NEXT_PUBLIC_FITTINGBOX_FRAME_ID") or "00192950009483"
+def tryoncloud_configured() -> bool:
+    return bool(tryoncloud_api_key())
+
+
+def garment_path(product: dict) -> Path | None:
+    sku = str(product.get("garment_sku") or "").strip()
+    if not sku:
+        return None
+    path = FRAMES_DIR / f"{sku}.png"
+    return path if path.is_file() else None
 
 
 def catalog_cards_html() -> str:
@@ -150,6 +157,4 @@ def render_product_page(template: str, product: dict) -> str:
         .replace("{{PRODUCT_DESCRIPTION}}", html.escape(product["description"]))
         .replace("{{PRODUCT_FEATURES}}", features)
         .replace("{{PRODUCT_JSON}}", json.dumps(product, ensure_ascii=False))
-        .replace("{{FITTINGBOX_API_KEY_JSON}}", json.dumps(fittingbox_api_key()))
-        .replace("{{FRAME_ID_JSON}}", json.dumps(product["frameId"]))
     )
