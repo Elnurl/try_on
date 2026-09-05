@@ -5,7 +5,7 @@
   const INIT_ERROR =
     "Virtual Try-On yüklənmədi. Browser-i yeniləyib yenidən cəhd edin.";
   const MISSING_KEY_ERROR =
-    "Fittingbox açarı serverdə yoxdur. Render Dashboard → tryon-wa → Environment → FITTINGBOX_API_KEY əlavə edin. Dəyər lokal vto-test/.env.local faylındakı NEXT_PUBLIC_FITTINGBOX_API_KEY ilə eyni olmalıdır.";
+    "Canlı kamera üçün Fittingbox açarı Render-də yoxdur. Yeni hesab lazım deyil: vto-test/.env.local içindəki NEXT_PUBLIC_FITTINGBOX_API_KEY dəyərini Render → Environment → FITTINGBOX_API_KEY kimi yapışdırın.";
   const CAMERA_ERROR =
     "Kamera icazəsi verilmədi. Virtual Try-On üçün kamera icazəsi lazımdır.";
 

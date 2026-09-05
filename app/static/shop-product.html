@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{PAGE_TITLE}}</title>
-    <link rel="stylesheet" href="/static/shop.css?v=3" />
+    <link rel="stylesheet" href="/static/shop.css?v=4" />
   </head>
   <body class="g-body">
     <header class="g-header">
@@ -31,7 +31,7 @@
         </nav>
         <div class="g-product">
           <div>
-            <div class="g-art-lg" data-vto-art>
+            <div class="g-art-lg">
               <svg viewBox="0 0 240 96" width="256" height="128" fill="none" stroke="#3f3f46" stroke-width="5" stroke-linecap="round" aria-hidden="true">
                 <rect x="12" y="22" width="84" height="52" rx="22"></rect>
                 <rect x="144" y="22" width="84" height="52" rx="22"></rect>
@@ -40,9 +40,8 @@
                 <path d="M228 42h8"></path>
               </svg>
             </div>
-            <input type="file" accept="image/jpeg,image/png,image/webp" capture="user" hidden data-vto-file />
-            <button type="button" class="g-btn" data-start-vto>Üzümdə yoxla</button>
-            <p class="g-hint" data-vto-status>Selfie və ya üz şəkli seçin. Nəticə 5–15 saniyəyə hazır olur.</p>
+            <button type="button" class="g-btn" data-start-vto disabled>Üzümdə yoxla</button>
+            <p class="g-hint" data-vto-status>Virtual Try-On hazırlanır…</p>
             <p class="g-error" data-vto-error hidden></p>
           </div>
           <div>
@@ -67,10 +66,26 @@
       <strong>Glassify.az</strong>
       <p>Virtual Try-On texnologiyası ilə eynəyinizi evdən seçin.</p>
     </footer>
+    <div id="vto-overlay" aria-hidden="true">
+      <div class="vto-shell">
+        <header class="vto-bar">
+          <div>
+            <p>Virtual Try-On</p>
+            <p class="sub">Kameraya icazə verin</p>
+          </div>
+          <button type="button" data-stop-vto>Bağla</button>
+        </header>
+        <div class="vto-stage">
+          <div id="fitmix-container"></div>
+          <p class="vto-wait" data-vto-wait hidden>Fittingbox şərtlərini qəbul edin, kamera açıq qalacaq</p>
+        </div>
+      </div>
+    </div>
     <script>
       window.SHOP_PRODUCT = {{PRODUCT_JSON}};
+      window.FITTINGBOX = { apiKey: {{FITTINGBOX_API_KEY_JSON}}, frameId: {{FRAME_ID_JSON}} };
     </script>
-    <script src="/static/shop.js?v=3"></script>
-    <script src="/static/shop-vto.js?v=3"></script>
+    <script src="/static/shop.js?v=4"></script>
+    <script src="/static/fittingbox-vto.js?v=4"></script>
   </body>
 </html>
