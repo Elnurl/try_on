@@ -59,7 +59,9 @@
         }
       },
       onStopVto: () => {
+        document.body.classList.remove("vto-open");
         startBtn.disabled = false;
+        setStatus("Üzümdə yoxla — canlı kamera açılacaq.");
       },
     },
     () => {
@@ -71,8 +73,13 @@
   );
 
   startBtn.addEventListener("click", () => {
-    if (!ready || !widget) return;
+    if (!ready || !widget) {
+      setError("Virtual Try-On hələ hazır deyil. 3 saniyə gözləyib yenidən basın.");
+      return;
+    }
     setError("");
+    document.body.classList.add("vto-open");
+    setStatus("Pəncərə açıldı. Ortada narıncı çərçivəyə baxın.");
     if (frameId) widget.setFrame(frameId);
     widget.startVto("live");
   });
