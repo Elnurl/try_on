@@ -24,7 +24,7 @@
   let instance = null;
   let ready = false;
   let starting = false;
-  let userClosing = false;
+  let observer = null;
 
   function setError(message) {
     if (!errorEl) return;
@@ -51,15 +51,16 @@
     startBtn.disabled = !apiKey;
   }
 
-  function allowCameraOnIframe() {
+  function allowCameraOnce() {
     const iframe = container.querySelector("iframe");
     if (!iframe) return false;
-    iframe.setAttribute("allow", "camera; microphone; autoplay");
-    iframe.setAttribute("allowfullscreen", "true");
-    iframe.style.width = "100%";
-    iframe.style.height = "100%";
-    iframe.style.minHeight = "100%";
-    iframe.style.border = "0";
+    const allow = iframe.getAttribute("allow") || "";
+    if (!allow.includes("camera")) {
+      iframe.setAttribute("allow", "camera; microphone; autoplay");
+    }
+    if (!iframe.hasAttribute("allowfullscreen")) {
+      iframe.setAttribute("allowfullscreen", "true");
+    }
     return true;
   }
 
@@ -69,16 +70,17 @@
     });
   }
 
-  async function requestPageCameraAccess() {
-    if (!navigator.mediaDevices?.getUserMedia) return false;
+  function resetWidget() {
+    observer?.disconnect();
+    observer = null;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      stream.getTracks().forEach((track) => track.stop());
-      return true;
-    } catch (err) {
-      console.warn("[Fittingbox] page camera request failed", err);
-      return false;
+      instance?.remove?.();
+    } catch {
+      /* Fittingbox may already have torn the iframe down */
     }
+    instance = null;
+    ready = false;
+    container.replaceChildren();
   }
 
   function handleIssue(data) {
@@ -108,7 +110,12 @@
     if (!window.FitMix) {
       throw new Error("FitMix is missing");
     }
-    const observer = new MutationObserver(allowCameraOnIframe);
+    observer = new MutationObserver(() => {
+      if (allowCameraOnce()) {
+        observer?.disconnect();
+        observer = null;
+      }
+    });
     observer.observe(container, { childList: true, subtree: true });
     const widget = window.FitMix.createWidget(
       CONTAINER_ID,
@@ -135,18 +142,15 @@
         },
         onStopVto: () => {
           starting = false;
-          if (waitEl) waitEl.hidden = true;
           startBtn.disabled = false;
-          if (userClosing) {
-            userClosing = false;
-            hideOverlay();
-          }
+          hideOverlay();
+          resetWidget();
         },
       },
       () => {
         ready = true;
         if (frameId) widget.setFrame(frameId);
-        allowCameraOnIframe();
+        allowCameraOnce();
       },
     );
     return widget;
@@ -172,7 +176,6 @@
 
   async function startVto() {
     setError("");
-    userClosing = false;
     if (!apiKey) {
       setError(MISSING_KEY_ERROR);
       return;
@@ -181,7 +184,6 @@
     startBtn.disabled = true;
     showOverlay();
     await nextPaint();
-    await requestPageCameraAccess();
 
     try {
       if (!instance) {
@@ -189,21 +191,20 @@
       }
       await waitUntilReady();
       await nextPaint();
-      allowCameraOnIframe();
       if (frameId) instance.setFrame(frameId);
       instance.startVto("live");
     } catch (err) {
       console.error("[Fittingbox] startVto failed", err);
-      starting = false;
+      resetWidget();
       hideOverlay();
       setError(INIT_ERROR);
     }
   }
 
   function stopVto() {
-    userClosing = true;
     if (!instance) {
       hideOverlay();
+      resetWidget();
       return;
     }
     try {
@@ -211,6 +212,7 @@
     } catch (err) {
       console.error("[Fittingbox] stopVto failed", err);
       hideOverlay();
+      resetWidget();
     }
   }
 
