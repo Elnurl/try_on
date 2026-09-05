@@ -35,6 +35,7 @@ from app.frames import FRAMES_DIR, ensure_frame_assets
 from app.overlay import NoFaceError, overlay_bytes
 from app.vendor_assets import ensure_vendor
 from app.shop import (
+    auglio_feed_xml,
     garment_path,
     get_product,
     render_catalog,
@@ -165,8 +166,18 @@ def vto_widget() -> FileResponse:
 
 @app.get("/shop", response_class=HTMLResponse)
 def glassify_shop() -> str:
-    """Glassify Fittingbox demo catalog. Partner landing stays at /."""
+    """Glassify catalog. Partner landing stays at /."""
     return render_catalog((STATIC / "shop.html").read_text(encoding="utf-8"))
+
+
+@app.get("/shop/auglio-feed.xml")
+def glassify_auglio_feed(request: Request) -> Response:
+    """Public Auglio product XML. Paste this URL in Auglio → Import products."""
+    base = str(request.base_url).rstrip("/")
+    return Response(
+        content=auglio_feed_xml(base),
+        media_type="application/xml; charset=utf-8",
+    )
 
 
 @app.get("/shop/product/{product_id}", response_class=HTMLResponse)

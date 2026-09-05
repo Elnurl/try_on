@@ -8,7 +8,9 @@ from __future__ import annotations
 import html
 import json
 import os
+import re
 from pathlib import Path
+from xml.sax.saxutils import escape as xml_escape
 
 from app.frames import FRAMES_DIR
 
@@ -23,6 +25,8 @@ PRODUCTS: list[dict] = [
         "price": 259,
         "currency": "AZN",
         "frameId": "00192950009483",
+        "auglio_item_id": "rb-aviator-classic",
+        "auglio_category": 16,
         "garment_sku": "aviator-gold",
         "category": "Günəş eynəyi",
         "description": (
@@ -46,6 +50,8 @@ PRODUCTS: list[dict] = [
         "price": 229,
         "currency": "AZN",
         "frameId": "00889652315713",
+        "auglio_item_id": "rb-new-wayfarer",
+        "auglio_category": 16,
         "garment_sku": "square-tortoise",
         "category": "Günəş eynəyi",
         "description": (
@@ -86,6 +92,51 @@ def fittingbox_api_key() -> str:
         if value:
             return value
     return _read_env_local("NEXT_PUBLIC_FITTINGBOX_API_KEY")
+
+
+_AUGLIO_KEY_RE = re.compile(r"^[A-Za-z0-9._-]{8,128}$")
+
+
+def auglio_api_key() -> str:
+    for name in ("AUGLIO_API_KEY", "NEXT_PUBLIC_AUGLIO_API_KEY"):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value if _AUGLIO_KEY_RE.fullmatch(value) else ""
+    raw = _read_env_local("AUGLIO_API_KEY") or _read_env_local(
+        "NEXT_PUBLIC_AUGLIO_API_KEY"
+    )
+    return raw if raw and _AUGLIO_KEY_RE.fullmatch(raw) else ""
+
+
+def auglio_item_id(product: dict) -> str:
+    return str(product.get("auglio_item_id") or product["id"])
+
+
+def auglio_feed_xml(base_url: str) -> str:
+    base = base_url.rstrip("/")
+    blocks = []
+    for product in PRODUCTS:
+        item_id = xml_escape(auglio_item_id(product))
+        name = product["name"].replace("]]>", "")
+        desc = product["description"].replace("]]>", "")
+        brand = product["brand"].replace("]]>", "")
+        category = int(product.get("auglio_category") or 16)
+        page = f"{base}/product/{product['id']}"
+        blocks.append(
+            f"""    <SHOPITEM>
+        <ITEM_ID>{item_id}</ITEM_ID>
+        <PRODUCTNAME><![CDATA[{name}]]></PRODUCTNAME>
+        <DESCRIPTION><![CDATA[{desc}]]></DESCRIPTION>
+        <PRICE>{float(product["price"]):.2f}</PRICE>
+        <IMGURL>{xml_escape(page)}</IMGURL>
+        <URL>{xml_escape(page)}</URL>
+        <CATEGORY>{category}</CATEGORY>
+        <SEX>U</SEX>
+        <EAN>{xml_escape(str(product.get("frameId") or ""))}</EAN>
+        <MANUFACTURER><![CDATA[{brand}]]></MANUFACTURER>
+    </SHOPITEM>"""
+        )
+    return '<?xml version="1.0" encoding="UTF-8"?>\n<SHOP>\n' + "\n".join(blocks) + "\n</SHOP>\n"
 
 
 def fittingbox_destination_url() -> str:
@@ -175,10 +226,6 @@ def render_product_page(template: str, product: dict) -> str:
         .replace("{{PRODUCT_DESCRIPTION}}", html.escape(product["description"]))
         .replace("{{PRODUCT_FEATURES}}", features)
         .replace("{{PRODUCT_JSON}}", json.dumps(product, ensure_ascii=False))
-        .replace("{{FITTINGBOX_API_KEY_JSON}}", json.dumps(fittingbox_api_key()))
-        .replace("{{FRAME_ID_JSON}}", json.dumps(product["frameId"]))
-        .replace(
-            "{{FITTINGBOX_DESTINATION_JSON}}",
-            json.dumps(fittingbox_destination_url()),
-        )
+        .replace("{{AUGLIO_API_KEY_JSON}}", json.dumps(auglio_api_key()))
+        .replace("{{AUGLIO_ITEM_ID_JSON}}", json.dumps(auglio_item_id(product)))
     )

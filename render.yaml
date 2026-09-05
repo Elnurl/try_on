@@ -10,8 +10,10 @@ services:
         sync: false
       - key: DEEPAR_LICENSE_KEY
         sync: false # DeepAR web key for tryon-wa.onrender.com + localhost
+      - key: AUGLIO_API_KEY
+        sync: false # Auglio Client Dashboard → Integration → Get Code
       - key: FITTINGBOX_API_KEY
-        sync: false # Fittingbox VTO Advanced browser key
+        sync: false # Unused after Auglio switch; keep only if an old page still reads it
       - key: FITTINGBOX_DESTINATION_URL
         sync: false # Optional VTO Standard destination URL from Fittingbox email
       - key: TRYONCLOUD_API_KEY
