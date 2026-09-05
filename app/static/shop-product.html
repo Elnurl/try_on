@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{PAGE_TITLE}}</title>
-    <link rel="stylesheet" href="/static/shop.css?v=14" />
+    <link rel="stylesheet" href="/static/shop.css?v=15" />
   </head>
   <body class="g-body">
     <header class="g-header">
@@ -40,9 +40,13 @@
                 <path d="M228 42h8"></path>
               </svg>
             </div>
-            <button type="button" class="g-btn auglio-tryon-btn" data-item_id="" style="display: none">Üzümdə yoxla</button>
-            <p class="g-hint" data-vto-status>Auglio hazırlanır…</p>
+            <button type="button" class="g-btn" data-start-vto disabled>Üzümdə yoxla</button>
+            <p class="g-hint" data-vto-status>Banuba hazırlanır…</p>
             <p class="g-error" data-vto-error hidden></p>
+            <p class="g-hint">
+              Hesab:
+              <a href="https://app.tintvto.com/" target="_blank" rel="noopener">app.tintvto.com</a>
+            </p>
           </div>
           <div>
             <p class="g-brand">{{PRODUCT_BRAND}}</p>
@@ -67,12 +71,11 @@
       <p>Virtual Try-On texnologiyası ilə eynəyinizi evdən seçin.</p>
     </footer>
     <script>
-      window.AUGLIO = {
-        apiKey: {{AUGLIO_API_KEY_JSON}},
-        itemId: {{AUGLIO_ITEM_ID_JSON}},
+      window.BANUBA = {
+        tryOnUrl: {{BANUBA_TRYON_URL_JSON}},
       };
     </script>
-    <script src="/static/shop.js?v=14"></script>
-    <script src="/static/auglio-vto.js?v=14"></script>
+    <script src="/static/shop.js?v=15"></script>
+    <script src="/static/banuba-vto.js?v=15"></script>
   </body>
 </html>

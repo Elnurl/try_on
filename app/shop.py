@@ -10,6 +10,7 @@ import json
 import os
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 from xml.sax.saxutils import escape as xml_escape
 
 from app.frames import FRAMES_DIR
@@ -106,6 +107,39 @@ def auglio_api_key() -> str:
         "NEXT_PUBLIC_AUGLIO_API_KEY"
     )
     return raw if raw and _AUGLIO_KEY_RE.fullmatch(raw) else ""
+
+
+_BANUBA_HOSTS = (
+    "tintvto.com",
+    "www.tintvto.com",
+    "app.tintvto.com",
+    "virtual-try-on-ready.banuba.com",
+)
+
+
+def _safe_https_url(raw: str, allowed_hosts: tuple[str, ...]) -> str:
+    value = raw.strip()
+    if not value:
+        return ""
+    parsed = urlparse(value)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or not host:
+        return ""
+    if host in allowed_hosts or host.endswith(".tintvto.com"):
+        return value
+    return ""
+
+
+def banuba_tryon_url(product: dict) -> str:
+    env_name = "BANUBA_TRYON_URL_" + str(product["id"]).upper().replace("-", "_")
+    for name in (env_name, "BANUBA_TRYON_URL"):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return _safe_https_url(value, _BANUBA_HOSTS)
+    from_file = _read_env_local(env_name) or _read_env_local("BANUBA_TRYON_URL")
+    if from_file:
+        return _safe_https_url(from_file, _BANUBA_HOSTS)
+    return _safe_https_url(str(product.get("banuba_url") or ""), _BANUBA_HOSTS)
 
 
 def auglio_item_id(product: dict) -> str:
@@ -228,4 +262,5 @@ def render_product_page(template: str, product: dict) -> str:
         .replace("{{PRODUCT_JSON}}", json.dumps(product, ensure_ascii=False))
         .replace("{{AUGLIO_API_KEY_JSON}}", json.dumps(auglio_api_key()))
         .replace("{{AUGLIO_ITEM_ID_JSON}}", json.dumps(auglio_item_id(product)))
+        .replace("{{BANUBA_TRYON_URL_JSON}}", json.dumps(banuba_tryon_url(product)))
     )

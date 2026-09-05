@@ -10,6 +10,10 @@ services:
         sync: false
       - key: DEEPAR_LICENSE_KEY
         sync: false # DeepAR web key for tryon-wa.onrender.com + localhost
+      - key: BANUBA_TRYON_URL_RB_NEW_WAYFARER
+        sync: false # TintVTO Easy hosted try-on link for New Wayfarer
+      - key: BANUBA_TRYON_URL_RB_AVIATOR_CLASSIC
+        sync: false # TintVTO Easy hosted try-on link for Aviator
       - key: AUGLIO_API_KEY
         sync: false # Auglio Client Dashboard → Integration → Get Code
       - key: FITTINGBOX_API_KEY
