@@ -88,6 +88,16 @@ def fittingbox_api_key() -> str:
     return _read_env_local("NEXT_PUBLIC_FITTINGBOX_API_KEY")
 
 
+def fittingbox_destination_url() -> str:
+    for name in ("FITTINGBOX_DESTINATION_URL", "NEXT_PUBLIC_FITTINGBOX_DESTINATION_URL"):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    return _read_env_local("FITTINGBOX_DESTINATION_URL") or _read_env_local(
+        "NEXT_PUBLIC_FITTINGBOX_DESTINATION_URL"
+    )
+
+
 def tryoncloud_api_key() -> str:
     for name in ("TRYONCLOUD_API_KEY", "TRYON_API_KEY"):
         value = os.environ.get(name, "").strip()
@@ -167,4 +177,8 @@ def render_product_page(template: str, product: dict) -> str:
         .replace("{{PRODUCT_JSON}}", json.dumps(product, ensure_ascii=False))
         .replace("{{FITTINGBOX_API_KEY_JSON}}", json.dumps(fittingbox_api_key()))
         .replace("{{FRAME_ID_JSON}}", json.dumps(product["frameId"]))
+        .replace(
+            "{{FITTINGBOX_DESTINATION_JSON}}",
+            json.dumps(fittingbox_destination_url()),
+        )
     )

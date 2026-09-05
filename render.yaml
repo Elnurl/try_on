@@ -11,7 +11,9 @@ services:
       - key: DEEPAR_LICENSE_KEY
         sync: false # DeepAR web key for tryon-wa.onrender.com + localhost
       - key: FITTINGBOX_API_KEY
-        sync: false # Optional leftover; Glassify shop now uses TryOnCloud
+        sync: false # Fittingbox VTO Advanced browser key
+      - key: FITTINGBOX_DESTINATION_URL
+        sync: false # Optional VTO Standard destination URL from Fittingbox email
       - key: TRYONCLOUD_API_KEY
         sync: false # Server-only Developer API key from tryoncloud.com → Developer API
     disk:
