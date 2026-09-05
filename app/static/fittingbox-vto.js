@@ -23,6 +23,24 @@
     statusEl.textContent = message || "";
   }
 
+  function popupSize() {
+    const widthPx = Math.max(
+      400,
+      Math.round(Math.min(window.innerWidth * 0.72, window.innerWidth - 32)),
+    );
+    const heightPx = Math.max(
+      480,
+      Math.round(Math.min(window.innerHeight * 0.82, window.innerHeight - 32)),
+    );
+    return { width: `${widthPx}px`, height: `${heightPx}px` };
+  }
+
+  function resetPrivacy() {
+    if (widget && typeof widget.resetDisclaimer === "function") {
+      widget.resetDisclaimer();
+    }
+  }
+
   if (!apiKey) {
     setError(
       "Fittingbox açarı yoxdur. Render → Environment → FITTINGBOX_API_KEY.",
@@ -37,16 +55,41 @@
     return;
   }
 
+  const size = popupSize();
+
   widget = window.FitMix.createWidget(
     "fitmix-container",
     {
       apiKey,
       frame: frameId,
+      lang: "en",
       popupIntegration: {
         centeredHorizontal: true,
         centeredVertical: true,
-        width: "400px",
-        height: "640px",
+        width: size.width,
+        height: size.height,
+      },
+      uiConfiguration: {
+        cameraPermissionScreen: true,
+        liveCameraAccessDenied: true,
+        vtoLoadingScreen: true,
+        loadingIndicator: true,
+      },
+      onPrivacyTermsShown: () => {
+        setStatus("Şərtlər açıldı. I agree düyməsinə basın.");
+      },
+      onAgreePrivacyTerms: () => {
+        setStatus("Şərtlər qəbul edildi. Kamera açılacaq.");
+      },
+      onDisagreePrivacyTerms: () => {
+        document.body.classList.remove("vto-open");
+        startBtn.disabled = false;
+        setStatus("Şərtlər qəbul edilmədi. Yenidən Üzümdə yoxla basın.");
+      },
+      onOpenStream: (value) => {
+        if (value && value.success) {
+          setStatus("Kamera açıqdır.");
+        }
       },
       onIssue: (data) => {
         if (!data || !Object.values(data).some(Boolean)) return;
@@ -66,6 +109,7 @@
     },
     () => {
       ready = true;
+      resetPrivacy();
       if (frameId) widget.setFrame(frameId);
       startBtn.disabled = false;
       setStatus("Üzümdə yoxla — canlı kamera açılacaq.");
@@ -78,8 +122,9 @@
       return;
     }
     setError("");
+    resetPrivacy();
     document.body.classList.add("vto-open");
-    setStatus("Pəncərə açıldı. Ortada narıncı çərçivəyə baxın.");
+    setStatus("Pəncərə açılır. Ağ şərtlər ekranını gözləyin.");
     if (frameId) widget.setFrame(frameId);
     widget.startVto("live");
   });
