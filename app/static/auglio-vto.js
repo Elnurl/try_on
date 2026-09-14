@@ -5,6 +5,10 @@
   const cfg = window.AUGLIO || {};
   const apiKey = typeof cfg.apiKey === "string" ? cfg.apiKey.trim() : "";
   const itemId = typeof cfg.itemId === "string" ? cfg.itemId.trim() : "";
+  const demoUrl =
+    typeof cfg.demoUrl === "string" && cfg.demoUrl.trim()
+      ? cfg.demoUrl.trim()
+      : "https://auglio.com/en/demo-store/eyewear";
 
   function setError(message) {
     if (!errorEl) return;
@@ -20,8 +24,7 @@
 
   function buttonVisible() {
     if (!btn) return false;
-    const display = window.getComputedStyle(btn).display;
-    return display !== "none";
+    return window.getComputedStyle(btn).display !== "none";
   }
 
   if (!btn) return;
@@ -32,11 +35,14 @@
 
   if (!apiKey) {
     btn.style.display = "flex";
-    btn.disabled = true;
-    setStatus("");
-    setError(
-      "Auglio açarı yoxdur. auglio.com-da trial açın, Dashboard → Integration → Get Code, sonra Render → Environment → AUGLIO_API_KEY.",
+    btn.disabled = false;
+    setError("");
+    setStatus(
+      "Açar gələndə sizin eynəklər açılacaq. İndi Auglio-nun rəsmi eynək demo-su açılır.",
     );
+    btn.addEventListener("click", () => {
+      window.location.href = demoUrl;
+    });
     return;
   }
 
@@ -54,7 +60,7 @@
   script.onerror = () => {
     btn.style.display = "flex";
     btn.disabled = true;
-    setError("Auglio skripti yüklənmədi. Açarı və interneti yoxlayın.");
+    setError("Auglio skripti yüklənmədi. Açarı yoxlayın.");
   };
   document.body.appendChild(script);
 
@@ -62,11 +68,11 @@
 
   window.setTimeout(() => {
     if (buttonVisible()) {
-      setStatus("Üzümdə yoxla — Auglio canlı kamera açılacaq.");
+      setStatus("Üzümdə yoxla — Auglio canlı kamera və ya şəkil açılacaq.");
       return;
     }
     setError(
-      `Bu eynək Auglio-da tapılmadı. Dashboard-da NEW PRODUCT → ID mütləq ${itemId} olsun, və ya XML feed: /shop/auglio-feed.xml`,
+      `Bu eynək Auglio-da tapılmadı. Alex-ə yazın: ITEM_ID ${itemId}, feed ${location.origin}/shop/auglio-feed.xml`,
     );
   }, 10000);
 })();

@@ -142,6 +142,20 @@ def banuba_tryon_url(product: dict) -> str:
     return _safe_https_url(str(product.get("banuba_url") or ""), _BANUBA_HOSTS)
 
 
+def auglio_demo_url() -> str:
+    default = "https://auglio.com/en/demo-store/eyewear"
+    raw = (
+        os.environ.get("AUGLIO_DEMO_URL", "").strip()
+        or _read_env_local("AUGLIO_DEMO_URL")
+        or default
+    )
+    parsed = urlparse(raw)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme == "https" and host.endswith("auglio.com"):
+        return raw
+    return default
+
+
 def auglio_item_id(product: dict) -> str:
     return str(product.get("auglio_item_id") or product["id"])
 
@@ -262,5 +276,6 @@ def render_product_page(template: str, product: dict) -> str:
         .replace("{{PRODUCT_JSON}}", json.dumps(product, ensure_ascii=False))
         .replace("{{AUGLIO_API_KEY_JSON}}", json.dumps(auglio_api_key()))
         .replace("{{AUGLIO_ITEM_ID_JSON}}", json.dumps(auglio_item_id(product)))
+        .replace("{{AUGLIO_DEMO_URL_JSON}}", json.dumps(auglio_demo_url()))
         .replace("{{BANUBA_TRYON_URL_JSON}}", json.dumps(banuba_tryon_url(product)))
     )
