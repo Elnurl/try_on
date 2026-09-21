@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Səbət | Eynək.com</title>
+    <title>{{STORE_NAME}} | Eynək.com</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/static/shop.css?v=50" />
   </head>
   <body class="g-body">
-    <div class="g-ribbon"><p>Bakıda pulsuz çatdırılma</p></div>
+    <div class="g-ribbon"><p>Marketplace satıcı vitrini</p></div>
     <header class="g-header">
       <div class="g-wrap g-header-top">
         <a class="g-logo" href="/shop">EYNƏK</a>
         <nav class="g-nav" aria-label="Əsas" style="display:flex;padding:0">
           <a class="g-nav-link" href="/shop">Kataloq</a>
-          <a class="g-nav-link" href="/shop#vto">Virtual sınaq</a>
+          <a class="g-nav-link" href="/shop#stores">Satıcılar</a>
           <a class="g-nav-link" href="/cart">Səbət</a>
         </nav>
         <div class="g-header-tools">
@@ -32,19 +32,33 @@
       </div>
     </header>
     <main class="g-wrap">
-      <div class="g-page-head">
-        <h1>Səbət</h1>
-        <button type="button" class="g-clear" data-clear-cart>Təmizlə</button>
-      </div>
-      <div class="g-cart-root" data-cart-root></div>
+      <nav class="g-crumb">
+        <a href="/shop">Marketplace</a>
+        <span>/</span>
+        <a href="/shop#stores">Satıcılar</a>
+        <span>/</span>
+        <span>{{STORE_NAME}}</span>
+      </nav>
+      <section class="g-store-hero">
+        <p class="g-brand">{{STORE_CITY}}</p>
+        <h1>{{STORE_NAME}}</h1>
+        <p class="g-store-tagline">{{STORE_TAGLINE}}</p>
+        <p class="g-section-meta">Bu mağazadan {{STORE_COUNT}} eynək</p>
+      </section>
+      <section class="g-section" style="padding-top:0">
+        <div class="g-grid" data-product-grid>{{PRODUCT_CARDS}}</div>
+      </section>
     </main>
     <footer class="g-footer">
       <div class="g-wrap">
         <strong>Eynək.com</strong>
-        <p>Virtual Try-On ilə sına, sonra sifariş et.</p>
+        <p><a href="/shop">Marketplace-ə qayıt</a></p>
       </div>
     </footer>
     <div class="g-toast" data-toast hidden></div>
+    <script>
+      window.SHOP_PRODUCTS = {{PRODUCTS_JSON}};
+    </script>
     <script src="/static/shop.js?v=50"></script>
   </body>
 </html>

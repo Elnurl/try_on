@@ -112,6 +112,12 @@ def save_uploaded_frame(
     name: str,
     brand: str,
     png_bytes: bytes,
+    *,
+    price: float | None = None,
+    category: str = "",
+    filter_key: str = "optical",
+    published: bool = False,
+    currency: str = "AZN",
 ) -> dict:
     if not SKU_RE.match(sku):
         raise ValueError("SKU yalnız hərf, rəqəm, - və _ ola bilər.")
@@ -119,6 +125,24 @@ def save_uploaded_frame(
     out = store_dir(slug) / "frames" / f"{sku}.png"
     img.save(out)
     existing = next((row for row in extra_catalog(slug) if row["id"] == sku), None)
+    filt = (filter_key or "optical").strip().lower()
+    if filt not in ("sunglasses", "optical", "luxury", "sports"):
+        filt = "optical"
+    category_map = {
+        "sunglasses": "Günəş eynəyi",
+        "optical": "Optik eynək",
+        "luxury": "Lüks",
+        "sports": "İdman",
+    }
+    cat = (category or "").strip() or category_map[filt]
+    if price is not None:
+        amount: float | None = max(0.0, float(price))
+    elif existing and existing.get("price") is not None:
+        amount = float(existing["price"])
+    else:
+        amount = None
+    if published and amount is None:
+        raise ValueError("Marketplace üçün qiymət lazımdır.")
     item = {
         "id": sku,
         "name": name or sku,
@@ -132,11 +156,95 @@ def save_uploaded_frame(
         "custom": True,
         "image_url": f"/media/{slug}/{sku}.png",
         "angles": list(existing.get("angles", [])) if existing else [],
+        "price": amount,
+        "currency": (currency or "AZN").strip().upper() or "AZN",
+        "category": cat,
+        "filter": filt,
+        "marketplace": bool(published),
     }
     items = [row for row in extra_catalog(slug) if row["id"] != sku]
     items.append(item)
     _write_catalog(slug, items)
     return item
+
+
+def set_frame_marketplace(slug: str, sku: str, published: bool, price: float | None = None) -> dict:
+    items = extra_catalog(slug)
+    found = None
+    for row in items:
+        if row["id"] == sku:
+            if price is not None:
+                row["price"] = max(0.0, float(price))
+            if published and row.get("price") is None:
+                raise ValueError("Marketplace üçün qiymət lazımdır.")
+            row["marketplace"] = bool(published)
+            found = row
+            break
+    if found is None:
+        raise ValueError("SKU tapılmadı.")
+    _write_catalog(slug, items)
+    return found
+
+
+def marketplace_listings() -> list[dict]:
+    """Published seller frames shaped for Eynək.com shop catalog."""
+    brands = load_brands()
+    rows: list[dict] = []
+    for slug, brand in brands.items():
+        seller_name = str(brand.get("name") or slug)
+        seller_city = str(brand.get("city") or "Bakı")
+        for frame in extra_catalog(slug):
+            if not frame.get("custom") or not frame.get("marketplace"):
+                continue
+            if frame.get("price") is None:
+                continue
+            filt = str(frame.get("filter") or "optical")
+            pid = f"{slug}-{frame['id']}"
+            rows.append(
+                {
+                    "id": pid,
+                    "sku": frame["id"],
+                    "name": frame.get("name") or frame["id"],
+                    "brand": frame.get("brand") or seller_name,
+                    "seller_id": slug,
+                    "seller_name": seller_name,
+                    "seller_city": seller_city,
+                    "price": int(round(float(frame["price"]))),
+                    "currency": frame.get("currency") or "AZN",
+                    "rating": float(frame.get("rating") or 4.8),
+                    "reviews": int(frame.get("reviews") or 0),
+                    "tryon": True,
+                    "featured": bool(frame.get("featured")),
+                    "image": frame.get("image_url") or f"/media/{slug}/{frame['id']}.png",
+                    "category": frame.get("category") or "Optik eynək",
+                    "filter": filt,
+                    "description": str(
+                        frame.get("description")
+                        or f"{frame.get('brand') or seller_name} — {frame.get('name') or frame['id']}."
+                    ),
+                    "colors": frame.get("colors")
+                    or [{"name": "Standart", "hex": "#1a1a1a", "swatch": "ink"}],
+                    "marketplace": True,
+                }
+            )
+    return rows
+
+
+def marketplace_stores() -> list[dict]:
+    brands = load_brands()
+    listed = {row["seller_id"] for row in marketplace_listings()}
+    stores = []
+    for slug in listed:
+        brand = brands.get(slug) or {}
+        stores.append(
+            {
+                "id": slug,
+                "name": str(brand.get("name") or slug),
+                "city": str(brand.get("city") or "Bakı"),
+                "tagline": str(brand.get("tagline") or "Eynək.com satıcısı"),
+            }
+        )
+    return stores
 
 
 def update_calibration(slug: str, sku: str, scale: float, offset_x: float, offset_y: float) -> dict:

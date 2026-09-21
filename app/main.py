@@ -38,8 +38,10 @@ from app.shop import (
     auglio_feed_xml,
     garment_path,
     get_product,
+    get_store,
     render_catalog,
     render_product_page,
+    render_store_page,
     tryoncloud_api_key,
     tryoncloud_configured,
 )
@@ -59,6 +61,7 @@ from app.store import (
     save_brand_settings,
     save_lead,
     save_uploaded_frame,
+    set_frame_marketplace,
     update_brand,
     update_calibration,
     update_domains,
@@ -166,7 +169,7 @@ def vto_widget() -> FileResponse:
 
 @app.get("/shop", response_class=HTMLResponse)
 def glassify_shop() -> str:
-    """Glassify catalog. Partner landing stays at /."""
+    """Eynək.com catalog. Partner landing stays at /."""
     return render_catalog((STATIC / "shop.html").read_text(encoding="utf-8"))
 
 
@@ -199,6 +202,22 @@ def glassify_product(product_id: str) -> str:
         (STATIC / "shop-product.html").read_text(encoding="utf-8"),
         product,
     )
+
+
+@app.get("/store/{store_id}", response_class=HTMLResponse)
+def glassify_store(store_id: str) -> str:
+    store = get_store(store_id)
+    if store is None:
+        raise HTTPException(status_code=404, detail="Mağaza tapılmadı.")
+    return render_store_page(
+        (STATIC / "shop-store.html").read_text(encoding="utf-8"),
+        store,
+    )
+
+
+@app.get("/shop/store/{store_id}", response_class=HTMLResponse)
+def glassify_store_alias(store_id: str) -> RedirectResponse:
+    return RedirectResponse(f"/store/{store_id}", status_code=307)
 
 
 @app.get("/cart", response_class=HTMLResponse)
@@ -365,14 +384,34 @@ async def upload_frame(
     sku: str = Form(...),
     name: str = Form(...),
     brand: str = Form(""),
+    price: str = Form(""),
+    category: str = Form("optical"),
+    marketplace: str = Form(""),
     file: UploadFile = File(...),
 ) -> dict:
     require_store_access(request, slug)
     if get_brand(slug) is None:
         raise HTTPException(status_code=404, detail="Brend tapılmadı.")
     data = await file.read()
+    price_val = None
+    raw_price = (price or "").strip().replace(",", ".")
+    if raw_price:
+        try:
+            price_val = float(raw_price)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Qiymət düzgün deyil.") from exc
+    published = marketplace.strip().lower() in ("1", "true", "yes", "on")
     try:
-        return save_uploaded_frame(slug, sku.strip(), name.strip(), brand.strip(), data)
+        return save_uploaded_frame(
+            slug,
+            sku.strip(),
+            name.strip(),
+            brand.strip(),
+            data,
+            price=price_val,
+            filter_key=category.strip() or "optical",
+            published=published,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
@@ -380,6 +419,31 @@ async def upload_frame(
             status_code=400,
             detail="Şəkil açılmadı — şəffaf fonlu PNG və ya JPG yükləyin.",
         ) from exc
+
+
+@app.post("/api/brand/{slug}/frames/{sku}/marketplace")
+def api_frame_marketplace(
+    request: Request,
+    slug: str,
+    sku: str,
+    marketplace: str = Form(...),
+    price: str = Form(""),
+) -> dict:
+    require_store_access(request, slug)
+    if get_brand(slug) is None:
+        raise HTTPException(status_code=404, detail="Brend tapılmadı.")
+    published = marketplace.strip().lower() in ("1", "true", "yes", "on")
+    price_val = None
+    raw_price = (price or "").strip().replace(",", ".")
+    if raw_price:
+        try:
+            price_val = float(raw_price)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Qiymət düzgün deyil.") from exc
+    try:
+        return set_frame_marketplace(slug, sku, published, price_val)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/media/{slug}/{filename}")

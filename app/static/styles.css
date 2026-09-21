@@ -598,6 +598,27 @@ body.engine-deepar #camera {
   border-radius: 6px;
 }
 
+.admin-form .check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.admin-form .check-row input {
+  width: auto;
+}
+
+.listing-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.listing-card .lede {
+  margin: 4px 0;
+}
+
 .path-btn {
   width: 100%;
   text-align: left;

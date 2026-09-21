@@ -72,6 +72,18 @@ CATALOG: list[dict] = [
         "lenses": ["#eef2f4", "#9aa3ad", "#2f4a3a"],
         "effect_url": "/static/vendor/deepar/effects/aviators",
     },
+    {
+        "id": "ql2009-c1",
+        "name": "QL2009 C1",
+        "name_az": "QL2009 C1",
+        "brand": "NN OPTIC EYEWEAR",
+        "model": "QL2009 C1",
+        "scale": 2.35,
+        "offset_x": 0.0,
+        "offset_y": -0.12,
+        "lenses": ["#eef2f4"],
+        "effect_url": "/ql2009/QL2009_C1.deepar",
+    },
 ]
 
 
