@@ -146,35 +146,41 @@
     const filt = escapeHtml(product.filter || "sunglasses");
     const sellerId = escapeHtml(product.seller_id || "");
     const seller = escapeHtml(product.seller_name || "");
+    const city = escapeHtml(product.seller_city || "");
     const search = escapeHtml(
       `${product.brand} ${product.name} ${product.category} ${product.seller_name || ""}`.toLowerCase(),
     );
-    const tryon = product.tryon
-      ? '<span class="g-tryon-badge">3D SINAQ</span>'
+    const tryonFlag = product.tryon ? "1" : "0";
+    const vto = product.tryon
+      ? `<a class="g-card-vto" href="/product/${pid}#vto">Üzümdə yoxla</a>`
       : "";
-    const rating = product.rating != null ? Number(product.rating).toFixed(1) : "";
-    const sellerMeta = seller
-      ? `<p class="g-seller-meta">${seller}${rating ? ` <span class="star">★</span> ${rating}` : ""}</p>`
+    const sellerLabel = seller ? (city ? `${seller} · ${city}` : seller) : "";
+    const sellerMeta = sellerLabel
+      ? sellerId
+        ? `<a class="g-seller-meta" href="/store/${sellerId}">${sellerLabel}</a>`
+        : `<p class="g-seller-meta">${sellerLabel}</p>`
       : "";
     const media = product.image
       ? `<img class="g-card-photo" src="${escapeHtml(product.image)}" alt="" loading="lazy" />`
       : GLASSES_SVG;
-    return `<article class="g-card" data-product-id="${pid}" data-filter="${filt}" data-seller="${sellerId}" data-search="${search}">
+    return `<article class="g-card" data-product-id="${pid}" data-filter="${filt}" data-seller="${sellerId}" data-search="${search}" data-tryon="${tryonFlag}">
       <div class="g-card-art">
         <button type="button" class="g-heart" data-save="${pid}" aria-label="${escapeHtml(product.name)} saxla">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
           </svg>
         </button>
-        ${tryon}
-        <a href="/product/${pid}" aria-label="${escapeHtml(product.brand)} ${escapeHtml(product.name)}">${media}</a>
+        <a class="g-card-media" href="/product/${pid}" aria-label="${escapeHtml(product.brand)} ${escapeHtml(product.name)}">${media}</a>
+        ${vto}
       </div>
-      <a class="g-card-body" href="/product/${pid}">
-        <p class="g-brand">${escapeHtml(product.brand)}</p>
-        <h3>${escapeHtml(product.name)}</h3>
-        <p class="g-price">${product.price} ${escapeHtml(product.currency)}</p>
+      <div class="g-card-body">
+        <a href="/product/${pid}">
+          <p class="g-brand">${escapeHtml(product.brand)}</p>
+          <h3>${escapeHtml(product.name)}</h3>
+          <p class="g-price">${product.price} ${escapeHtml(product.currency || "AZN")}</p>
+        </a>
         ${sellerMeta}
-      </a>
+      </div>
     </article>`;
   }
 
@@ -195,7 +201,8 @@
 
   function applyCatalogFilter() {
     const filter =
-      document.querySelector(".g-quick-chip.is-on")?.getAttribute("data-filter") ||
+      document.querySelector(".g-filters-side .g-filters:not(.g-filters-sellers) .g-chip.is-on")
+        ?.getAttribute("data-filter") ||
       document.querySelector(".g-filters:not(.g-filters-sellers) .g-chip.is-on")
         ?.getAttribute("data-filter") ||
       document.querySelector("[data-filter].is-on")?.getAttribute("data-filter") ||
@@ -204,6 +211,7 @@
       document
         .querySelector("[data-seller-filter].is-on")
         ?.getAttribute("data-seller-filter") || "all";
+    const tryonOnly = !!document.querySelector("[data-filter-tryon].is-on");
     const query = (
       document.querySelector("[data-search-input]")?.value ||
       document.querySelector("[data-search-input-focus]")?.value ||
@@ -211,38 +219,52 @@
     )
       .trim()
       .toLowerCase();
-    const cards = [...document.querySelectorAll("[data-product-grid] .g-card")];
+    const sort = document.querySelector("[data-sort]")?.value || "recommended";
+    const grid = document.querySelector("[data-product-grid]");
+    if (!grid) return;
+    const cards = [...grid.querySelectorAll(".g-card")];
+    cards.sort((a, b) => {
+      const pa = window.SHOP_PRODUCTS?.find((p) => String(p.id) === a.dataset.productId);
+      const pb = window.SHOP_PRODUCTS?.find((p) => String(p.id) === b.dataset.productId);
+      if (!pa || !pb) return 0;
+      if (sort === "price-asc") return (pa.price || 0) - (pb.price || 0);
+      if (sort === "price-desc") return (pb.price || 0) - (pa.price || 0);
+      if (sort === "name") return String(pa.name).localeCompare(String(pb.name), "az");
+      return 0;
+    });
+    cards.forEach((card) => grid.appendChild(card));
     let visible = 0;
     cards.forEach((card) => {
       const matchFilter =
         filter === "all" || card.getAttribute("data-filter") === filter;
       const matchSeller =
         seller === "all" || card.getAttribute("data-seller") === seller;
+      const matchTryon = !tryonOnly || card.getAttribute("data-tryon") === "1";
       const hay = card.getAttribute("data-search") || "";
       const show =
-        matchFilter && matchSeller && (!query || hay.includes(query));
+        matchFilter && matchSeller && matchTryon && (!query || hay.includes(query));
       card.hidden = !show;
       if (show) visible += 1;
     });
-    const grid = document.querySelector("[data-product-grid]");
-    if (!grid) return;
     let empty = grid.querySelector(".g-empty-filter");
     if (!visible) {
       if (!empty) {
-        empty = document.createElement("p");
-        empty.className = "g-empty-filter";
-        empty.textContent = "Bu filtrə uyğun məhsul yoxdur.";
+        empty = document.createElement("div");
+        empty.className = "g-empty g-empty-filter";
+        empty.innerHTML =
+          "<h2>Bu axtarışa uyğun eynək tapılmadı.</h2><p>Filtrləri dəyişin və ya başqa söz yoxlayın.</p>";
         grid.appendChild(empty);
       }
     } else if (empty) {
       empty.remove();
     }
     const count = document.querySelector("[data-style-count]");
-    if (count) count.textContent = `${visible} stil`;
+    if (count) count.textContent = `${visible} məhsul`;
   }
 
   function renderSavedGrid() {
     const grid = document.querySelector("[data-saved-grid]");
+    const empty = document.querySelector("[data-saved-empty]");
     if (!grid) return;
     const products = Array.isArray(window.SHOP_PRODUCTS)
       ? window.SHOP_PRODUCTS
@@ -250,10 +272,11 @@
     const ids = new Set(loadSaved());
     const matched = products.filter((product) => ids.has(String(product.id)));
     if (!matched.length) {
-      grid.innerHTML =
-        '<p class="g-panel-empty">Hələ saxlanılan çərçivə yoxdur. Ürəyə toxunun.</p>';
+      grid.innerHTML = "";
+      if (empty) empty.hidden = false;
       return;
     }
+    if (empty) empty.hidden = true;
     grid.innerHTML = matched.map(cardHtml).join("");
     paintHearts(grid);
     wireSaveButtons(grid);
@@ -275,14 +298,66 @@
     if (!document.querySelector("[data-product-grid]")) return;
 
     document.querySelector("[data-menu-toggle]")?.addEventListener("click", () => {
-      document.querySelector("[data-mobile-nav]")?.classList.toggle("is-open");
+      const nav = document.querySelector("[data-mobile-nav]");
+      if (!nav) return;
+      const open = nav.hasAttribute("hidden");
+      if (open) nav.removeAttribute("hidden");
+      else nav.setAttribute("hidden", "");
+      document.querySelector("[data-menu-toggle]")?.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+
+    document.querySelector("[data-search-toggle]")?.addEventListener("click", () => {
+      const panel = document.querySelector("[data-search-panel]");
+      if (!panel) return;
+      const open = panel.hasAttribute("hidden");
+      if (open) {
+        panel.removeAttribute("hidden");
+        panel.querySelector("input")?.focus();
+      } else panel.setAttribute("hidden", "");
+    });
+
+    document.querySelector("[data-filter-open]")?.addEventListener("click", () => {
+      const drawer = document.querySelector("[data-filter-drawer]");
+      const body = document.querySelector("[data-filter-drawer-body]");
+      const side = document.querySelector(".g-filters-side");
+      if (!drawer || !body || !side) return;
+      body.innerHTML = side.innerHTML;
+      drawer.removeAttribute("hidden");
+      body.querySelectorAll("[data-filter]").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          setFilter(chip.getAttribute("data-filter") || "all");
+          drawer.setAttribute("hidden", "");
+        });
+      });
+      body.querySelectorAll("[data-seller-filter]").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          document.querySelectorAll("[data-seller-filter]").forEach((item) => item.classList.remove("is-on"));
+          document
+            .querySelectorAll(`[data-seller-filter="${chip.getAttribute("data-seller-filter")}"]`)
+            .forEach((item) => item.classList.add("is-on"));
+          applyCatalogFilter();
+          drawer.setAttribute("hidden", "");
+        });
+      });
+      body.querySelectorAll("[data-filter-tryon]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll("[data-filter-tryon]").forEach((item) => item.classList.toggle("is-on"));
+          applyCatalogFilter();
+          drawer.setAttribute("hidden", "");
+        });
+      });
+    });
+
+    document.querySelector("[data-filter-close]")?.addEventListener("click", () => {
+      document.querySelector("[data-filter-drawer]")?.setAttribute("hidden", "");
+    });
+
+    document.querySelector("[data-filter-drawer]")?.addEventListener("click", (e) => {
+      if (e.target === e.currentTarget) e.currentTarget.setAttribute("hidden", "");
     });
 
     function setFilter(filter) {
       document.querySelectorAll("[data-filter]").forEach((item) => {
-        item.classList.toggle("is-on", item.getAttribute("data-filter") === filter);
-      });
-      document.querySelectorAll(".g-quick-chip[data-filter]").forEach((item) => {
         item.classList.toggle("is-on", item.getAttribute("data-filter") === filter);
       });
       document.querySelectorAll("[data-nav-filter]").forEach((item) => {
@@ -304,7 +379,7 @@
     document.querySelectorAll("[data-nav-filter]").forEach((btn) => {
       btn.addEventListener("click", () => {
         setFilter(btn.getAttribute("data-nav-filter") || "all");
-        document.querySelector("[data-mobile-nav]")?.classList.remove("is-open");
+        document.querySelector("[data-mobile-nav]")?.setAttribute("hidden", "");
       });
     });
 
@@ -315,6 +390,32 @@
           .forEach((item) => item.classList.remove("is-on"));
         chip.classList.add("is-on");
         applyCatalogFilter();
+      });
+    });
+
+    document.querySelectorAll("[data-filter-tryon]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("[data-filter-tryon]").forEach((item) => {
+          item.classList.toggle("is-on");
+        });
+        applyCatalogFilter();
+        document.querySelector("#catalog")?.scrollIntoView({ behavior: "smooth" });
+      });
+    });
+
+    document.querySelector("[data-sort]")?.addEventListener("change", () => {
+      applyCatalogFilter();
+    });
+
+    document.querySelectorAll("[data-brand-search]").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const brand = chip.getAttribute("data-brand-search") || "";
+        const input = document.querySelector("[data-search-input]");
+        if (input) {
+          input.value = brand;
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        document.querySelector("#catalog")?.scrollIntoView({ behavior: "smooth" });
       });
     });
 
@@ -333,12 +434,12 @@
       btn.addEventListener("click", (event) => {
         event.preventDefault();
         showView("saved");
-        document.querySelector("[data-mobile-nav]")?.classList.remove("is-open");
+        document.querySelector("[data-mobile-nav]")?.setAttribute("hidden", "");
       });
     });
 
-    document.querySelector("[data-back-discover]")?.addEventListener("click", () => {
-      showView("discover");
+    document.querySelectorAll("[data-back-discover]").forEach((btn) => {
+      btn.addEventListener("click", () => showView("discover"));
     });
 
     wireSaveButtons();
@@ -364,9 +465,23 @@
         </div>`;
       return;
     }
-    const rows = items
-      .map(
-        ({ product, quantity }) => `
+    const bySeller = {};
+    items.forEach((row) => {
+      const key = row.product.seller_id || row.product.seller_name || "digər";
+      if (!bySeller[key]) {
+        bySeller[key] = {
+          name: row.product.seller_name || "Satıcı",
+          city: row.product.seller_city || "",
+          rows: [],
+        };
+      }
+      bySeller[key].rows.push(row);
+    });
+    const groups = Object.values(bySeller)
+      .map((group) => {
+        const lines = group.rows
+          .map(
+            ({ product, quantity }) => `
         <li class="g-item">
           <div class="g-item-art">${
             product.image
@@ -383,12 +498,18 @@
             <button type="button" class="remove" data-remove="${escapeHtml(product.id)}">Sil</button>
           </div>
         </li>`,
-      )
+          )
+          .join("");
+        return `<section class="g-cart-group">
+          <h2 class="g-cart-seller">${escapeHtml(group.name)}${group.city ? ` · ${escapeHtml(group.city)}` : ""}</h2>
+          <ul class="g-cart-list">${lines}</ul>
+        </section>`;
+      })
       .join("");
     root.innerHTML = `
-      <ul class="g-cart-list">${rows}</ul>
+      ${groups}
       <div class="g-sum">
-        <div class="g-sum-row"><span>Çatdırılma</span><span class="g-sum-free">Pulsuz</span></div>
+        <div class="g-sum-row"><span>Çatdırılma (EYNƏK)</span><span class="g-sum-free">Pulsuz*</span></div>
         <div class="g-sum-row total"><span>Cəmi</span><span>${totalPrice(items)} AZN</span></div>
         <form class="g-checkout" data-checkout-form>
           <h3>Sifariş məlumatları</h3>
@@ -398,7 +519,7 @@
           <label>Ünvan <input name="address" required autocomplete="street-address" placeholder="Küçə, bina, mənzil" /></label>
           <label>Qeyd (istəyə bağlı) <textarea name="note" rows="2" placeholder="Çatdırılma vaxtı və s."></textarea></label>
           <button type="submit" class="g-btn">Sifarişi göndər</button>
-          <p class="g-checkout-note">Ödəniş nağd və ya kartla çatdırılmada. Təsdiq üçün sizinlə əlaqə saxlanılacaq.</p>
+          <p class="g-checkout-note">Ödəniş EYNƏK vasitəsilə (nağd/kart çatdırılmada). Onlayn ödəniş inteqrasiyası növbəti mərhələdə.</p>
         </form>
       </div>`;
     root.querySelectorAll("[data-remove]").forEach((btn) => {

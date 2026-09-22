@@ -11,16 +11,16 @@
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/shop.css?v=60" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/shop.css?v=70" />
   </head>
   <body class="g-body">
     <header class="g-header">
       <div class="g-wrap g-header-row">
-        <a class="g-logo" href="/">Eynək<span>.com</span></a>
+        <a class="g-logo" href="/">EYNƏK</a>
         <nav class="g-nav" aria-label="Əsas">
-          <a class="g-nav-link" href="/shop">Kəşf et</a>
-          <a class="g-nav-link" href="/shop#stores">Satıcılar</a>
+          <a class="g-nav-link" href="/shop">Eynəklər</a>
+          <a class="g-nav-link" href="/shop#stores">Mağazalar</a>
           <a class="g-nav-link" href="/cart">Səbət</a>
         </nav>
         <div class="g-header-tools">
@@ -59,9 +59,9 @@
             </a>
             <span class="g-badge">Ən çox satılan</span>
           </div>
-          <div class="g-stage-tools">
+          <div class="g-stage-tools" id="vto">
             <button type="button" class="g-vto-pill auglio-tryon-btn" data-item_id="" style="display:none">
-              Virtual sınaq
+              Üzümdə yoxla
             </button>
           </div>
         </section>
@@ -119,6 +119,9 @@
           </div>
 
           <div class="g-buyrow">
+            <button type="button" class="g-btn g-vto-pill auglio-tryon-btn" data-item_id="" style="display:none">
+              Üzümdə yoxla
+            </button>
             <button type="button" class="g-btn g-btn-ghost" data-add-cart>Səbətə əlavə et</button>
             <a class="g-btn" href="/cart" data-buy-now>İndi al · {{PRODUCT_PRICE}} {{PRODUCT_CURRENCY}}</a>
           </div>
@@ -131,8 +134,8 @@
 
     <footer class="g-footer">
       <div class="g-wrap">
-        <strong class="g-logo">Eynək<span>.com</span></strong>
-        <p>Virtual Try-On ilə sına, sonra sifariş et.</p>
+        <strong class="g-logo">EYNƏK</strong>
+        <p>Bütün eynəklər. Bir marketplace.</p>
       </div>
     </footer>
     <div class="g-toast" data-toast hidden></div>
@@ -144,7 +147,7 @@
         demoUrl: {{AUGLIO_DEMO_URL_JSON}},
       };
     </script>
-    <script src="/static/shop.js?v=60"></script>
+    <script src="/static/shop.js?v=70"></script>
     <script src="/static/auglio-vto.js?v=50"></script>
   </body>
 </html>

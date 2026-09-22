@@ -403,14 +403,10 @@ def product_card_html(product: dict) -> str:
     filt = html.escape(str(product.get("filter") or "sunglasses"))
     seller_id = html.escape(str(product.get("seller_id") or ""))
     seller = html.escape(str(product.get("seller_name") or ""))
+    city = html.escape(str(product.get("seller_city") or ""))
     search = html.escape(
         f'{product["brand"]} {product["name"]} {product["category"]} '
         f'{product.get("seller_name") or ""}'.lower()
-    )
-    badge = (
-        '<span class="g-tryon-badge"><i></i>3D TRY-ON</span>'
-        if product.get("tryon")
-        else ""
     )
     image = str(product.get("image") or "").strip()
     media = (
@@ -418,35 +414,42 @@ def product_card_html(product: dict) -> str:
         if image
         else _GLASSES_SVG
     )
-    rating_val = product.get("rating")
-    rating = f"{float(rating_val):.1f}" if rating_val is not None else ""
-    if seller and rating:
-        seller_meta = (
-            f'<p class="g-seller-meta">{seller} '
-            f'<span class="star">★</span> {rating}</p>'
+    seller_line = ""
+    if seller:
+        label = f"{seller} · {city}" if city else seller
+        if seller_id:
+            seller_line = (
+                f'<a class="g-seller-meta" href="/store/{seller_id}">{label}</a>'
+            )
+        else:
+            seller_line = f'<p class="g-seller-meta">{label}</p>'
+    vto = ""
+    if product.get("tryon"):
+        vto = (
+            f'<a class="g-card-vto" href="/product/{pid}#vto">'
+            f"Üzümdə yoxla</a>"
         )
-    elif seller:
-        seller_meta = f'<p class="g-seller-meta">{seller}</p>'
-    else:
-        seller_meta = ""
-    return f"""<article class="g-card" data-product-id="{pid}" data-filter="{filt}" data-seller="{seller_id}" data-search="{search}">
+    tryon_flag = "1" if product.get("tryon") else "0"
+    return f"""<article class="g-card" data-product-id="{pid}" data-filter="{filt}" data-seller="{seller_id}" data-search="{search}" data-tryon="{tryon_flag}">
   <div class="g-card-art">
     <button type="button" class="g-heart" data-save="{pid}" aria-label="{html.escape(product['name'])} saxla">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
         <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
       </svg>
     </button>
-    {badge}
-    <a href="/product/{pid}" aria-label="{html.escape(product['brand'])} {html.escape(product['name'])}">
+    <a class="g-card-media" href="/product/{pid}" aria-label="{html.escape(product['brand'])} {html.escape(product['name'])}">
       {media}
     </a>
+    {vto}
   </div>
-  <a class="g-card-body" href="/product/{pid}">
-    <p class="g-brand">{html.escape(product["brand"])}</p>
-    <h3>{html.escape(product["name"])}</h3>
-    <p class="g-price">{product["price"]} {html.escape(product["currency"])}</p>
-    {seller_meta}
-  </a>
+  <div class="g-card-body">
+    <a href="/product/{pid}">
+      <p class="g-brand">{html.escape(product["brand"])}</p>
+      <h3>{html.escape(product["name"])}</h3>
+      <p class="g-price">{product["price"]} {html.escape(product["currency"])}</p>
+    </a>
+    {seller_line}
+  </div>
 </article>"""
 
 
@@ -463,10 +466,15 @@ def store_cards_html() -> str:
         label = "məhsul" if count == 1 else "məhsul"
         cards.append(
             f"""<a class="g-store-card" href="/store/{sid}">
-  <p class="g-brand">{html.escape(store["city"])}</p>
-  <h3>{html.escape(store["name"])}</h3>
-  <p>{html.escape(store["tagline"])}</p>
-  <span>{count} {label}</span>
+  <div class="g-store-card-top">
+    <p class="g-brand">{html.escape(store["city"])}</p>
+    <h3>{html.escape(store["name"])}</h3>
+    <p>{html.escape(store["tagline"])}</p>
+  </div>
+  <div class="g-store-card-foot">
+    <span>{count} {label}</span>
+    <span class="g-store-cta">Mağazaya bax</span>
+  </div>
 </a>"""
         )
     return "\n".join(cards)
@@ -475,7 +483,10 @@ def store_cards_html() -> str:
 def brand_chips_html() -> str:
     chips = []
     for name in catalog_brands():
-        chips.append(f'<span class="g-brand-chip">{html.escape(name)}</span>')
+        chips.append(
+            f'<button type="button" class="g-brand-chip" data-brand-search="{html.escape(name)}">'
+            f"{html.escape(name)}</button>"
+        )
     return "\n".join(chips)
 
 
@@ -554,9 +565,9 @@ def render_product_page(template: str, product: dict) -> str:
         else _GLASSES_SVG
     )
     vto_status = (
-        "Auglio hazırlanır…"
+        "Kamera ilə real-time try-on inteqrasiyası hazırlanır. Auglio açarı olduqda burada işə düşəcək."
         if tryon
-        else "Bu çərçivə üçün Virtual Try-On tezliklə açılacaq."
+        else "Bu çərçivə üçün Virtual Try-On hələ aktiv deyil."
     )
     return (
         template.replace(

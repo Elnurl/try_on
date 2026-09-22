@@ -3,29 +3,28 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>{{STORE_NAME}} | Eynək.com</title>
+    <title>{{STORE_NAME}} | EYNƏK</title>
     <meta name="description" content="{{STORE_TAGLINE}}" />
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/shop.css?v=60" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/shop.css?v=70" />
   </head>
   <body class="g-body">
     <header class="g-header">
       <div class="g-wrap g-header-row">
-        <a class="g-logo" href="/">Eynək<span>.com</span></a>
+        <a class="g-logo" href="/">EYNƏK</a>
         <nav class="g-nav" aria-label="Əsas">
-          <a class="g-nav-link" href="/shop">Kəşf et</a>
-          <a class="g-nav-link" href="/shop#stores">Satıcılar</a>
+          <a class="g-nav-link" href="/shop">Eynəklər</a>
+          <a class="g-nav-link" href="/shop#stores">Mağazalar</a>
           <a class="g-nav-link" href="/cart">Səbət</a>
         </nav>
         <div class="g-header-tools">
           <a class="g-icon-btn solid" href="/cart" aria-label="Səbət">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
-              <path d="M3 6h18" />
-              <path d="M16 10a4 4 0 0 1-8 0" />
+              <path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" />
             </svg>
             <span class="g-count" data-cart-count>0</span>
           </a>
@@ -34,9 +33,9 @@
     </header>
     <main class="g-wrap">
       <nav class="g-crumb">
-        <a href="/shop">Marketplace</a>
+        <a href="/shop">EYNƏK</a>
         <span>/</span>
-        <a href="/shop#stores">Satıcılar</a>
+        <a href="/shop#stores">Mağazalar</a>
         <span>/</span>
         <span>{{STORE_NAME}}</span>
       </nav>
@@ -44,7 +43,7 @@
         <p class="g-brand">{{STORE_CITY}}</p>
         <h1>{{STORE_NAME}}</h1>
         <p class="g-store-tagline">{{STORE_TAGLINE}}</p>
-        <p class="g-section-meta">Bu mağazadan {{STORE_COUNT}} eynək</p>
+        <p class="g-section-meta">EYNƏK satıcısı · {{STORE_COUNT}} məhsul</p>
       </section>
       <section class="g-section" style="padding-top:0">
         <div class="g-grid" data-product-grid>{{PRODUCT_CARDS}}</div>
@@ -52,7 +51,7 @@
     </main>
     <footer class="g-footer">
       <div class="g-wrap">
-        <strong class="g-logo">Eynək<span>.com</span></strong>
+        <strong class="g-logo">EYNƏK</strong>
         <p>Marketplace satıcı vitrini</p>
       </div>
     </footer>
@@ -60,6 +59,6 @@
     <script>
       window.SHOP_PRODUCTS = {{PRODUCTS_JSON}};
     </script>
-    <script src="/static/shop.js?v=60"></script>
+    <script src="/static/shop.js?v=70"></script>
   </body>
 </html>
