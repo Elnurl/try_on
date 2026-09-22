@@ -8,16 +8,15 @@
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/shop.css?v=51" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/shop.css?v=60" />
   </head>
   <body class="g-body">
-    <div class="g-ribbon"><p>Marketplace satıcı vitrini</p></div>
     <header class="g-header">
-      <div class="g-wrap g-header-top">
-        <a class="g-logo" href="/">EYNƏK</a>
-        <nav class="g-nav" aria-label="Əsas" style="display:flex;padding:0">
-          <a class="g-nav-link" href="/shop">Kataloq</a>
+      <div class="g-wrap g-header-row">
+        <a class="g-logo" href="/">Eynək<span>.com</span></a>
+        <nav class="g-nav" aria-label="Əsas">
+          <a class="g-nav-link" href="/shop">Kəşf et</a>
           <a class="g-nav-link" href="/shop#stores">Satıcılar</a>
           <a class="g-nav-link" href="/cart">Səbət</a>
         </nav>
@@ -53,14 +52,14 @@
     </main>
     <footer class="g-footer">
       <div class="g-wrap">
-        <strong>Eynək.com</strong>
-        <p><a href="/shop">Marketplace-ə qayıt</a></p>
+        <strong class="g-logo">Eynək<span>.com</span></strong>
+        <p>Marketplace satıcı vitrini</p>
       </div>
     </footer>
     <div class="g-toast" data-toast hidden></div>
     <script>
       window.SHOP_PRODUCTS = {{PRODUCTS_JSON}};
     </script>
-    <script src="/static/shop.js?v=51"></script>
+    <script src="/static/shop.js?v=60"></script>
   </body>
 </html>

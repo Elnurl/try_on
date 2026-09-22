@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Eynək.com — Optika marketplace</title>
+    <title>Eynək.com — Premium Eyewear Marketplace</title>
     <meta
       name="description"
       content="Azərbaycanda eynək marketplace: optik və günəş eynəkləri, Virtual Try-On, etibarlı satıcılar."
     />
-    <meta property="og:title" content="Eynək.com — Optika marketplace" />
+    <meta property="og:title" content="Eynək.com — Premium Eyewear Marketplace" />
     <meta
       property="og:description"
-      content="Eynəkləri bir yerdə gəz, Virtual Try-On ilə sına, sifariş et."
+      content="İdeal çərçivəni tap. Virtual Try-On ilə sına, sonra sifariş et."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://xn--eynk-x6b.com/shop" />
@@ -20,31 +20,44 @@
     <link rel="canonical" href="https://xn--eynk-x6b.com/shop" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/shop.css?v=51" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/shop.css?v=60" />
   </head>
   <body class="g-body">
-    <div class="g-ribbon">
-      <p>Bakıda pulsuz çatdırılma · Virtual Try-On ilə sına, sonra al</p>
-    </div>
-
     <header class="g-header">
-      <div class="g-wrap g-header-top">
-        <a class="g-logo" href="/">EYNƏK</a>
+      <div class="g-wrap g-header-row">
+        <a class="g-logo" href="/">Eynək<span>.com</span></a>
+
+        <nav class="g-nav" aria-label="Əsas">
+          <button type="button" class="g-nav-link is-on" data-nav-filter="all">Kəşf et</button>
+          <button type="button" class="g-nav-link" data-nav-filter="optical">Optik</button>
+          <button type="button" class="g-nav-link" data-nav-filter="sunglasses">Günəş</button>
+          <a class="g-nav-link" href="#stores">Satıcılar</a>
+        </nav>
+
         <label class="g-search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="m21 21-4.34-4.34" /><circle cx="11" cy="11" r="8" />
           </svg>
-          <input type="search" placeholder="Eynək, marka və ya satıcı axtar" data-search-input autocomplete="off" />
+          <input type="search" placeholder="Çərçivə, marka, satıcı axtar" data-search-input autocomplete="off" />
         </label>
+
         <div class="g-header-tools">
-          <a class="g-tool" href="/partner/login">Giriş</a>
-          <button type="button" class="g-tool" data-open-saved>Seçilmişlər</button>
-          <a class="g-tool" href="/sell">Sat</a>
-          <a class="g-tool g-tool-cart" href="/cart" aria-label="Səbət">
-            Səbət
+          <a class="g-sell-btn" href="/sell">Eynək.com-da sat</a>
+          <button type="button" class="g-icon-btn" data-open-saved aria-label="Seçilmişlər">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+            </svg>
+          </button>
+          <a class="g-icon-btn" href="/cart" aria-label="Səbət">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+              <path d="M3 6h18" />
+              <path d="M16 10a4 4 0 0 1-8 0" />
+            </svg>
             <span class="g-count" data-cart-count>0</span>
           </a>
+          <a class="g-avatar" href="/partner/login" aria-label="Giriş">E</a>
           <button type="button" class="g-icon-btn g-menu-btn" data-menu-toggle aria-label="Menyu">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M4 6h16M4 12h16M4 18h16" />
@@ -52,23 +65,15 @@
           </button>
         </div>
       </div>
-      <nav class="g-wrap g-nav" aria-label="Əsas">
-        <button type="button" class="g-nav-link is-on" data-nav-filter="all">Hamısı</button>
-        <button type="button" class="g-nav-link" data-nav-filter="optical">Optik eynək</button>
-        <button type="button" class="g-nav-link" data-nav-filter="sunglasses">Günəş eynəyi</button>
-        <button type="button" class="g-nav-link" data-nav-filter="luxury">Lüks</button>
-        <button type="button" class="g-nav-link" data-nav-filter="sports">İdman</button>
-        <a class="g-nav-link" href="#stores">Satıcılar</a>
-        <a class="g-nav-link accent" href="#vto">Virtual sınaq</a>
-      </nav>
       <div class="g-wrap g-mobile-nav" data-mobile-nav>
         <label class="g-mobile-search">
-          <input type="search" placeholder="Eynək, marka, satıcı axtar" data-search-input-focus autocomplete="off" />
+          <input type="search" placeholder="Çərçivə, marka, satıcı axtar" data-search-input-focus autocomplete="off" />
         </label>
-        <button type="button" data-nav-filter="all">Hamısı</button>
+        <button type="button" data-nav-filter="all">Kəşf et</button>
         <button type="button" data-nav-filter="optical">Optik</button>
         <button type="button" data-nav-filter="sunglasses">Günəş</button>
         <a href="#stores">Satıcılar</a>
+        <a href="/sell">Eynək.com-da sat</a>
         <a href="/partner/login">Giriş</a>
         <a href="/cart">Səbət</a>
         <button type="button" data-open-saved>Seçilmişlər</button>
@@ -78,49 +83,54 @@
     <main>
       <div data-view="discover">
         <section class="g-wrap g-hero" id="vto">
-          <div class="g-hero-copy">
-            <p class="g-hero-kicker">Daha sürətli seçim</p>
-            <h1>Çərçivəni tez tap.</h1>
-            <p class="g-hero-lede">
-              Etibarlı optikalardan eynəkləri bir yerdə gəz, Virtual Try-On ilə sına, sonra sifariş et.
-            </p>
-            <a class="g-hero-btn" href="#catalog">Kataloqa bax</a>
+          <div class="g-hero-panel">
+            <div class="g-hero-copy">
+              <p class="g-hero-kicker">Yeni təcrübə</p>
+              <h1>İdeal çərçivəni tap.</h1>
+              <p class="g-hero-lede">
+                Azərbaycan üzrə etibarlı optikalardan yüzlərlə çərçivə —
+                almadan əvvəl Virtual Try-On ilə sına.
+              </p>
+              <a class="g-hero-btn" href="#catalog">
+                Virtual sına
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                  <path d="M7 17 17 7" /><path d="M8 7h9v9" />
+                </svg>
+              </a>
+            </div>
+            <div class="g-hero-stats" aria-label="Platforma göstəriciləri">
+              <article class="g-stat">
+                <strong>{{PRODUCT_COUNT}}+</strong>
+                <span>Çərçivə</span>
+              </article>
+              <article class="g-stat">
+                <strong>{{STORE_COUNT}}</strong>
+                <span>Təsdiqli satıcı</span>
+              </article>
+              <article class="g-stat">
+                <strong>48s</strong>
+                <span>Bakıda çatdırılma</span>
+              </article>
+              <article class="g-stat">
+                <strong>3D</strong>
+                <span>Virtual try-on</span>
+              </article>
+            </div>
           </div>
-          <div class="g-hero-visual" aria-hidden="true">
-            <img class="g-hero-photo" src="/static/images/hero-model.jpg" alt="" width="720" height="900" />
-          </div>
-        </section>
-
-        <section class="g-wrap g-promo-grid">
-          <a class="g-promo g-promo-a" href="#catalog" data-nav-filter="sunglasses">
-            <p>Günəş kolleksiyası</p>
-            <h2>Yay üslubu</h2>
-            <span>İndi bax</span>
-          </a>
-          <a class="g-promo g-promo-b" href="#catalog" data-nav-filter="optical">
-            <p>Gündəlik taxım</p>
-            <h2>Optik eynəklər</h2>
-            <span>Kolleksiyaya bax</span>
-          </a>
-          <a class="g-promo g-promo-c" href="#stores">
-            <p>Marketplace</p>
-            <h2>Etibarlı satıcılar</h2>
-            <span>Mağazalara bax</span>
-          </a>
         </section>
 
         <section class="g-wrap g-section" id="catalog">
           <div class="g-section-head">
             <div>
-              <p>Kataloq</p>
-              <h2>Eynəklər</h2>
+              <p>Sənə seçilmiş</p>
+              <h2>Çərçivələrə bax</h2>
             </div>
-            <span class="g-section-meta" data-style-count>{{PRODUCT_COUNT}} model</span>
+            <span class="g-section-meta" data-style-count>{{PRODUCT_COUNT}} stil</span>
           </div>
           <div class="g-filters" role="tablist" aria-label="Kateqoriyalar">
             <button type="button" class="g-chip is-on" data-filter="all">Hamısı</button>
-            <button type="button" class="g-chip" data-filter="optical">Optik</button>
             <button type="button" class="g-chip" data-filter="sunglasses">Günəş eynəyi</button>
+            <button type="button" class="g-chip" data-filter="optical">Optik</button>
             <button type="button" class="g-chip" data-filter="luxury">Lüks</button>
             <button type="button" class="g-chip" data-filter="sports">İdman</button>
           </div>
@@ -134,22 +144,11 @@
           <div class="g-section-head">
             <div>
               <p>Marketplace</p>
-              <h2>Satıcı mağazaları</h2>
+              <h2>Satıcılar</h2>
             </div>
             <span class="g-section-meta">{{STORE_COUNT}} satıcı</span>
           </div>
           <div class="g-store-grid">{{STORE_CARDS}}</div>
-        </section>
-
-        <section class="g-wrap g-section" id="brands" style="padding-top:0">
-          <div class="g-section-head">
-            <div>
-              <p>Kataloqda</p>
-              <h2>Markalar</h2>
-            </div>
-            <span class="g-section-meta">{{BRAND_COUNT}} marka</span>
-          </div>
-          <div class="g-brand-row">{{BRAND_CHIPS}}</div>
         </section>
       </div>
 
@@ -165,19 +164,21 @@
     <footer class="g-footer">
       <div class="g-wrap g-footer-grid">
         <div>
-          <strong>Eynək.com</strong>
-          <p>Azərbaycanda optikalar və eynək brendlərinin satdığı peşəkar marketplace.</p>
+          <strong class="g-logo">Eynək<span>.com</span></strong>
+          <p>Optikalar və eynək brendlərinin Azərbaycanda satdığı marketplace.</p>
         </div>
         <div>
           <strong>Alış-veriş</strong>
-          <p><a href="#catalog">Optik</a></p>
-          <p><a href="#catalog">Günəş eynəyi</a></p>
+          <p><a href="#catalog" data-nav-filter="optical">Optik</a></p>
+          <p><a href="#catalog" data-nav-filter="sunglasses">Günəş eynəyi</a></p>
+          <p><a href="#catalog" data-nav-filter="luxury">Lüks</a></p>
           <p><a href="#vto">Virtual sınaq</a></p>
         </div>
         <div>
-          <strong>Satıcılar</strong>
+          <strong>Satıcılar üçün</strong>
           <p><a href="/sell">Mağaza aç</a></p>
           <p><a href="/partner/login">Satıcı paneli</a></p>
+          <p><a href="/sell">Çatdırılma &amp; qaytarma</a></p>
           <p>hello@eynək.com</p>
         </div>
       </div>
@@ -188,6 +189,6 @@
       window.SHOP_PRODUCTS = {{PRODUCTS_JSON}};
       window.SHOP_STORES = {{STORES_JSON}};
     </script>
-    <script src="/static/shop.js?v=51"></script>
+    <script src="/static/shop.js?v=60"></script>
   </body>
 </html>

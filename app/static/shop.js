@@ -238,7 +238,7 @@
       empty.remove();
     }
     const count = document.querySelector("[data-style-count]");
-    if (count) count.textContent = `${visible} model`;
+    if (count) count.textContent = `${visible} stil`;
   }
 
   function renderSavedGrid() {

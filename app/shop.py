@@ -408,7 +408,7 @@ def product_card_html(product: dict) -> str:
         f'{product.get("seller_name") or ""}'.lower()
     )
     badge = (
-        '<span class="g-tryon-badge">3D SINAQ</span>'
+        '<span class="g-tryon-badge"><i></i>3D TRY-ON</span>'
         if product.get("tryon")
         else ""
     )

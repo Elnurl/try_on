@@ -11,16 +11,15 @@
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/shop.css?v=51" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/shop.css?v=60" />
   </head>
   <body class="g-body">
-    <div class="g-ribbon"><p>Bakıda pulsuz çatdırılma · Virtual Try-On</p></div>
     <header class="g-header">
-      <div class="g-wrap g-header-top">
-        <a class="g-logo" href="/">EYNƏK</a>
-        <nav class="g-nav" aria-label="Əsas" style="display:flex;padding:0">
-          <a class="g-nav-link" href="/shop">Kataloq</a>
+      <div class="g-wrap g-header-row">
+        <a class="g-logo" href="/">Eynək<span>.com</span></a>
+        <nav class="g-nav" aria-label="Əsas">
+          <a class="g-nav-link" href="/shop">Kəşf et</a>
           <a class="g-nav-link" href="/shop#stores">Satıcılar</a>
           <a class="g-nav-link" href="/cart">Səbət</a>
         </nav>
@@ -81,15 +80,16 @@
               </div>
             </div>
           </div>
+
           <p class="g-desc">{{PRODUCT_DESCRIPTION}}</p>
 
           <a class="g-seller-card" href="/store/{{SELLER_ID}}">
             <div>
               <p class="g-label">Satıcı</p>
               <strong>{{SELLER_NAME}}</strong>
-              <p>{{SELLER_CITY}} · Eynək marketplace</p>
+              <p class="g-hint">{{SELLER_CITY}}</p>
             </div>
-            <span>Vitrinə bax →</span>
+            <span>Mağazaya →</span>
           </a>
 
           <div class="g-opts">
@@ -110,7 +110,6 @@
           <div class="g-qty-row">
             <div>
               <p class="g-label">Miqdar</p>
-              <p>Bakıda pulsuz çatdırılma</p>
             </div>
             <div class="g-stepper">
               <button type="button" data-qty-minus aria-label="Azalt">−</button>
@@ -132,8 +131,8 @@
 
     <footer class="g-footer">
       <div class="g-wrap">
-        <strong>Eynək.com</strong>
-        <p>Peşəkar eynək marketplace — Virtual Try-On ilə seçin.</p>
+        <strong class="g-logo">Eynək<span>.com</span></strong>
+        <p>Virtual Try-On ilə sına, sonra sifariş et.</p>
       </div>
     </footer>
     <div class="g-toast" data-toast hidden></div>
@@ -145,7 +144,7 @@
         demoUrl: {{AUGLIO_DEMO_URL_JSON}},
       };
     </script>
-    <script src="/static/shop.js?v=51"></script>
+    <script src="/static/shop.js?v=60"></script>
     <script src="/static/auglio-vto.js?v=50"></script>
   </body>
 </html>
