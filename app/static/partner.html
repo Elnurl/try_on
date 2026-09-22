@@ -3,101 +3,220 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Mağaza paneli — Eynək.com</title>
+    <title>Satıcı paneli — EYNƏK</title>
     <meta name="robots" content="noindex" />
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/styles.css?v=11" />
+    <link rel="stylesheet" href="/static/styles.css?v=13" />
   </head>
-  <body>
-    <main>
-      <header>
-        <p class="eyebrow">Eynək.com · Satıcı paneli</p>
-        <h1 id="title">Mağaza</h1>
-        <p class="lede" id="hello">Yüklənir…</p>
-        <p>
-          <a href="/shop">Marketplace-ə bax</a>
-          ·
-          <a href="/sell">Satıcı səhifəsi</a>
-          ·
+  <body class="seller-body">
+    <header class="seller-top">
+      <div class="seller-top-inner">
+        <div>
+          <p class="eyebrow">EYNƏK · Satıcı paneli</p>
+          <h1 id="title">Mağaza</h1>
+          <p class="lede" id="hello">Yüklənir…</p>
+        </div>
+        <div class="seller-top-actions">
+          <a class="ghost-btn" id="storefront-link" href="/shop">Vitrin</a>
           <button type="button" class="ghost-btn" id="logout">Çıxış</button>
-        </p>
-      </header>
+        </div>
+      </div>
+      <nav class="seller-tabs" aria-label="Panel bölmələri">
+        <button type="button" class="seller-tab is-on" data-tab="overview">İcmal</button>
+        <button type="button" class="seller-tab" data-tab="products">Məhsullar</button>
+        <button type="button" class="seller-tab" data-tab="orders">Sifarişlər</button>
+        <button type="button" class="seller-tab" data-tab="finance">Maliyyə</button>
+        <button type="button" class="seller-tab" data-tab="notifications">
+          Bildirişlər <span class="tab-badge" id="notif-badge" hidden>0</span>
+        </button>
+        <button type="button" class="seller-tab" data-tab="settings">Ayarlar</button>
+      </nav>
+    </header>
 
-      <section class="panel">
-        <h2 class="h2">1. Mağazanız hansıdır?</h2>
-        <p class="lede">Birini seçin. Sonra dəyişə bilərsiniz.</p>
-        <div class="split">
-          <button type="button" class="panel path-btn" id="pick-site" data-mode="own_site">
-            <strong>Öz saytım var</strong>
-            <p>Kod alıram, öz saytıma qoyuram.</p>
-          </button>
-          <button type="button" class="panel path-btn" id="pick-host" data-mode="hosted">
-            <strong>Saytım yoxdur</strong>
-            <p>Eynək yükləyirəm, Eynək.com-da dərc edirəm.</p>
-          </button>
+    <main class="seller-main">
+      <section class="seller-panel is-on" data-panel="overview">
+        <div class="stat-grid" id="stat-grid"></div>
+        <div class="panel">
+          <h2 class="h2">Tez keçidlər</h2>
+          <p class="lede">
+            Marketplace-ə dərc etdiyiniz məhsullar admin təsdiqindən sonra kataloqda görünür.
+            EYNƏK komissiyası sifariş üzərindən hesablanır.
+          </p>
+          <div class="seller-quick">
+            <button type="button" class="copy" data-goto="products">Məhsul əlavə et</button>
+            <button type="button" class="ghost-btn" data-goto="orders">Sifarişlərə bax</button>
+            <button type="button" class="ghost-btn" data-goto="finance">Balansa bax</button>
+          </div>
         </div>
       </section>
 
-      <section class="panel" id="box-site" hidden>
-        <h2 class="h2">2. Saytınıza qoyulacaq kod</h2>
-        <p class="lede">Bu kodu saytınızın HTML-inə əlavə edin. Hər məhsul düyməsində SKU yazın.</p>
-        <textarea id="snippet" readonly rows="6"></textarea>
-        <button type="button" class="copy" id="copy">Kodu kopyala</button>
-        <p id="copy-msg" class="status" hidden></p>
+      <section class="seller-panel" data-panel="products" hidden>
+        <div class="panel">
+          <h2 class="h2">Yeni eynək əlavə et</h2>
+          <p class="lede">Marketplace qutusu işarələnəndə məhsul «gözləyir» statusuna düşür — admin təsdiqindən sonra dərc olunur.</p>
+          <form id="up" class="admin-form">
+            <label>Kod (SKU) <input name="sku" required placeholder="rb-3025" /></label>
+            <label>Ad <input name="name" required placeholder="Aviator" /></label>
+            <label>Marka <input name="brand" placeholder="Ray-Ban" /></label>
+            <label>Qiymət (AZN) <input name="price" type="number" min="0" step="1" placeholder="149" /></label>
+            <label>Stok <input name="stock" type="number" min="0" step="1" value="1" /></label>
+            <label>
+              Kateqoriya
+              <select name="category">
+                <option value="optical">Optik</option>
+                <option value="sunglasses">Günəş eynəyi</option>
+                <option value="luxury">Lüks</option>
+                <option value="sports">İdman</option>
+              </select>
+            </label>
+            <label>
+              Şəkil
+              <input name="file" type="file" accept="image/png,image/jpeg,image/webp" required />
+            </label>
+            <div class="upload-preview" id="preview" hidden>
+              <img alt="Önizləmə" />
+            </div>
+            <label class="check-row">
+              <input name="marketplace" type="checkbox" value="1" checked />
+              Marketplace üçün göndər (admin təsdiqi)
+            </label>
+            <button class="copy" type="submit">Yüklə</button>
+          </form>
+          <p id="up-msg" class="status" hidden></p>
+        </div>
+
+        <div class="panel">
+          <h2 class="h2">Kataloq</h2>
+          <div id="list"></div>
+        </div>
       </section>
 
-      <section class="panel" id="box-host" hidden>
-        <h2 class="h2">2. Müştəri linki və QR</h2>
-        <p class="lede">Instagram bio, WhatsApp və ya vitrin üçün.</p>
-        <p><a id="try-link" href="#">Try-on səhifəsi</a></p>
-        <p><img id="qr" alt="QR kod" width="180" height="180" /></p>
+      <section class="seller-panel" data-panel="orders" hidden>
+        <div class="panel">
+          <h2 class="h2">Sifarişləriniz</h2>
+          <p class="lede">Yalnız sizin məhsullarınız olan sifariş sətirləri göstərilir.</p>
+          <div id="orders"></div>
+        </div>
+      </section>
 
-        <h2 class="h2">3. Eynək əlavə et və dərc et</h2>
-        <p class="lede">Şəkil və qiymət yazın. Marketplace qutusunu işarələyin — dərhal kataloqda görünür.</p>
-        <form id="up" class="admin-form">
-          <label>Kod (SKU) <input name="sku" required placeholder="rb-3025" /></label>
-          <label>Ad <input name="name" required placeholder="Aviator" /></label>
-          <label>Marka <input name="brand" placeholder="Ray-Ban" /></label>
-          <label>Qiymət (AZN) <input name="price" type="number" min="0" step="1" placeholder="149" /></label>
-          <label>
-            Kateqoriya
-            <select name="category">
-              <option value="optical">Optik</option>
-              <option value="sunglasses">Günəş eynəyi</option>
-              <option value="luxury">Lüks</option>
-              <option value="sports">İdman</option>
-            </select>
-          </label>
-          <label>
-            Şəkil
-            <input name="file" type="file" accept="image/png,image/jpeg,image/webp" required />
-          </label>
-          <div class="upload-preview" id="preview" hidden>
-            <img alt="Önizləmə" />
+      <section class="seller-panel" data-panel="finance" hidden>
+        <div class="stat-grid" id="finance-stats"></div>
+        <div class="panel">
+          <h2 class="h2">Ödəniş tarixçəsi</h2>
+          <div id="payouts"></div>
+        </div>
+      </section>
+
+      <section class="seller-panel" data-panel="notifications" hidden>
+        <div class="panel">
+          <div class="seller-row-head">
+            <h2 class="h2">Bildirişlər</h2>
+            <button type="button" class="ghost-btn" id="mark-read">Hamısını oxunmuş et</button>
           </div>
-          <label class="check-row">
-            <input name="marketplace" type="checkbox" value="1" checked />
-            Eynək.com marketplace-ə dərc et
-          </label>
-          <button class="copy" type="submit">Yüklə və dərc et</button>
-        </form>
-        <p id="up-msg" class="status" hidden></p>
+          <div id="notifications"></div>
+        </div>
+      </section>
 
-        <h2 class="h2">Kataloqunuz</h2>
-        <div id="list"></div>
+      <section class="seller-panel" data-panel="settings" hidden>
+        <div class="panel">
+          <h2 class="h2">Mağaza ayarları</h2>
+          <form id="settings-form" class="admin-form">
+            <label>Ad <input name="name" required /></label>
+            <label>Şəhər <input name="city" placeholder="Bakı" /></label>
+            <label>Slogan <input name="tagline" /></label>
+            <label>Əlaqə <input name="contact" placeholder="telefon / email" /></label>
+            <label>Ünvan <input name="address" /></label>
+            <label>İş saatları <input name="hours" placeholder="10:00–20:00" /></label>
+            <label>Instagram <input name="instagram" /></label>
+            <label>Vebsayt <input name="website" /></label>
+            <label>Haqqında <textarea name="description" rows="3"></textarea></label>
+            <button class="copy" type="submit">Saxla</button>
+          </form>
+          <p id="settings-msg" class="status" hidden></p>
+        </div>
+
+        <div class="panel">
+          <h2 class="h2">Satış rejimi</h2>
+          <div class="split">
+            <button type="button" class="panel path-btn" id="pick-site" data-mode="own_site">
+              <strong>Öz saytım var</strong>
+              <p>Widget kodunu öz saytıma qoyuram.</p>
+            </button>
+            <button type="button" class="panel path-btn" id="pick-host" data-mode="hosted">
+              <strong>Saytım yoxdur</strong>
+              <p>EYNƏK vitrinində satıram.</p>
+            </button>
+          </div>
+        </div>
+
+        <div class="panel" id="box-site" hidden>
+          <h2 class="h2">Widget kodu</h2>
+          <textarea id="snippet" readonly rows="5"></textarea>
+          <button type="button" class="copy" id="copy">Kodu kopyala</button>
+          <p id="copy-msg" class="status" hidden></p>
+        </div>
+
+        <div class="panel" id="box-host" hidden>
+          <h2 class="h2">Vitrin və QR</h2>
+          <p><a id="try-link" href="#">Try-on səhifəsi</a></p>
+          <p><img id="qr" alt="QR kod" width="160" height="160" /></p>
+        </div>
       </section>
     </main>
+
     <script>
       let slug = "";
+      let me = null;
       const title = document.querySelector("#title");
       const hello = document.querySelector("#hello");
       const boxSite = document.querySelector("#box-site");
       const boxHost = document.querySelector("#box-host");
       const preview = document.querySelector("#preview");
       const previewImg = preview.querySelector("img");
+
+      const STATUS_LABEL = {
+        draft: "Qaralama",
+        pending: "Gözləyir",
+        approved: "Təsdiqli",
+        rejected: "Rədd",
+        out_of_stock: "Stokda yox",
+        new: "Yeni",
+        confirmed: "Təsdiqləndi",
+        preparing: "Hazırlanır",
+        ready: "Hazırdır",
+        completed: "Tamamlandı",
+        cancelled: "Ləğv",
+      };
+
+      function escapeHtml(text) {
+        return String(text ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+
+      function money(value) {
+        if (value == null || value === "") return "—";
+        return `${Number(value).toFixed(2)} AZN`;
+      }
+
+      function showTab(name) {
+        document.querySelectorAll(".seller-tab").forEach((btn) => {
+          btn.classList.toggle("is-on", btn.dataset.tab === name);
+        });
+        document.querySelectorAll(".seller-panel").forEach((panel) => {
+          const on = panel.dataset.panel === name;
+          panel.hidden = !on;
+          panel.classList.toggle("is-on", on);
+        });
+        if (name === "notifications") {
+          fetch("/api/partner/notifications/read", { method: "POST" }).then(() => loadNotifications());
+        }
+      }
 
       function showMode(mode) {
         boxSite.hidden = mode !== "own_site";
@@ -107,9 +226,18 @@
         });
       }
 
-      function money(value) {
-        if (value == null || value === "") return "—";
-        return `${Number(value)} AZN`;
+      async function setInventory(sku, fields) {
+        const body = new URLSearchParams(fields);
+        const res = await fetch(
+          "/api/partner/frames/" + encodeURIComponent(sku) + "/inventory",
+          { method: "POST", body },
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: "Yenilənmədi" }));
+          alert(err.detail || "Yenilənmədi.");
+          return false;
+        }
+        return true;
       }
 
       async function toggleMarket(sku, published, price) {
@@ -126,27 +254,43 @@
           alert(err.detail || "Yenilənmədi.");
           return;
         }
-        load();
+        loadProducts();
+        loadOverview();
       }
 
-      async function load() {
-        const me = await fetch("/api/partner/me");
-        if (!me.ok) {
-          location.href = "/partner/login";
-          return;
+      function renderStats(dash) {
+        const f = dash.finance || {};
+        document.querySelector("#stat-grid").innerHTML = [
+          ["Məhsul", dash.products],
+          ["Gözləyən", dash.pending_products],
+          ["Az stok", dash.low_stock],
+          ["Yeni sifariş", dash.orders_new],
+          ["Sifarişlər", dash.orders_total],
+          ["Balans", money(f.pending_payout)],
+        ]
+          .map(
+            ([label, value]) =>
+              `<article class="stat-card"><p>${escapeHtml(label)}</p><strong>${escapeHtml(value)}</strong></article>`,
+          )
+          .join("");
+        const badge = document.querySelector("#notif-badge");
+        if (dash.unread_notifications > 0) {
+          badge.hidden = false;
+          badge.textContent = String(dash.unread_notifications);
+        } else {
+          badge.hidden = true;
         }
-        const data = await me.json();
-        slug = data.slug;
-        title.textContent = data.name;
-        hello.textContent =
-          "Eynək yükləyin, qiymət yazın və marketplace-ə dərc edin.";
-        document.querySelector("#snippet").value =
-          `<script src="${location.origin}/vto-widget.js" data-store-id="${slug}"><\/script>\n` +
-          `<button class="try-on-btn" data-sku="SKU">Virtual sına</button>`;
-        document.querySelector("#try-link").href = "/t/" + slug;
-        document.querySelector("#try-link").textContent = location.origin + "/t/" + slug;
-        document.querySelector("#qr").src = "/api/brand/" + slug + "/qr.png";
-        showMode(data.store_mode || "");
+      }
+
+      async function loadOverview() {
+        const res = await fetch("/api/partner/dashboard");
+        if (!res.ok) return;
+        const dash = await res.json();
+        renderStats(dash);
+        document.querySelector("#storefront-link").href = dash.marketplace_url || "/shop";
+      }
+
+      async function loadProducts() {
         const brand = await (await fetch("/api/brand/" + slug)).json();
         const list = document.querySelector("#list");
         const frames = (brand.frames || []).filter((item) => item.custom);
@@ -155,48 +299,63 @@
               .map((item) => {
                 const on = !!item.marketplace;
                 const price = item.price == null ? "" : item.price;
+                const st = item.status || (on ? "pending" : "draft");
+                const stock = item.stock == null ? 0 : item.stock;
                 return `<article class="panel listing-card">
-                  <img src="${item.image_url}" alt="" />
+                  <img src="${escapeHtml(item.image_url)}" alt="" />
                   <div>
-                    <strong>${item.name}</strong>
-                    <p class="lede">${item.brand || ""} · ${item.id}</p>
-                    <span class="badge ${on ? "on" : ""}">${on ? "Marketplace-də" : "Gizli"}</span>
+                    <strong>${escapeHtml(item.name)}</strong>
+                    <p class="lede">${escapeHtml(item.brand || "")} · ${escapeHtml(item.id)}</p>
+                    <span class="badge ${st === "approved" ? "on" : ""}">${escapeHtml(STATUS_LABEL[st] || st)}</span>
                     <label class="price-row">Qiymət (AZN)
-                      <input type="number" min="0" step="1" data-price-input="${item.id}" value="${price}" />
+                      <input type="number" min="0" step="1" data-price-input="${escapeHtml(item.id)}" value="${escapeHtml(price)}" />
+                    </label>
+                    <label class="price-row">Stok
+                      <input type="number" min="0" step="1" data-stock-input="${escapeHtml(item.id)}" value="${escapeHtml(stock)}" />
                     </label>
                     <label class="check-row">
-                      <input type="checkbox" data-market="${item.id}" ${on ? "checked" : ""} />
-                      Eynək.com-da dərc et
+                      <input type="checkbox" data-market="${escapeHtml(item.id)}" ${on ? "checked" : ""} />
+                      Marketplace üçün göndər
                     </label>
                     <div class="listing-actions">
-                      <button type="button" class="copy" data-save-price="${item.id}">Qiyməti saxla</button>
-                      <button type="button" class="ghost-btn" data-del="${item.id}">Sil</button>
+                      <button type="button" class="copy" data-save-inv="${escapeHtml(item.id)}">Saxla</button>
+                      <button type="button" class="ghost-btn" data-del="${escapeHtml(item.id)}">Sil</button>
                     </div>
                   </div>
                 </article>`;
               })
               .join("")
           : "<p class='lede'>Hələ eynək yoxdur. Yuxarıdakı formadan əlavə edin.</p>";
+
         list.querySelectorAll("[data-del]").forEach((btn) => {
           btn.addEventListener("click", async () => {
             if (!confirm("Bu eynəyi silmək istəyirsiniz?")) return;
-            await fetch("/api/brand/" + slug + "/frames/" + btn.dataset.del, {
-              method: "DELETE",
-            });
-            load();
+            await fetch("/api/brand/" + slug + "/frames/" + btn.dataset.del, { method: "DELETE" });
+            loadProducts();
+            loadOverview();
           });
         });
-        list.querySelectorAll("[data-save-price]").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const sku = btn.dataset.savePrice;
-            const input = list.querySelector(`[data-price-input="${sku}"]`);
+        list.querySelectorAll("[data-save-inv]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const sku = btn.dataset.saveInv;
+            const priceEl = list.querySelector(`[data-price-input="${sku}"]`);
+            const stockEl = list.querySelector(`[data-stock-input="${sku}"]`);
             const market = list.querySelector(`[data-market="${sku}"]`);
-            const price = Number(String(input.value || "").replace(",", "."));
+            const price = Number(String(priceEl.value || "").replace(",", "."));
+            const stock = Number(stockEl.value || 0);
             if (Number.isNaN(price) || price < 0) {
               alert("Düzgün qiymət yazın.");
               return;
             }
-            toggleMarket(sku, !!(market && market.checked), price);
+            const ok = await setInventory(sku, {
+              price: String(price),
+              stock: String(stock),
+              marketplace: market && market.checked ? "1" : "0",
+            });
+            if (ok) {
+              loadProducts();
+              loadOverview();
+            }
           });
         });
         list.querySelectorAll("[data-market]").forEach((box) => {
@@ -214,6 +373,143 @@
         });
       }
 
+      async function loadOrders() {
+        const rows = await (await fetch("/api/partner/orders")).json();
+        const root = document.querySelector("#orders");
+        root.innerHTML = rows.length
+          ? rows
+              .map((order) => {
+                const myStatus =
+                  (order.seller_status && order.seller_status[slug]) || order.status || "new";
+                const lines = (order.items || [])
+                  .map(
+                    (it) =>
+                      `${escapeHtml(it.name)} × ${it.quantity} — ${money(it.subtotal)} (sizin: ${money(it.seller_net)})`,
+                  )
+                  .join("<br>");
+                return `<article class="panel">
+                  <strong>#${escapeHtml(order.id)}</strong>
+                  <p>${escapeHtml(order.name)} · ${escapeHtml(order.phone)}</p>
+                  <p>${escapeHtml(order.city || "")} · ${escapeHtml(order.address || "")}</p>
+                  <p>${lines}</p>
+                  <p><strong>${money(order.seller_net)}</strong> · status: ${escapeHtml(STATUS_LABEL[myStatus] || myStatus)}</p>
+                  <label class="price-row">Status
+                    <select data-order-status="${escapeHtml(order.id)}">
+                      ${["new", "confirmed", "preparing", "ready", "completed", "cancelled"]
+                        .map(
+                          (s) =>
+                            `<option value="${s}" ${s === myStatus ? "selected" : ""}>${STATUS_LABEL[s]}</option>`,
+                        )
+                        .join("")}
+                    </select>
+                  </label>
+                </article>`;
+              })
+              .join("")
+          : "<p class='lede'>Hələ sifariş yoxdur.</p>";
+        root.querySelectorAll("[data-order-status]").forEach((sel) => {
+          sel.addEventListener("change", async () => {
+            const body = new URLSearchParams({ status: sel.value });
+            const res = await fetch(
+              "/api/partner/orders/" + encodeURIComponent(sel.dataset.orderStatus) + "/status",
+              { method: "POST", body },
+            );
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({ detail: "Yenilənmədi" }));
+              alert(err.detail || "Yenilənmədi.");
+              loadOrders();
+              return;
+            }
+            loadOrders();
+            loadOverview();
+          });
+        });
+      }
+
+      async function loadFinance() {
+        const f = await (await fetch("/api/partner/finance")).json();
+        document.querySelector("#finance-stats").innerHTML = [
+          ["Ümumi satış", money(f.gross_sales)],
+          [`EYNƏK komissiya (${Math.round((f.commission_rate || 0) * 100)}%)`, money(f.eynek_commission)],
+          ["Sizin gəlir", money(f.seller_earnings)],
+          ["Ödənilən", money(f.paid_payouts)],
+          ["Gözləyən balans", money(f.pending_payout)],
+          ["Sifariş sayı", f.order_count],
+        ]
+          .map(
+            ([label, value]) =>
+              `<article class="stat-card"><p>${escapeHtml(label)}</p><strong>${escapeHtml(value)}</strong></article>`,
+          )
+          .join("");
+        const payouts = f.payouts || [];
+        document.querySelector("#payouts").innerHTML = payouts.length
+          ? payouts
+              .map(
+                (p) =>
+                  `<article class="panel"><strong>${money(p.amount)}</strong>
+                  <p>${escapeHtml(p.status || "")} · ${escapeHtml(p.at || "")}</p>
+                  <p class="lede">${escapeHtml(p.note || "")}</p></article>`,
+              )
+              .join("")
+          : "<p class='lede'>Hələ ödəniş qeydi yoxdur. Balans sifarişlər tamamlandıqca yığılır.</p>";
+      }
+
+      async function loadNotifications() {
+        const rows = await (await fetch("/api/partner/notifications")).json();
+        document.querySelector("#notifications").innerHTML = rows.length
+          ? rows
+              .map(
+                (n) =>
+                  `<article class="panel ${n.read ? "" : "is-unread"}">
+                    <strong>${escapeHtml(n.title)}</strong>
+                    <p>${escapeHtml(n.body || "")}</p>
+                    <p class="lede">${escapeHtml(n.at || "")}</p>
+                  </article>`,
+              )
+              .join("")
+          : "<p class='lede'>Bildiriş yoxdur.</p>";
+        loadOverview();
+      }
+
+      function fillSettings() {
+        const form = document.querySelector("#settings-form");
+        ["name", "city", "tagline", "contact", "address", "hours", "instagram", "website", "description"].forEach(
+          (key) => {
+            const el = form.elements[key];
+            if (el) el.value = me[key] || "";
+          },
+        );
+      }
+
+      async function load() {
+        const meRes = await fetch("/api/partner/me");
+        if (!meRes.ok) {
+          location.href = "/partner/login";
+          return;
+        }
+        me = await meRes.json();
+        slug = me.slug;
+        title.textContent = me.name;
+        hello.textContent = me.city
+          ? `${me.city} · məhsul idarəsi, sifarişlər və balans`
+          : "Məhsul idarəsi, sifarişlər və balans";
+        document.querySelector("#snippet").value =
+          `<script src="${location.origin}/vto-widget.js" data-store-id="${slug}"><\/script>\n` +
+          `<button class="try-on-btn" data-sku="SKU">Üzümdə yoxla</button>`;
+        document.querySelector("#try-link").href = "/t/" + slug;
+        document.querySelector("#try-link").textContent = location.origin + "/t/" + slug;
+        document.querySelector("#qr").src = "/api/brand/" + slug + "/qr.png";
+        showMode(me.store_mode || "");
+        fillSettings();
+        await Promise.all([loadOverview(), loadProducts(), loadOrders(), loadFinance(), loadNotifications()]);
+      }
+
+      document.querySelectorAll(".seller-tab").forEach((btn) => {
+        btn.addEventListener("click", () => showTab(btn.dataset.tab));
+      });
+      document.querySelectorAll("[data-goto]").forEach((btn) => {
+        btn.addEventListener("click", () => showTab(btn.dataset.goto));
+      });
       document.querySelectorAll(".path-btn").forEach((btn) => {
         btn.addEventListener("click", async () => {
           const body = new URLSearchParams({ store_mode: btn.dataset.mode });
@@ -242,6 +538,7 @@
         e.preventDefault();
         const fd = new FormData(e.target);
         if (!fd.get("marketplace")) fd.set("marketplace", "0");
+        const stock = fd.get("stock");
         const res = await fetch("/api/brand/" + slug + "/frames", {
           method: "POST",
           body: fd,
@@ -255,14 +552,45 @@
           return;
         }
         const item = await res.json();
+        if (stock != null && stock !== "") {
+          await setInventory(item.id, { stock: String(stock) });
+        }
         msg.style.color = "var(--accent)";
         msg.textContent = item.marketplace
-          ? "Eynək əlavə olundu və marketplace-ə dərc edildi."
-          : "Eynək əlavə olundu. İstəsəniz aşağıdan marketplace-ə dərc edin.";
+          ? "Yükləndi. Marketplace üçün admin təsdiqi gözlənilir."
+          : "Eynək əlavə olundu (qaralama).";
         e.target.reset();
         preview.hidden = true;
         previewImg.removeAttribute("src");
-        load();
+        loadProducts();
+        loadOverview();
+      });
+      document.querySelector("#settings-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const body = Object.fromEntries(fd.entries());
+        const res = await fetch("/api/partner/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const msg = document.querySelector("#settings-msg");
+        msg.hidden = false;
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: "Saxlanmadı" }));
+          msg.style.color = "";
+          msg.textContent = err.detail || "Saxlanmadı.";
+          return;
+        }
+        me = { ...me, ...(await res.json()) };
+        title.textContent = me.name;
+        msg.style.color = "var(--accent)";
+        msg.textContent = "Ayarlar saxlandı.";
+        loadOverview();
+      });
+      document.querySelector("#mark-read").addEventListener("click", async () => {
+        await fetch("/api/partner/notifications/read", { method: "POST" });
+        loadNotifications();
       });
       document.querySelector("#logout").addEventListener("click", async () => {
         await fetch("/api/partner/logout", { method: "POST" });

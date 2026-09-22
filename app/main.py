@@ -58,17 +58,27 @@ from app.store import (
     get_stats,
     load_applications,
     load_orders,
+    mark_notifications_read,
     media_path,
+    pending_marketplace_products,
     public_brand,
     save_application,
     save_brand_settings,
     save_lead,
     save_order,
     save_uploaded_frame,
+    seller_dashboard,
+    seller_finance,
+    seller_notifications,
+    seller_orders,
     set_frame_marketplace,
+    set_listing_status,
     update_brand,
     update_calibration,
     update_domains,
+    update_frame_inventory,
+    update_seller_order_status,
+    update_seller_settings,
 )
 
 ROOT = Path(__file__).resolve().parent
@@ -356,7 +366,132 @@ def api_partner_me(request: Request) -> dict:
         "slug": slug,
         "name": brand["name"],
         "store_mode": brand.get("store_mode") or "",
+        "city": brand.get("city") or "",
+        "tagline": brand.get("tagline") or "",
+        "contact": brand.get("contact") or "",
+        "address": brand.get("address") or "",
+        "hours": brand.get("hours") or "",
+        "instagram": brand.get("instagram") or "",
+        "website": brand.get("website") or "",
+        "description": brand.get("description") or "",
     }
+
+
+@app.get("/api/partner/dashboard")
+def api_partner_dashboard(request: Request) -> dict:
+    slug = partner_slug(request)
+    if not slug:
+        raise HTTPException(status_code=401, detail="Giriş tələb olunur.")
+    return seller_dashboard(slug)
+
+
+@app.get("/api/partner/orders")
+def api_partner_orders(request: Request) -> list[dict]:
+    slug = partner_slug(request)
+    if not slug:
+        raise HTTPException(status_code=401, detail="Giriş tələb olunur.")
+    return seller_orders(slug)
+
+
+@app.post("/api/partner/orders/{order_id}/status")
+def api_partner_order_status(
+    request: Request,
+    order_id: str,
+    status: str = Form(...),
+) -> dict:
+    slug = partner_slug(request)
+    if not slug:
+        raise HTTPException(status_code=401, detail="Giriş tələb olunur.")
+    try:
+        return update_seller_order_status(slug, order_id, status.strip().lower())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/partner/finance")
+def api_partner_finance(request: Request) -> dict:
+    slug = partner_slug(request)
+    if not slug:
+        raise HTTPException(status_code=401, detail="Giriş tələb olunur.")
+    return seller_finance(slug)
+
+
+@app.get("/api/partner/notifications")
+def api_partner_notifications(request: Request) -> list[dict]:
+    slug = partner_slug(request)
+    if not slug:
+        raise HTTPException(status_code=401, detail="Giriş tələb olunur.")
+    return seller_notifications(slug)
+
+
+@app.post("/api/partner/notifications/read")
+def api_partner_notifications_read(request: Request) -> dict:
+    slug = partner_slug(request)
+    if not slug:
+        raise HTTPException(status_code=401, detail="Giriş tələb olunur.")
+    return {"ok": True, "marked": mark_notifications_read(slug)}
+
+
+@app.post("/api/partner/settings")
+async def api_partner_settings(request: Request) -> dict:
+    slug = partner_slug(request)
+    if not slug:
+        raise HTTPException(status_code=401, detail="Giriş tələb olunur.")
+    content_type = (request.headers.get("content-type") or "").lower()
+    if "application/json" in content_type:
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Yanlış məlumat.")
+    else:
+        form = await request.form()
+        payload = {k: str(form.get(k) or "") for k in form.keys()}
+    try:
+        return update_seller_settings(slug, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/partner/frames/{sku}/inventory")
+def api_partner_inventory(
+    request: Request,
+    sku: str,
+    stock: str = Form(""),
+    status: str = Form(""),
+    price: str = Form(""),
+    marketplace: str = Form(""),
+) -> dict:
+    slug = partner_slug(request)
+    if not slug:
+        raise HTTPException(status_code=401, detail="Giriş tələb olunur.")
+    stock_val = None
+    price_val = None
+    status_val = None
+    market_val = None
+    if stock.strip() != "":
+        try:
+            stock_val = int(stock)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Stok düzgün deyil.") from exc
+    if price.strip() != "":
+        try:
+            price_val = float(price.replace(",", "."))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Qiymət düzgün deyil.") from exc
+    if status.strip():
+        status_val = status.strip().lower()
+    if marketplace.strip() != "":
+        market_val = marketplace.strip().lower() in ("1", "true", "yes", "on")
+    try:
+        return update_frame_inventory(
+            slug,
+            sku,
+            stock=stock_val,
+            status=status_val,
+            price=price_val,
+            marketplace=market_val,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/partner/mode")
@@ -367,6 +502,29 @@ def api_partner_mode(request: Request, store_mode: str = Form(...)) -> dict:
     if store_mode not in ("own_site", "hosted"):
         raise HTTPException(status_code=400, detail="Yanlış seçim.")
     return public_brand(update_brand(slug, store_mode=store_mode))
+
+
+@app.get("/api/admin/pending-products")
+def api_admin_pending_products(request: Request) -> list[dict]:
+    require_admin_api(request)
+    return pending_marketplace_products()
+
+
+@app.post("/api/admin/products/{slug}/{sku}/status")
+def api_admin_product_status(
+    request: Request,
+    slug: str,
+    sku: str,
+    status: str = Form(...),
+) -> dict:
+    require_admin_api(request)
+    status = status.strip().lower()
+    if status not in ("approved", "rejected", "pending"):
+        raise HTTPException(status_code=400, detail="Yanlış status.")
+    try:
+        return set_listing_status(slug, sku, status)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/applications")

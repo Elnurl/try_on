@@ -3,18 +3,26 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Platforma — Eynək.com</title>
+    <title>Platforma — EYNƏK</title>
     <meta name="robots" content="noindex" />
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/styles.css?v=11" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/styles.css?v=13" />
   </head>
   <body>
     <main>
       <header>
-        <p class="eyebrow">Eynək.com · admin</p>
-        <h1>Müraciətlər, sifarişlər və mağazalar</h1>
-        <p class="lede">Partnyor müraciətlərini təsdiqləyin və gələn sifarişləri izləyin.</p>
+        <p class="eyebrow">EYNƏK · admin</p>
+        <h1>Müraciətlər, məhsullar və sifarişlər</h1>
+        <p class="lede">Satıcı müraciətlərini və marketplace məhsullarını təsdiqləyin.</p>
       </header>
+
+      <section>
+        <h2 class="h2">Gözləyən məhsullar</h2>
+        <div id="pending-products"></div>
+      </section>
 
       <section>
         <h2 class="h2">Yeni sifarişlər</h2>
@@ -39,37 +47,85 @@
           .replaceAll("<", "&lt;")
           .replaceAll(">", "&gt;");
       }
+
+      async function setProductStatus(sellerId, sku, status) {
+        const body = new URLSearchParams({ status });
+        const res = await fetch(
+          "/api/admin/products/" + encodeURIComponent(sellerId) + "/" + encodeURIComponent(sku) + "/status",
+          { method: "POST", body },
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: "Yenilənmədi" }));
+          alert(err.detail || "Yenilənmədi.");
+          return;
+        }
+        refresh();
+      }
+
       async function refresh() {
-        const [apps, brands, orders] = await Promise.all([
+        const [apps, brands, orders, pending] = await Promise.all([
           (await fetch("/api/applications")).json(),
           (await fetch("/api/brands")).json(),
           (await fetch("/api/orders")).json(),
+          (await fetch("/api/admin/pending-products")).json(),
         ]);
+
+        document.querySelector("#pending-products").innerHTML = pending.length
+          ? pending
+              .map(
+                (row) => `<article class="panel listing-card">
+                  <img src="${escapeHtml(row.image)}" alt="" />
+                  <div>
+                    <strong>${escapeHtml(row.name)}</strong>
+                    <p class="lede">${escapeHtml(row.seller_name)} · ${escapeHtml(row.sku)} · ${row.price} AZN</p>
+                    <p>Stok: ${row.stock}</p>
+                    <div class="listing-actions">
+                      <button type="button" class="copy" data-approve="${escapeHtml(row.seller_id)}" data-sku="${escapeHtml(row.sku)}">Təsdiqlə</button>
+                      <button type="button" class="ghost-btn" data-reject="${escapeHtml(row.seller_id)}" data-sku="${escapeHtml(row.sku)}">Rədd et</button>
+                    </div>
+                  </div>
+                </article>`,
+              )
+              .join("")
+          : "<p class='lede'>Gözləyən məhsul yoxdur.</p>";
+
+        document.querySelectorAll("[data-approve]").forEach((btn) => {
+          btn.addEventListener("click", () => setProductStatus(btn.dataset.approve, btn.dataset.sku, "approved"));
+        });
+        document.querySelectorAll("[data-reject]").forEach((btn) => {
+          btn.addEventListener("click", () => setProductStatus(btn.dataset.reject, btn.dataset.sku, "rejected"));
+        });
+
         document.querySelector("#orders").innerHTML = orders.length
           ? orders
+              .slice()
+              .reverse()
               .slice(0, 30)
               .map((row) => {
                 const lines = (row.items || [])
                   .map(
                     (it) =>
-                      `${escapeHtml(it.name)} × ${it.quantity} (${it.price} AZN)`,
+                      `${escapeHtml(it.name)} × ${it.quantity} (${it.price} AZN)` +
+                      (it.seller_id ? ` · ${escapeHtml(it.seller_id)}` : ""),
                   )
                   .join("<br>");
+                const commission =
+                  row.commission_total != null ? ` · EYNƏK: ${row.commission_total} AZN` : "";
                 return `<article class="panel">
                   <strong>#${escapeHtml(row.id)}</strong>
                   <p>${escapeHtml(row.name)} · ${escapeHtml(row.phone)}</p>
                   <p>${escapeHtml(row.city || "")} · ${escapeHtml(row.address || "")}</p>
                   <p>${lines}</p>
-                  <p><strong>${row.total} AZN</strong> · ${escapeHtml(row.status || "new")}</p>
+                  <p><strong>${row.total} AZN</strong>${commission} · ${escapeHtml(row.status || "new")}</p>
                   <p class="lede">${escapeHtml(row.note || "")}</p>
                 </article>`;
               })
               .join("")
           : "<p class='lede'>Hələ sifariş yoxdur.</p>";
 
-        const pending = apps.filter((row) => row.status === "pending");
-        document.querySelector("#apps").innerHTML = pending.length
-          ? pending
+        const pendingApps = apps.filter((row) => row.status === "pending");
+        document.querySelector("#apps").innerHTML = pendingApps.length
+          ? pendingApps
               .map(
                 (row) => `
           <article class="panel" data-id="${row.id}">
@@ -109,8 +165,7 @@
             }
             const data = await res.json();
             msg.style.color = "var(--accent)";
-            msg.textContent =
-              "Açıldı: " + data.slug + " / şifrə: " + data.password;
+            msg.textContent = "Açıldı: " + data.slug + " / şifrə: " + data.password;
             refresh();
           });
         });
@@ -120,7 +175,7 @@
                 (b) =>
                   `<article class="panel"><strong>${escapeHtml(b.name)}</strong>
               <p><code>${escapeHtml(b.slug)}</code></p>
-              <p><a href="/t/${encodeURIComponent(b.slug)}">Try-on</a> · <a href="/admin/${encodeURIComponent(b.slug)}">Ətraflı kataloq</a></p></article>`
+              <p><a href="/store/${encodeURIComponent(b.slug)}">Vitrin</a> · <a href="/t/${encodeURIComponent(b.slug)}">Try-on</a> · <a href="/admin/${encodeURIComponent(b.slug)}">Kataloq</a></p></article>`
               )
               .join("")
           : "<p class='lede'>Mağaza yoxdur.</p>";

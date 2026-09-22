@@ -51,8 +51,6 @@ DEMO_PRODUCTS: list[dict] = [
         "seller_city": "Bakı",
         "price": 259,
         "currency": "AZN",
-        "rating": 4.8,
-        "reviews": 124,
         "tryon": True,
         "featured": True,
         "image": "/static/images/products/p4.jpg",
@@ -87,8 +85,6 @@ DEMO_PRODUCTS: list[dict] = [
         "seller_city": "Bakı",
         "price": 229,
         "currency": "AZN",
-        "rating": 4.9,
-        "reviews": 86,
         "tryon": True,
         "featured": True,
         "image": "/static/images/products/rb-aviator-classic.jpg",
@@ -123,8 +119,6 @@ DEMO_PRODUCTS: list[dict] = [
         "seller_city": "Bakı",
         "price": 149,
         "currency": "AZN",
-        "rating": 4.6,
-        "reviews": 32,
         "tryon": True,
         "featured": True,
         "image": "/static/images/products/p5.jpg",
@@ -151,8 +145,6 @@ DEMO_PRODUCTS: list[dict] = [
         "seller_city": "Gəncə",
         "price": 119,
         "currency": "AZN",
-        "rating": 4.5,
-        "reviews": 18,
         "tryon": False,
         "featured": False,
         "image": "/static/images/products/cat-eye.jpg",
@@ -178,8 +170,6 @@ DEMO_PRODUCTS: list[dict] = [
         "seller_city": "Gəncə",
         "price": 99,
         "currency": "AZN",
-        "rating": 4.4,
-        "reviews": 21,
         "tryon": True,
         "featured": False,
         "image": "/static/images/products/rb-new-wayfarer.jpg",
@@ -581,8 +571,6 @@ def render_product_page(template: str, product: dict) -> str:
         .replace("{{PRODUCT_PRICE}}", str(product["price"]))
         .replace("{{PRODUCT_CURRENCY}}", html.escape(product["currency"]))
         .replace("{{PRODUCT_DESCRIPTION}}", html.escape(product["description"]))
-        .replace("{{PRODUCT_RATING}}", str(product.get("rating") or 4.8))
-        .replace("{{PRODUCT_REVIEWS}}", str(product.get("reviews") or 0))
         .replace("{{PRODUCT_SWATCHES}}", product_swatches_html(product))
         .replace("{{SELLER_ID}}", seller_id)
         .replace("{{SELLER_NAME}}", seller_name)

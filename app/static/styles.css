@@ -830,3 +830,133 @@ body.engine-deepar #camera {
   gap: 8px;
   margin-top: 8px;
 }
+
+/* Seller dashboard */
+.seller-body {
+  background: #f4f5f7;
+}
+
+.seller-top {
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+  padding: 24px 20px 0;
+}
+
+.seller-top-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.seller-top-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.seller-tabs {
+  max-width: 1100px;
+  margin: 20px auto 0;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 0;
+}
+
+.seller-tab {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 650;
+  padding: 12px 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+
+.seller-tab.is-on {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.tab-badge {
+  display: inline-flex;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  padding: 0 6px;
+  margin-left: 4px;
+}
+
+.seller-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+.seller-panel[hidden] {
+  display: none !important;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.stat-card p {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.stat-card strong {
+  font-size: 22px;
+  font-weight: 750;
+}
+
+.seller-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.seller-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.seller-row-head .h2 {
+  margin: 0;
+}
+
+.panel.is-unread {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+@media (max-width: 720px) {
+  .seller-top-inner {
+    flex-direction: column;
+  }
+}

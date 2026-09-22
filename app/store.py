@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
 import re
 import secrets
 from datetime import datetime, timezone
@@ -23,6 +24,8 @@ BRANDS_FILE = STORES / "brands.json"
 LEADS_FILE = STORES / "leads.json"
 APPLICATIONS_FILE = STORES / "applications.json"
 ORDERS_FILE = STORES / "orders.json"
+PAYOUTS_FILE = STORES / "payouts.json"
+COMMISSION_RATE = max(0.0, min(0.5, float(os.environ.get("EYNEK_COMMISSION_RATE", "0.15"))))
 AZ_SLUG = str.maketrans(
     {
         "ə": "e",
@@ -144,6 +147,14 @@ def save_uploaded_frame(
         amount = None
     if published and amount is None:
         raise ValueError("Marketplace üçün qiymət lazımdır.")
+    stock_val = int(existing.get("stock") or 0) if existing else 0
+    # Yeni dərc: admin təsdiqi gözləyir. Yeniləmədə köhnə status qalır.
+    if published:
+        status = "pending" if not existing else str(existing.get("status") or "pending")
+        if existing and existing.get("marketplace") and existing.get("status") == "approved":
+            status = "approved"
+    else:
+        status = str(existing.get("status") or "draft") if existing else "draft"
     item = {
         "id": sku,
         "name": name or sku,
@@ -162,6 +173,9 @@ def save_uploaded_frame(
         "category": cat,
         "filter": filt,
         "marketplace": bool(published),
+        "stock": stock_val if stock_val > 0 else (1 if published else 0),
+        "status": status,
+        "tryon": bool(existing.get("tryon")) if existing else False,
     }
     items = [row for row in extra_catalog(slug) if row["id"] != sku]
     items.append(item)
@@ -179,6 +193,10 @@ def set_frame_marketplace(slug: str, sku: str, published: bool, price: float | N
             if published and row.get("price") is None:
                 raise ValueError("Marketplace üçün qiymət lazımdır.")
             row["marketplace"] = bool(published)
+            if published and str(row.get("status") or "") != "approved":
+                row["status"] = "pending"
+            if not published:
+                row["status"] = "draft"
             found = row
             break
     if found is None:
@@ -199,6 +217,12 @@ def marketplace_listings() -> list[dict]:
                 continue
             if frame.get("price") is None:
                 continue
+            status = str(frame.get("status") or "approved")
+            if status not in ("approved",):
+                continue
+            stock = int(frame.get("stock") or 0)
+            if stock < 0:
+                continue
             filt = str(frame.get("filter") or "optical")
             pid = f"{slug}-{frame['id']}"
             rows.append(
@@ -212,9 +236,7 @@ def marketplace_listings() -> list[dict]:
                     "seller_city": seller_city,
                     "price": int(round(float(frame["price"]))),
                     "currency": frame.get("currency") or "AZN",
-                    "rating": float(frame.get("rating") or 4.8),
-                    "reviews": int(frame.get("reviews") or 0),
-                    "tryon": True,
+                    "tryon": bool(frame.get("tryon")),
                     "featured": bool(frame.get("featured")),
                     "image": frame.get("image_url") or f"/media/{slug}/{frame['id']}.png",
                     "category": frame.get("category") or "Optik eynək",
@@ -226,6 +248,8 @@ def marketplace_listings() -> list[dict]:
                     "colors": frame.get("colors")
                     or [{"name": "Standart", "hex": "#1a1a1a", "swatch": "ink"}],
                     "marketplace": True,
+                    "stock": int(frame.get("stock") or 0),
+                    "status": str(frame.get("status") or "approved"),
                 }
             )
     return rows
@@ -242,7 +266,7 @@ def marketplace_stores() -> list[dict]:
                 "id": slug,
                 "name": str(brand.get("name") or slug),
                 "city": str(brand.get("city") or "Bakı"),
-                "tagline": str(brand.get("tagline") or "Eynək.com satıcısı"),
+                "tagline": str(brand.get("tagline") or "EYNƏK marketplace mağazası"),
             }
         )
     return stores
@@ -495,6 +519,57 @@ def load_orders() -> list[dict]:
     return json.loads(ORDERS_FILE.read_text(encoding="utf-8"))
 
 
+def _notif_path(slug: str) -> Path:
+    return store_dir(slug) / "notifications.json"
+
+
+def add_seller_notification(slug: str, title: str, body: str = "", kind: str = "info") -> dict:
+    path = _notif_path(slug)
+    rows = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+    row = {
+        "id": secrets.token_hex(4),
+        "title": title[:120],
+        "body": body[:400],
+        "kind": kind[:40],
+        "read": False,
+        "at": datetime.now(timezone.utc).isoformat(),
+    }
+    rows.insert(0, row)
+    path.write_text(json.dumps(rows[:100], ensure_ascii=False, indent=2), encoding="utf-8")
+    return row
+
+
+def seller_notifications(slug: str) -> list[dict]:
+    path = _notif_path(slug)
+    if not path.exists():
+        return []
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def mark_notifications_read(slug: str) -> int:
+    path = _notif_path(slug)
+    if not path.exists():
+        return 0
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    n = 0
+    for row in rows:
+        if not row.get("read"):
+            row["read"] = True
+            n += 1
+    path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    return n
+
+
+def _attach_item_finance(item: dict) -> dict:
+    sub = float(item.get("price") or 0) * int(item.get("quantity") or 0)
+    commission = round(sub * COMMISSION_RATE, 2)
+    item["subtotal"] = round(sub, 2)
+    item["commission_rate"] = COMMISSION_RATE
+    item["commission"] = commission
+    item["seller_net"] = round(sub - commission, 2)
+    return item
+
+
 def save_order(payload: dict) -> dict:
     name = str(payload.get("name") or "").strip()
     phone = str(payload.get("phone") or "").strip()
@@ -531,10 +606,13 @@ def save_order(payload: dict) -> dict:
         }
         if not item["id"] or not item["name"]:
             continue
+        _attach_item_finance(item)
         items.append(item)
-        total += price * qty
+        total += item["subtotal"]
     if not items:
         raise ValueError("Səbət boşdur.")
+    commission_total = round(sum(float(i["commission"]) for i in items), 2)
+    seller_total = round(sum(float(i["seller_net"]) for i in items), 2)
     STORES.mkdir(parents=True, exist_ok=True)
     rows = load_orders()
     order = {
@@ -546,13 +624,216 @@ def save_order(payload: dict) -> dict:
         "note": note,
         "items": items,
         "total": round(total, 2),
+        "commission_total": commission_total,
+        "seller_total": seller_total,
         "currency": "AZN",
         "status": "new",
         "at": datetime.now(timezone.utc).isoformat(),
     }
     rows.append(order)
     ORDERS_FILE.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    sellers = {str(i.get("seller_id") or "") for i in items if i.get("seller_id")}
+    for seller in sellers:
+        add_seller_notification(
+            seller,
+            "Yeni sifariş",
+            f"#{order['id']} — {order['total']} AZN",
+            "order",
+        )
     return {"ok": True, "id": order["id"], "total": order["total"]}
+
+
+def update_frame_inventory(
+    slug: str,
+    sku: str,
+    *,
+    stock: int | None = None,
+    status: str | None = None,
+    price: float | None = None,
+    marketplace: bool | None = None,
+) -> dict:
+    items = extra_catalog(slug)
+    found = None
+    for row in items:
+        if row["id"] != sku:
+            continue
+        if stock is not None:
+            row["stock"] = max(0, int(stock))
+            if row["stock"] == 0 and row.get("status") == "approved":
+                row["status"] = "out_of_stock"
+            elif row["stock"] > 0 and row.get("status") == "out_of_stock":
+                row["status"] = "approved" if row.get("marketplace") else "draft"
+        if status is not None:
+            allowed = {"draft", "pending", "approved", "rejected", "out_of_stock"}
+            if status not in allowed:
+                raise ValueError("Yanlış status.")
+            row["status"] = status
+        if price is not None:
+            row["price"] = max(0.0, float(price))
+        if marketplace is not None:
+            row["marketplace"] = bool(marketplace)
+            if marketplace and str(row.get("status") or "") not in ("approved", "pending"):
+                row["status"] = "pending"
+        found = row
+        break
+    if found is None:
+        raise ValueError("SKU tapılmadı.")
+    _write_catalog(slug, items)
+    return found
+
+
+def pending_marketplace_products() -> list[dict]:
+    brands = load_brands()
+    rows = []
+    for slug, brand in brands.items():
+        for frame in extra_catalog(slug):
+            if not frame.get("custom"):
+                continue
+            if str(frame.get("status") or "") != "pending":
+                continue
+            rows.append(
+                {
+                    "seller_id": slug,
+                    "seller_name": brand.get("name") or slug,
+                    "sku": frame["id"],
+                    "name": frame.get("name") or frame["id"],
+                    "brand": frame.get("brand") or "",
+                    "price": frame.get("price"),
+                    "image": frame.get("image_url") or f"/media/{slug}/{frame['id']}.png",
+                    "marketplace": bool(frame.get("marketplace")),
+                    "stock": int(frame.get("stock") or 0),
+                    "status": "pending",
+                }
+            )
+    return rows
+
+
+def set_listing_status(slug: str, sku: str, status: str) -> dict:
+    row = update_frame_inventory(slug, sku, status=status)
+    if status == "approved":
+        add_seller_notification(slug, "Məhsul təsdiqləndi", f"{sku} marketplace-də aktivdir.", "product")
+    elif status == "rejected":
+        add_seller_notification(slug, "Məhsul rədd edildi", f"{sku} yenidən yoxlanmalıdır.", "product")
+    return row
+
+
+def seller_orders(slug: str) -> list[dict]:
+    out = []
+    for order in load_orders():
+        lines = [i for i in (order.get("items") or []) if str(i.get("seller_id") or "") == slug]
+        if not lines:
+            continue
+        for line in lines:
+            _attach_item_finance(line)
+        out.append(
+            {
+                **{k: order.get(k) for k in ("id", "name", "phone", "city", "address", "note", "status", "at")},
+                "items": lines,
+                "seller_subtotal": round(sum(float(i.get("subtotal") or 0) for i in lines), 2),
+                "seller_commission": round(sum(float(i.get("commission") or 0) for i in lines), 2),
+                "seller_net": round(sum(float(i.get("seller_net") or 0) for i in lines), 2),
+            }
+        )
+    out.sort(key=lambda row: row.get("at") or "", reverse=True)
+    return out
+
+
+def update_seller_order_status(slug: str, order_id: str, status: str) -> dict:
+    allowed = {"new", "confirmed", "preparing", "ready", "completed", "cancelled"}
+    if status not in allowed:
+        raise ValueError("Yanlış sifariş statusu.")
+    rows = load_orders()
+    found = None
+    for order in rows:
+        if order.get("id") != order_id:
+            continue
+        if not any(str(i.get("seller_id") or "") == slug for i in order.get("items") or []):
+            raise ValueError("Bu sifariş sizə aid deyil.")
+        # Multi-seller: track per-seller status map
+        seller_status = dict(order.get("seller_status") or {})
+        seller_status[slug] = status
+        order["seller_status"] = seller_status
+        # Overall stays new until all sellers progress — keep simple for now
+        if status in ("confirmed", "preparing", "ready", "completed") and order.get("status") == "new":
+            order["status"] = status if status != "ready" else "preparing"
+        found = order
+        break
+    if found is None:
+        raise ValueError("Sifariş tapılmadı.")
+    ORDERS_FILE.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    return next(o for o in seller_orders(slug) if o["id"] == order_id)
+
+
+def load_payouts() -> list[dict]:
+    if not PAYOUTS_FILE.exists():
+        return []
+    return json.loads(PAYOUTS_FILE.read_text(encoding="utf-8"))
+
+
+def seller_finance(slug: str) -> dict:
+    orders = seller_orders(slug)
+    gross = round(sum(float(o.get("seller_subtotal") or 0) for o in orders), 2)
+    commission = round(sum(float(o.get("seller_commission") or 0) for o in orders), 2)
+    net = round(sum(float(o.get("seller_net") or 0) for o in orders), 2)
+    payouts = [p for p in load_payouts() if p.get("seller_id") == slug]
+    paid = round(sum(float(p.get("amount") or 0) for p in payouts if p.get("status") == "paid"), 2)
+    pending_payout = round(max(0.0, net - paid), 2)
+    return {
+        "commission_rate": COMMISSION_RATE,
+        "gross_sales": gross,
+        "eynek_commission": commission,
+        "seller_earnings": net,
+        "paid_payouts": paid,
+        "pending_payout": pending_payout,
+        "payouts": payouts[:50],
+        "order_count": len(orders),
+    }
+
+
+def seller_dashboard(slug: str) -> dict:
+    brand = load_brands().get(slug) or {}
+    frames = [f for f in extra_catalog(slug) if f.get("custom")]
+    orders = seller_orders(slug)
+    finance = seller_finance(slug)
+    pending = sum(1 for f in frames if str(f.get("status") or "") == "pending")
+    low_stock = sum(1 for f in frames if int(f.get("stock") or 0) <= 2)
+    notifs = seller_notifications(slug)
+    unread = sum(1 for n in notifs if not n.get("read"))
+    return {
+        "slug": slug,
+        "name": brand.get("name") or slug,
+        "store_mode": brand.get("store_mode") or "",
+        "city": brand.get("city") or "",
+        "products": len(frames),
+        "pending_products": pending,
+        "low_stock": low_stock,
+        "orders_new": sum(1 for o in orders if (o.get("seller_status") or {}).get(slug, o.get("status")) == "new"),
+        "orders_total": len(orders),
+        "unread_notifications": unread,
+        "finance": finance,
+        "marketplace_url": f"/store/{slug}",
+        "tryon_url": f"/t/{slug}",
+    }
+
+
+def update_seller_settings(slug: str, payload: dict) -> dict:
+    brand = load_brands().get(slug)
+    if brand is None:
+        raise ValueError("Mağaza tapılmadı.")
+    fields = {
+        "name": str(payload.get("name") or brand.get("name") or "").strip()[:80],
+        "tagline": str(payload.get("tagline") or brand.get("tagline") or "").strip()[:160],
+        "city": str(payload.get("city") or brand.get("city") or "").strip()[:80],
+        "contact": str(payload.get("contact") or brand.get("contact") or "").strip()[:80],
+        "address": str(payload.get("address") or brand.get("address") or "").strip()[:200],
+        "hours": str(payload.get("hours") or brand.get("hours") or "").strip()[:120],
+        "instagram": str(payload.get("instagram") or brand.get("instagram") or "").strip()[:120],
+        "website": str(payload.get("website") or brand.get("website") or "").strip()[:200],
+        "description": str(payload.get("description") or brand.get("description") or "").strip()[:800],
+    }
+    if not fields["name"]:
+        raise ValueError("Mağaza adı lazımdır.")
+    return public_brand(update_brand(slug, **fields))
 
 
 def media_path(slug: str, filename: str) -> Path | None:
