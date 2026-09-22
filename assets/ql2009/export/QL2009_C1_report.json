@@ -1,0 +1,92 @@
+{
+  "sku": "QL2009 C1",
+  "method": "manual Blender hard-surface from official front photo trace + Mirror",
+  "triangle_count": {
+    "frame": 4720,
+    "lenses": 5120,
+    "total": 9840
+  },
+  "dimensions_mm": {
+    "frame": {
+      "x_min": -63.36,
+      "x_max": 63.36,
+      "y_min": -24.47,
+      "y_max": 24.47,
+      "z_min": -142.18,
+      "z_max": 4.64,
+      "width": 126.71,
+      "height": 48.94,
+      "depth": 146.82
+    },
+    "lenses": {
+      "x_min": -59.97,
+      "x_max": 59.97,
+      "y_min": -22.77,
+      "y_max": 22.77,
+      "z_min": -0.97,
+      "z_max": 3.1,
+      "width": 119.94,
+      "height": 45.54,
+      "depth": 4.07
+    }
+  },
+  "locked_from_photo": {
+    "A_lens_width_mm": 49.0,
+    "inner_lens_height_mm": 45.54,
+    "right_inner_x_min": 10.93,
+    "right_inner_x_max": 60.03,
+    "photo_inner_gap_at_mid_mm": 21.86,
+    "stamp_DBL_mm": 18.0,
+    "temple_length_mm": 142.0,
+    "rim_width_mm_from_photo_6oclock": 1.44
+  },
+  "materials": {
+    "frame": {
+      "name": "QL2009_Ultem_MatteBlack",
+      "base_color": [
+        0.018,
+        0.018,
+        0.018
+      ],
+      "roughness": 0.65,
+      "metallic": 0.0
+    },
+    "lens": {
+      "name": "QL2009_Lens_Clear",
+      "ior": 1.5,
+      "transmission": 1.0,
+      "factory_markings": false
+    }
+  },
+  "assumptions": {
+    "rim_depth_mm": 3.4,
+    "rim_width_used_mm": 1.7,
+    "front_wrap_deg_per_side": 2.5,
+    "lens_sagitta_mm": 1.15,
+    "lens_thickness_mm": 1.6,
+    "temple_cross_section_hinge_mm": [
+      2.2,
+      4.0
+    ],
+    "ear_drop_mm": 20.0,
+    "temple_inset_mm": 6.0,
+    "nose_pads": "omitted \u2014 visible on photo (clear pads + metal arms) but 3D path cannot be reconstructed reliably; not invented",
+    "hinge_mechanics": "flush lug only; no screws / spring barrel",
+    "face_form": "near-flat; WRAP_DEG is an assumption"
+  },
+  "needs_verification": [
+    "rim front-to-back depth (no top photo)",
+    "temple cross-section (round vs flat)",
+    "ear-bend start in mm",
+    "exact hinge hardware",
+    "nose-pad arm path if pads are required later",
+    "stamp DBL 18 mm vs photo mid-gap ~22 mm \u2014 silhouette follows the photo"
+  ],
+  "export": {
+    "blend": "C:\\Users\\Elnur\\Projects\\tryon-wa\\assets\\ql2009\\export\\QL2009_C1.blend",
+    "fbx": "C:\\Users\\Elnur\\Projects\\tryon-wa\\assets\\ql2009\\export\\QL2009_C1.fbx",
+    "glb": "C:\\Users\\Elnur\\Projects\\tryon-wa\\assets\\ql2009\\export\\QL2009_C1.glb"
+  },
+  "origin": "geometric center of the front; +Y up; front faces +Z; temples travel -Z",
+  "scale": "1 Blender unit = 1 mm"
+}

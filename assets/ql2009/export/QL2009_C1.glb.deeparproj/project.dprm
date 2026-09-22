@@ -1,0 +1,14 @@
+{
+    "format": 400,
+    "studio": "DeepAR Studio 4.5.2.139-rel (4.5.2.139)",
+    "traits": {
+        "selectedEnvironmentMap": null,
+        "toneMappingExposure": 0.0,
+        "toneMappingFunction": "Neutral",
+        "usesCameraMultiplyShader": true,
+        "usesEmptyTextureColorData": true,
+        "usesMatCapShader": true,
+        "usesUnlitTextureShader": true
+    },
+    "version": "4.5.2.139"
+}

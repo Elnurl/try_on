@@ -1,0 +1,18 @@
+{
+    "flags": {
+        "blendMode": "multiply",
+        "cullMode": "off",
+        "enableDepthTest": true,
+        "writeAlpha": true,
+        "writeColor": true,
+        "writeDepth": true
+    },
+    "shader": "../__dprs_int_f18caee1_d65d_4319_957b_2f6556abda06__/unlit_texture_shader.dprx",
+    "uniformValues": {
+        "s_texColor": {
+            "texture": "../Textures/Gradient.png",
+            "type": "texture"
+        }
+    },
+    "uvTransformUniformValues": {}
+}

@@ -1,0 +1,402 @@
+{
+    "animationEnabled": true,
+    "children": [
+        {
+            "animationEnabled": true,
+            "children": [
+                {
+                    "animationEnabled": true,
+                    "children": [
+                        {
+                            "animationEnabled": true,
+                            "components": [
+                                {
+                                    "blendShapeWeightsExpanded": false,
+                                    "bonesExpanded": false,
+                                    "enabled": true,
+                                    "material": "~/Materials/HeadOccluder.mat",
+                                    "mesh": "~/Models/Head.armesh",
+                                    "meshDriver": "none",
+                                    "open": true,
+                                    "type": "meshRenderer"
+                                }
+                            ],
+                            "depth": 0,
+                            "dynamicUv": "cameraTextureUv2_V2",
+                            "editorAnimationsOpen": false,
+                            "editorOpen": false,
+                            "editorPropertyOpen": true,
+                            "editorSelectedAnimation": "",
+                            "enabled": true,
+                            "localPosition": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localRotation": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ],
+                            "localScale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ],
+                            "name": "Head",
+                            "viewId": 2
+                        },
+                        {
+                            "animationEnabled": true,
+                            "children": [
+                                {
+                                    "animationEnabled": true,
+                                    "components": [
+                                        {
+                                            "blendShapeWeightsExpanded": false,
+                                            "bonesExpanded": false,
+                                            "enabled": true,
+                                            "material": "~/Materials/Plastic.mat",
+                                            "mesh": "~/Models/Plastic.armesh",
+                                            "meshDriver": "none",
+                                            "open": true,
+                                            "type": "meshRenderer"
+                                        }
+                                    ],
+                                    "depth": 0,
+                                    "dynamicUv": "disabled",
+                                    "editorAnimationsOpen": false,
+                                    "editorOpen": false,
+                                    "editorPropertyOpen": true,
+                                    "editorSelectedAnimation": "",
+                                    "enabled": true,
+                                    "localPosition": [
+                                        0.0,
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "localRotation": [
+                                        0.0,
+                                        0.0,
+                                        0.0,
+                                        1.0
+                                    ],
+                                    "localScale": [
+                                        1.0,
+                                        1.0,
+                                        1.0
+                                    ],
+                                    "name": "Plastic",
+                                    "viewId": 2
+                                },
+                                {
+                                    "animationEnabled": true,
+                                    "components": [
+                                        {
+                                            "blendShapeWeightsExpanded": false,
+                                            "bonesExpanded": false,
+                                            "enabled": true,
+                                            "material": "~/Materials/LensesMultiply.mat",
+                                            "mesh": "~/Models/LensesMultiply.armesh",
+                                            "meshDriver": "none",
+                                            "open": true,
+                                            "type": "meshRenderer"
+                                        }
+                                    ],
+                                    "depth": 1,
+                                    "dynamicUv": "disabled",
+                                    "editorAnimationsOpen": false,
+                                    "editorOpen": false,
+                                    "editorPropertyOpen": true,
+                                    "editorSelectedAnimation": "",
+                                    "enabled": true,
+                                    "localPosition": [
+                                        0.0,
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "localRotation": [
+                                        0.0,
+                                        0.0,
+                                        0.0,
+                                        1.0
+                                    ],
+                                    "localScale": [
+                                        1.0,
+                                        1.0,
+                                        1.0
+                                    ],
+                                    "name": "LensesMultiply",
+                                    "viewId": 2
+                                },
+                                {
+                                    "animationEnabled": true,
+                                    "components": [
+                                        {
+                                            "blendShapeWeightsExpanded": false,
+                                            "bonesExpanded": false,
+                                            "enabled": true,
+                                            "material": "~/Materials/Logo.mat",
+                                            "mesh": "~/Models/LogoSides.armesh",
+                                            "meshDriver": "none",
+                                            "open": true,
+                                            "type": "meshRenderer"
+                                        }
+                                    ],
+                                    "depth": 0,
+                                    "dynamicUv": "disabled",
+                                    "editorAnimationsOpen": false,
+                                    "editorOpen": false,
+                                    "editorPropertyOpen": true,
+                                    "editorSelectedAnimation": "",
+                                    "enabled": true,
+                                    "localPosition": [
+                                        0.0,
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "localRotation": [
+                                        0.0,
+                                        0.0,
+                                        0.0,
+                                        1.0
+                                    ],
+                                    "localScale": [
+                                        1.0,
+                                        1.0,
+                                        1.0
+                                    ],
+                                    "name": "LogoSides",
+                                    "viewId": 2
+                                },
+                                {
+                                    "animationEnabled": true,
+                                    "components": [
+                                        {
+                                            "blendShapeWeightsExpanded": false,
+                                            "bonesExpanded": false,
+                                            "enabled": true,
+                                            "material": "~/Materials/Metal.mat",
+                                            "mesh": "~/Models/Metal.armesh",
+                                            "meshDriver": "none",
+                                            "open": true,
+                                            "type": "meshRenderer"
+                                        }
+                                    ],
+                                    "depth": 0,
+                                    "dynamicUv": "disabled",
+                                    "editorAnimationsOpen": false,
+                                    "editorOpen": false,
+                                    "editorPropertyOpen": true,
+                                    "editorSelectedAnimation": "",
+                                    "enabled": true,
+                                    "localPosition": [
+                                        0.0,
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "localRotation": [
+                                        0.0,
+                                        0.0,
+                                        0.0,
+                                        1.0
+                                    ],
+                                    "localScale": [
+                                        1.0,
+                                        1.0,
+                                        1.0
+                                    ],
+                                    "name": "Metal",
+                                    "viewId": 2
+                                },
+                                {
+                                    "animationEnabled": true,
+                                    "components": [
+                                        {
+                                            "blendShapeWeightsExpanded": false,
+                                            "bonesExpanded": false,
+                                            "enabled": true,
+                                            "material": "~/Materials/Logo.mat",
+                                            "mesh": "~/Models/LogoFront.armesh",
+                                            "meshDriver": "none",
+                                            "open": true,
+                                            "type": "meshRenderer"
+                                        }
+                                    ],
+                                    "depth": 0,
+                                    "dynamicUv": "disabled",
+                                    "editorAnimationsOpen": false,
+                                    "editorOpen": false,
+                                    "editorPropertyOpen": true,
+                                    "editorSelectedAnimation": "",
+                                    "enabled": true,
+                                    "localPosition": [
+                                        0.0,
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "localRotation": [
+                                        0.0,
+                                        0.0,
+                                        0.0,
+                                        1.0
+                                    ],
+                                    "localScale": [
+                                        1.0,
+                                        1.0,
+                                        1.0
+                                    ],
+                                    "name": "LogoFront",
+                                    "viewId": 3
+                                },
+                                {
+                                    "animationEnabled": true,
+                                    "components": [
+                                        {
+                                            "blendShapeWeightsExpanded": false,
+                                            "bonesExpanded": false,
+                                            "enabled": true,
+                                            "material": "~/Materials/LensesAdd.mat",
+                                            "mesh": "~/Models/LensesAdd.armesh",
+                                            "meshDriver": "none",
+                                            "open": true,
+                                            "type": "meshRenderer"
+                                        }
+                                    ],
+                                    "depth": 2,
+                                    "dynamicUv": "disabled",
+                                    "editorAnimationsOpen": false,
+                                    "editorOpen": false,
+                                    "editorPropertyOpen": true,
+                                    "editorSelectedAnimation": "",
+                                    "enabled": true,
+                                    "localPosition": [
+                                        0.0,
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "localRotation": [
+                                        0.0,
+                                        0.0,
+                                        0.0,
+                                        1.0
+                                    ],
+                                    "localScale": [
+                                        1.0,
+                                        1.0,
+                                        1.0
+                                    ],
+                                    "name": "LensesAdd",
+                                    "viewId": 2
+                                }
+                            ],
+                            "depth": 0,
+                            "dynamicUv": "disabled",
+                            "editorAnimationsOpen": false,
+                            "editorOpen": true,
+                            "editorPropertyOpen": true,
+                            "editorSelectedAnimation": "",
+                            "enabled": true,
+                            "localPosition": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localRotation": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ],
+                            "localScale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ],
+                            "name": "RayBanLow",
+                            "viewId": 2
+                        }
+                    ],
+                    "depth": 0,
+                    "dynamicUv": "disabled",
+                    "editorAnimationsOpen": false,
+                    "editorOpen": true,
+                    "editorPropertyOpen": true,
+                    "editorSelectedAnimation": "",
+                    "enabled": true,
+                    "localPosition": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "localRotation": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ],
+                    "localScale": [
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "name": "Wayfarer",
+                    "viewId": 2
+                }
+            ],
+            "depth": 0,
+            "dynamicUv": "disabled",
+            "editorAnimationsOpen": false,
+            "editorOpen": true,
+            "editorPropertyOpen": true,
+            "editorSelectedAnimation": "",
+            "enabled": true,
+            "localPosition": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localRotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "localScale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "name": "Wayfarer.fbx",
+            "sceneBase": "~/Models/Wayfarer.fbx",
+            "viewId": 2
+        }
+    ],
+    "depth": 0,
+    "dynamicUv": "disabled",
+    "editorAnimationsOpen": false,
+    "editorOpen": true,
+    "editorPropertyOpen": true,
+    "editorSelectedAnimation": "",
+    "enabled": true,
+    "hiddenViewIds": [],
+    "localEulerAngles": [
+        0.0,
+        0.0,
+        0.0
+    ],
+    "localPosition": [
+        0.0,
+        0.0,
+        0.0
+    ],
+    "localScale": [
+        1.0,
+        1.0,
+        1.0
+    ],
+    "name": "Root",
+    "space": "face",
+    "viewId": 2
+}

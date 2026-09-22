@@ -1,0 +1,34 @@
+{
+  "sku": "ql2009-c1",
+  "product": "QL2009 C1",
+  "effect_url": "/ql2009/QL2009_C1.deepar",
+  "source_meshes": {
+    "fbx": "assets/ql2009/export/QL2009_C1.fbx",
+    "glb": "assets/ql2009/export/QL2009_C1.glb",
+    "triangles": 9840
+  },
+  "deepar_file": null,
+  "studio": {
+    "required": "DeepAR Studio 4.5.2 (Windows), from https://developer.deepar.ai/downloads",
+    "installed": false,
+    "accepted_model": "cannot verify — Studio is not installed and download requires a signed-in DeepAR developer account",
+    "export_supported": true,
+    "note": ".deepar is a closed FlatBuffer binary. It cannot be authored from FBX/GLB in this repo. The bundled aviators effect was not used as this SKU."
+  },
+  "studio_steps_when_available": [
+    "File → New from Glasses template (or New effect + Face Position on Root)",
+    "Import assets/ql2009/export/QL2009_C1.fbx or .glb — do not retopo",
+    "Parent frame + lenses under the Face / Head node",
+    "Place bridge on the tracker nose; lenses in front of the eyes",
+    "Confirm temples stay on the head in yaw left/right and pitch up/down",
+    "Frame material: matte black, roughness ~0.65, non-metallic",
+    "Lens material: transparent, IOR 1.50, no factory text",
+    "Export QL2009_C1.deepar into this folder"
+  ],
+  "app_wiring": {
+    "catalog_id": "ql2009-c1",
+    "tryon_adapter": "unchanged — setItem(item.effect_url)",
+    "mediapipe_fallback": "unchanged",
+    "other_skus": "still use /static/vendor/deepar/effects/aviators"
+  }
+}

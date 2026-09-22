@@ -1,0 +1,32 @@
+{
+    "flags": {
+        "blendMode": "normal",
+        "cullMode": "off",
+        "enableDepthTest": true,
+        "writeAlpha": true,
+        "writeColor": true,
+        "writeDepth": true
+    },
+    "shader": "../__dprs_int_f18caee1_d65d_4319_957b_2f6556abda06__/camera_multiply_shader.dprx",
+    "uniformValues": {
+        "s_texColor": {
+            "texture": "../Textures/CameraTexture.tex",
+            "type": "texture"
+        },
+        "s_texMultiply": {
+            "texture": "../Textures/Shadow.png",
+            "type": "texture"
+        },
+        "u_color": {
+            "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "dataType": "color",
+            "type": "vector"
+        }
+    },
+    "uvTransformUniformValues": {}
+}
