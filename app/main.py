@@ -35,6 +35,8 @@ from app.frames import FRAMES_DIR, ensure_frame_assets
 from app.overlay import NoFaceError, overlay_bytes
 from app.vendor_assets import ensure_vendor
 from app.shop import (
+    all_products,
+    all_stores,
     auglio_feed_xml,
     garment_path,
     get_product,
@@ -55,11 +57,13 @@ from app.store import (
     delete_frame,
     get_stats,
     load_applications,
+    load_orders,
     media_path,
     public_brand,
     save_application,
     save_brand_settings,
     save_lead,
+    save_order,
     save_uploaded_frame,
     set_frame_marketplace,
     update_brand,
@@ -122,8 +126,39 @@ def render_tryon(slug: str, mode: str, sku: str = "") -> str:
 
 
 @app.get("/", response_class=HTMLResponse)
-def home() -> str:
+def home() -> RedirectResponse:
+    """Consumer homepage — marketplace catalog."""
+    return RedirectResponse("/shop", status_code=307)
+
+
+@app.get("/sell", response_class=HTMLResponse)
+def sell_landing() -> str:
+    """Seller / partner apply page."""
     return (STATIC / "landing.html").read_text(encoding="utf-8")
+
+
+@app.get("/robots.txt")
+def robots() -> Response:
+    body = "User-agent: *\nAllow: /\nSitemap: https://xn--eynk-x6b.com/sitemap.xml\n"
+    return Response(content=body, media_type="text/plain; charset=utf-8")
+
+
+@app.get("/sitemap.xml")
+def sitemap(request: Request) -> Response:
+    base = str(request.base_url).rstrip("/")
+    urls = [f"{base}/shop", f"{base}/sell", f"{base}/cart"]
+    for product in all_products():
+        urls.append(f"{base}/product/{product['id']}")
+    for store in all_stores():
+        urls.append(f"{base}/store/{store['id']}")
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for loc in urls:
+        parts.append(f"  <url><loc>{loc}</loc></url>")
+    parts.append("</urlset>")
+    return Response(content="\n".join(parts) + "\n", media_type="application/xml; charset=utf-8")
 
 
 @app.get("/t/{slug}", response_class=HTMLResponse)
@@ -233,7 +268,7 @@ def shop_demo() -> str:
 
 @app.get("/for-brands", response_class=HTMLResponse)
 def for_brands() -> RedirectResponse:
-    return RedirectResponse("/")
+    return RedirectResponse("/sell")
 
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -533,6 +568,28 @@ def api_leads(
         return save_lead(name, store, contact, message)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/orders")
+async def api_orders(request: Request) -> dict:
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="JSON gözlənilir.") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Yanlış sorğu.")
+    try:
+        return save_order(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/orders")
+def api_list_orders(request: Request) -> list[dict]:
+    require_admin_api(request)
+    rows = load_orders()
+    rows.sort(key=lambda row: row.get("at") or "", reverse=True)
+    return rows
 
 
 @app.post("/api/brands")

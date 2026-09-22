@@ -4,7 +4,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Mağaza paneli — Eynək.com</title>
-    <link rel="stylesheet" href="/static/styles.css?v=10" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/styles.css?v=11" />
   </head>
   <body>
     <main>
@@ -15,12 +20,14 @@
         <p>
           <a href="/shop">Marketplace-ə bax</a>
           ·
+          <a href="/sell">Satıcı səhifəsi</a>
+          ·
           <button type="button" class="ghost-btn" id="logout">Çıxış</button>
         </p>
       </header>
 
       <section class="panel">
-        <h2 class="h2">Mağazanız hansıdır?</h2>
+        <h2 class="h2">1. Mağazanız hansıdır?</h2>
         <p class="lede">Birini seçin. Sonra dəyişə bilərsiniz.</p>
         <div class="split">
           <button type="button" class="panel path-btn" id="pick-site" data-mode="own_site">
@@ -35,7 +42,7 @@
       </section>
 
       <section class="panel" id="box-site" hidden>
-        <h2 class="h2">Saytınıza qoyulacaq kod</h2>
+        <h2 class="h2">2. Saytınıza qoyulacaq kod</h2>
         <p class="lede">Bu kodu saytınızın HTML-inə əlavə edin. Hər məhsul düyməsində SKU yazın.</p>
         <textarea id="snippet" readonly rows="6"></textarea>
         <button type="button" class="copy" id="copy">Kodu kopyala</button>
@@ -43,13 +50,13 @@
       </section>
 
       <section class="panel" id="box-host" hidden>
-        <h2 class="h2">Müştəriyə verəcəyiniz link</h2>
-        <p class="lede">Bu linki Instagram bio-ya, WhatsApp-a və ya vizit kartına qoyun.</p>
+        <h2 class="h2">2. Müştəri linki və QR</h2>
+        <p class="lede">Instagram bio, WhatsApp və ya vitrin üçün.</p>
         <p><a id="try-link" href="#">Try-on səhifəsi</a></p>
         <p><img id="qr" alt="QR kod" width="180" height="180" /></p>
 
-        <h2 class="h2">Eynək əlavə et</h2>
-        <p class="lede">Şəkil, qiymət yazın. İstəsəniz birbaşa Eynək.com marketplace-ə dərc edin.</p>
+        <h2 class="h2">3. Eynək əlavə et və dərc et</h2>
+        <p class="lede">Şəkil və qiymət yazın. Marketplace qutusunu işarələyin — dərhal kataloqda görünür.</p>
         <form id="up" class="admin-form">
           <label>Kod (SKU) <input name="sku" required placeholder="rb-3025" /></label>
           <label>Ad <input name="name" required placeholder="Aviator" /></label>
@@ -64,14 +71,22 @@
               <option value="sports">İdman</option>
             </select>
           </label>
-          <label>Şəkil <input name="file" type="file" accept="image/png,image/jpeg" required /></label>
+          <label>
+            Şəkil
+            <input name="file" type="file" accept="image/png,image/jpeg,image/webp" required />
+          </label>
+          <div class="upload-preview" id="preview" hidden>
+            <img alt="Önizləmə" />
+          </div>
           <label class="check-row">
-            <input name="marketplace" type="checkbox" value="1" />
+            <input name="marketplace" type="checkbox" value="1" checked />
             Eynək.com marketplace-ə dərc et
           </label>
-          <button class="copy" type="submit">Yüklə</button>
+          <button class="copy" type="submit">Yüklə və dərc et</button>
         </form>
         <p id="up-msg" class="status" hidden></p>
+
+        <h2 class="h2">Kataloqunuz</h2>
         <div id="list"></div>
       </section>
     </main>
@@ -81,6 +96,8 @@
       const hello = document.querySelector("#hello");
       const boxSite = document.querySelector("#box-site");
       const boxHost = document.querySelector("#box-host");
+      const preview = document.querySelector("#preview");
+      const previewImg = preview.querySelector("img");
 
       function showMode(mode) {
         boxSite.hidden = mode !== "own_site";
@@ -139,43 +156,60 @@
                 const on = !!item.marketplace;
                 const price = item.price == null ? "" : item.price;
                 return `<article class="panel listing-card">
-                  <img src="${item.image_url}" alt="" style="height:56px;object-fit:contain" />
+                  <img src="${item.image_url}" alt="" />
                   <div>
                     <strong>${item.name}</strong>
-                    <p class="lede">${item.brand || ""} · ${item.id} · ${money(item.price)}</p>
-                    <p class="lede">${on ? "Marketplace-də aktiv" : "Yalnız sizin linkdə"}</p>
+                    <p class="lede">${item.brand || ""} · ${item.id}</p>
+                    <span class="badge ${on ? "on" : ""}">${on ? "Marketplace-də" : "Gizli"}</span>
+                    <label class="price-row">Qiymət (AZN)
+                      <input type="number" min="0" step="1" data-price-input="${item.id}" value="${price}" />
+                    </label>
                     <label class="check-row">
-                      <input type="checkbox" data-market="${item.id}" data-price="${price}" ${on ? "checked" : ""} />
+                      <input type="checkbox" data-market="${item.id}" ${on ? "checked" : ""} />
                       Eynək.com-da dərc et
                     </label>
-                    <button type="button" class="ghost-btn" data-del="${item.id}">Sil</button>
+                    <div class="listing-actions">
+                      <button type="button" class="copy" data-save-price="${item.id}">Qiyməti saxla</button>
+                      <button type="button" class="ghost-btn" data-del="${item.id}">Sil</button>
+                    </div>
                   </div>
                 </article>`;
               })
               .join("")
-          : "<p class='lede'>Hələ eynək yoxdur.</p>";
+          : "<p class='lede'>Hələ eynək yoxdur. Yuxarıdakı formadan əlavə edin.</p>";
         list.querySelectorAll("[data-del]").forEach((btn) => {
           btn.addEventListener("click", async () => {
+            if (!confirm("Bu eynəyi silmək istəyirsiniz?")) return;
             await fetch("/api/brand/" + slug + "/frames/" + btn.dataset.del, {
               method: "DELETE",
             });
             load();
           });
         });
-        list.querySelectorAll("[data-market]").forEach((box) => {
-          box.addEventListener("change", () => {
-            const priceRaw = box.dataset.price;
-            const price = priceRaw === "" ? null : Number(priceRaw);
-            if (box.checked && (price == null || Number.isNaN(price))) {
-              const typed = prompt("Marketplace üçün qiymət (AZN):", "99");
-              if (typed == null || typed.trim() === "") {
-                box.checked = false;
-                return;
-              }
-              toggleMarket(box.dataset.market, true, Number(typed.replace(",", ".")));
+        list.querySelectorAll("[data-save-price]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const sku = btn.dataset.savePrice;
+            const input = list.querySelector(`[data-price-input="${sku}"]`);
+            const market = list.querySelector(`[data-market="${sku}"]`);
+            const price = Number(String(input.value || "").replace(",", "."));
+            if (Number.isNaN(price) || price < 0) {
+              alert("Düzgün qiymət yazın.");
               return;
             }
-            toggleMarket(box.dataset.market, box.checked, price);
+            toggleMarket(sku, !!(market && market.checked), price);
+          });
+        });
+        list.querySelectorAll("[data-market]").forEach((box) => {
+          box.addEventListener("change", () => {
+            const sku = box.dataset.market;
+            const input = list.querySelector(`[data-price-input="${sku}"]`);
+            const price = Number(String(input?.value || "").replace(",", "."));
+            if (box.checked && (Number.isNaN(price) || input.value === "")) {
+              alert("Əvvəl qiymət yazın.");
+              box.checked = false;
+              return;
+            }
+            toggleMarket(sku, box.checked, Number.isNaN(price) ? null : price);
           });
         });
       }
@@ -193,6 +227,16 @@
         msg.hidden = false;
         msg.style.color = "var(--accent)";
         msg.textContent = "Kopyalandı.";
+      });
+      document.querySelector('#up input[name="file"]').addEventListener("change", (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) {
+          preview.hidden = true;
+          previewImg.removeAttribute("src");
+          return;
+        }
+        previewImg.src = URL.createObjectURL(file);
+        preview.hidden = false;
       });
       document.querySelector("#up").addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -216,6 +260,8 @@
           ? "Eynək əlavə olundu və marketplace-ə dərc edildi."
           : "Eynək əlavə olundu. İstəsəniz aşağıdan marketplace-ə dərc edin.";
         e.target.reset();
+        preview.hidden = true;
+        previewImg.removeAttribute("src");
         load();
       });
       document.querySelector("#logout").addEventListener("click", async () => {

@@ -368,25 +368,38 @@
       .map(
         ({ product, quantity }) => `
         <li class="g-item">
-          <div class="g-item-art">${GLASSES_SVG}</div>
+          <div class="g-item-art">${
+            product.image
+              ? `<img src="${escapeHtml(product.image)}" alt="" width="72" height="48" />`
+              : GLASSES_SVG
+          }</div>
           <div>
             <p class="g-brand">${escapeHtml(product.brand)}</p>
             <h2>${escapeHtml(product.name)}</h2>
-            <p>${quantity} × ${product.price} ${escapeHtml(product.currency)}</p>
+            <p>${quantity} × ${product.price} ${escapeHtml(product.currency || "AZN")}</p>
           </div>
           <div class="g-item-side">
-            <strong>${product.price * quantity} ${escapeHtml(product.currency)}</strong>
+            <strong>${product.price * quantity} ${escapeHtml(product.currency || "AZN")}</strong>
             <button type="button" class="remove" data-remove="${escapeHtml(product.id)}">Sil</button>
           </div>
         </li>`,
       )
       .join("");
     root.innerHTML = `
-      <ul style="list-style:none;margin:0;padding:0">${rows}</ul>
+      <ul class="g-cart-list">${rows}</ul>
       <div class="g-sum">
-        <div class="g-sum-row"><span>Çatdırılma</span><span style="color:#16a34a;font-weight:700">Pulsuz</span></div>
+        <div class="g-sum-row"><span>Çatdırılma</span><span class="g-sum-free">Pulsuz</span></div>
         <div class="g-sum-row total"><span>Cəmi</span><span>${totalPrice(items)} AZN</span></div>
-        <button type="button" class="g-btn" data-checkout>Sifarişi rəsmiləşdir</button>
+        <form class="g-checkout" data-checkout-form>
+          <h3>Sifariş məlumatları</h3>
+          <label>Ad, soyad <input name="name" required autocomplete="name" placeholder="Elnur Əhmədzadə" /></label>
+          <label>Telefon <input name="phone" type="tel" required autocomplete="tel" placeholder="+994 50 123 45 67" /></label>
+          <label>Şəhər <input name="city" required autocomplete="address-level2" placeholder="Bakı" /></label>
+          <label>Ünvan <input name="address" required autocomplete="street-address" placeholder="Küçə, bina, mənzil" /></label>
+          <label>Qeyd (istəyə bağlı) <textarea name="note" rows="2" placeholder="Çatdırılma vaxtı və s."></textarea></label>
+          <button type="submit" class="g-btn">Sifarişi göndər</button>
+          <p class="g-checkout-note">Ödəniş nağd və ya kartla çatdırılmada. Təsdiq üçün sizinlə əlaqə saxlanılacaq.</p>
+        </form>
       </div>`;
     root.querySelectorAll("[data-remove]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -394,8 +407,57 @@
         renderCartPage();
       });
     });
-    root.querySelector("[data-checkout]")?.addEventListener("click", () => {
-      toast("Ödəniş modulu tezliklə əlavə olunacaq");
+    root.querySelector("[data-checkout-form]")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const btn = form.querySelector('button[type="submit"]');
+      const fd = new FormData(form);
+      const cart = loadCart();
+      if (!cart.length) {
+        toast("Səbət boşdur");
+        return;
+      }
+      const payload = {
+        name: String(fd.get("name") || ""),
+        phone: String(fd.get("phone") || ""),
+        city: String(fd.get("city") || ""),
+        address: String(fd.get("address") || ""),
+        note: String(fd.get("note") || ""),
+        items: cart.map(({ product, quantity }) => ({
+          id: product.id,
+          name: product.name,
+          brand: product.brand,
+          price: product.price,
+          quantity,
+          seller_id: product.seller_id || product.store_id || "",
+          currency: product.currency || "AZN",
+        })),
+      };
+      if (btn) btn.disabled = true;
+      try {
+        const res = await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast(data.detail || "Sifariş göndərilmədi");
+          return;
+        }
+        saveCart([]);
+        root.innerHTML = `
+          <div class="g-empty g-order-ok">
+            <h1>Sifariş qəbul olundu</h1>
+            <p>Kod: <strong>${escapeHtml(data.id || "")}</strong>. Tezliklə sizinlə əlaqə saxlayacağıq.</p>
+            <a class="g-btn" href="/shop">Kataloqa qayıt</a>
+          </div>`;
+        toast("Sifariş göndərildi");
+      } catch {
+        toast("Şəbəkə xətası");
+      } finally {
+        if (btn) btn.disabled = false;
+      }
     });
   }
 

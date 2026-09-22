@@ -4,16 +4,21 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{{PAGE_TITLE}}</title>
+    <meta name="description" content="{{PRODUCT_DESCRIPTION}}" />
+    <meta property="og:title" content="{{PAGE_TITLE}}" />
+    <meta property="og:description" content="{{PRODUCT_DESCRIPTION}}" />
+    <meta property="og:type" content="product" />
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/shop.css?v=50" />
+    <link rel="stylesheet" href="/static/shop.css?v=51" />
   </head>
   <body class="g-body">
     <div class="g-ribbon"><p>Bakıda pulsuz çatdırılma · Virtual Try-On</p></div>
     <header class="g-header">
       <div class="g-wrap g-header-top">
-        <a class="g-logo" href="/shop">EYNƏK</a>
+        <a class="g-logo" href="/">EYNƏK</a>
         <nav class="g-nav" aria-label="Əsas" style="display:flex;padding:0">
           <a class="g-nav-link" href="/shop">Kataloq</a>
           <a class="g-nav-link" href="/shop#stores">Satıcılar</a>
@@ -140,7 +145,7 @@
         demoUrl: {{AUGLIO_DEMO_URL_JSON}},
       };
     </script>
-    <script src="/static/shop.js?v=50"></script>
+    <script src="/static/shop.js?v=51"></script>
     <script src="/static/auglio-vto.js?v=50"></script>
   </body>
 </html>

@@ -22,6 +22,7 @@ SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,30}$")
 BRANDS_FILE = STORES / "brands.json"
 LEADS_FILE = STORES / "leads.json"
 APPLICATIONS_FILE = STORES / "applications.json"
+ORDERS_FILE = STORES / "orders.json"
 AZ_SLUG = str.maketrans(
     {
         "ə": "e",
@@ -486,6 +487,72 @@ def save_lead(name: str, store: str, contact: str, message: str = "") -> dict:
     )
     LEADS_FILE.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
     return {"ok": True}
+
+
+def load_orders() -> list[dict]:
+    if not ORDERS_FILE.exists():
+        return []
+    return json.loads(ORDERS_FILE.read_text(encoding="utf-8"))
+
+
+def save_order(payload: dict) -> dict:
+    name = str(payload.get("name") or "").strip()
+    phone = str(payload.get("phone") or "").strip()
+    city = str(payload.get("city") or "").strip()
+    address = str(payload.get("address") or "").strip()
+    note = str(payload.get("note") or "").strip()
+    raw_items = payload.get("items") or []
+    if not name or not phone:
+        raise ValueError("Ad və telefon mütləqdir.")
+    if len(name) > 80 or len(phone) > 40 or len(city) > 80 or len(address) > 200 or len(note) > 500:
+        raise ValueError("Mətn çox uzundur.")
+    if not isinstance(raw_items, list) or not raw_items:
+        raise ValueError("Səbət boşdur.")
+    items: list[dict] = []
+    total = 0.0
+    for row in raw_items[:40]:
+        if not isinstance(row, dict):
+            continue
+        try:
+            price = float(row.get("price") or 0)
+            qty = int(row.get("quantity") or 1)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Məhsul məlumatı yanlışdır.") from exc
+        qty = max(1, min(99, qty))
+        price = max(0.0, min(100_000.0, price))
+        item = {
+            "id": str(row.get("id") or "")[:80],
+            "name": str(row.get("name") or "")[:120],
+            "brand": str(row.get("brand") or "")[:80],
+            "price": price,
+            "quantity": qty,
+            "seller_id": str(row.get("seller_id") or row.get("store_id") or "")[:80],
+            "currency": str(row.get("currency") or "AZN")[:8],
+        }
+        if not item["id"] or not item["name"]:
+            continue
+        items.append(item)
+        total += price * qty
+    if not items:
+        raise ValueError("Səbət boşdur.")
+    STORES.mkdir(parents=True, exist_ok=True)
+    rows = load_orders()
+    order = {
+        "id": secrets.token_hex(6),
+        "name": name,
+        "phone": phone,
+        "city": city,
+        "address": address,
+        "note": note,
+        "items": items,
+        "total": round(total, 2),
+        "currency": "AZN",
+        "status": "new",
+        "at": datetime.now(timezone.utc).isoformat(),
+    }
+    rows.append(order)
+    ORDERS_FILE.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"ok": True, "id": order["id"], "total": order["total"]}
 
 
 def media_path(slug: str, filename: str) -> Path | None:

@@ -3,17 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Mağaza girişi — VTO Studio</title>
-    <link rel="stylesheet" href="/static/styles.css?v=9" />
+    <title>Mağaza girişi — Eynək.com</title>
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/styles.css?v=11" />
   </head>
   <body>
     <main style="max-width: 420px">
       <header>
-        <p class="eyebrow"><a href="/">VTO Studio</a></p>
+        <p class="eyebrow"><a href="/shop">Eynək.com</a></p>
         <h1>Mağaza paneli</h1>
-        <p class="lede">
-          Sizə göndərilən mağaza kodunu və şifrəni yazın.
-        </p>
+        <p class="lede">Sizə göndərilən mağaza kodunu və şifrəni yazın.</p>
       </header>
       <section class="panel">
         <form id="login" class="admin-form">
@@ -23,6 +26,7 @@
         </form>
         <p id="msg" class="status" hidden></p>
       </section>
+      <p class="lede">Hələ partnyor deyilsiniz? <a href="/sell">Müraciət edin</a></p>
     </main>
     <script>
       document.querySelector("#login").addEventListener("submit", async (e) => {

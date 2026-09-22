@@ -3,33 +3,58 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>VTO Studio — optika mağazaları üçün virtual sınaq</title>
-    <link rel="stylesheet" href="/static/styles.css?v=9" />
+    <title>Satıcı ol | Eynək.com</title>
+    <meta
+      name="description"
+      content="Eynək.com-da mağaza açın: eynəklərinizi yükləyin, Virtual Try-On ilə satış edin."
+    />
+    <meta property="og:title" content="Satıcı ol | Eynək.com" />
+    <meta
+      property="og:description"
+      content="Optika mağazaları üçün marketplace və virtual sınaq."
+    />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/styles.css?v=11" />
   </head>
-  <body>
-    <main>
-      <header>
-        <p class="eyebrow">VTO Studio</p>
-        <h1>Müştəriniz eynəyi üzdə görsün</h1>
+  <body class="sell-body">
+    <header class="sell-top">
+      <a class="sell-logo" href="/shop">EYNƏK</a>
+      <nav>
+        <a href="/shop">Marketplace</a>
+        <a href="/partner/login">Giriş</a>
+      </nav>
+    </header>
+    <main class="sell-main">
+      <header class="sell-hero">
+        <p class="eyebrow">Eynək.com · Satıcılar</p>
+        <h1>Eynəklərinizi marketplace-də satın</h1>
         <p class="lede">
-          Biz optika mağazalarına virtual eynək sınağı veririk. Siz partnyor
-          olursunuz. Müştəri kameraya baxır və seçdiyi çərçivə üzündə görünür.
+          Müştəri kataloqdan seçir, Virtual Try-On ilə sınayır, sifariş verir.
+          Siz məhsul yükləyir və qiymət qoyursunuz.
         </p>
+        <div class="sell-cta">
+          <a class="copy" href="#partnyor">Müraciət et</a>
+          <a class="ghost-btn" href="/shop">Kataloqa bax</a>
+        </div>
       </header>
 
       <section class="split">
         <article class="panel">
           <h2 class="h2">Öz saytınız varsa</h2>
           <p class="lede">
-            Sizə bir sətir kod veririk. Kodu öz saytınıza qoyursunuz. Səbət və
-            əlaqə sizin saytınızda qalır. Bizim işimiz yalnız sınaqdır.
+            Bir sətir kod alırsınız. Virtual sınağı öz saytınıza qoyursunuz;
+            sifariş axını sizdə qala bilər.
           </p>
         </article>
         <article class="panel">
           <h2 class="h2">Saytınız yoxdursa</h2>
           <p class="lede">
-            Eynək şəkillərinizi buraya yükləyirsiniz. Biz sizə hazır sınaq
-            səhifəsi və QR kod veririk. Müştəri o linkdən eynəyi sınayır.
+            Eynək şəkillərini panelə yükləyirsiniz. Eynək.com-da dərc edirsiniz
+            və hazır try-on linki / QR alırsınız.
           </p>
         </article>
       </section>
@@ -37,8 +62,8 @@
       <section class="panel" id="partnyor">
         <h2 class="h2">Partnyor ol</h2>
         <p class="lede">
-          Müraciəti bizə göndərin. Biz mağazanızı açırıq və sizə giriş
-          məlumatını göndəririk. Özünüz qeydiyyatdan keçmirsiniz.
+          Müraciəti göndərin. Biz mağazanızı açırıq və giriş məlumatını sizə
+          ötürürük.
         </p>
         <form id="apply" class="admin-form">
           <label>Adınız <input name="name" required placeholder="Elnur" /></label>
@@ -57,8 +82,9 @@
         <p id="msg" class="status" hidden></p>
       </section>
 
-      <p class="lede">Partnyorsunuzsa: <a href="/partner/login">mağaza panelinə giriş</a></p>
-      <p class="lede">Demo mağaza: <a href="/shop">Eynək.com kataloqu</a></p>
+      <p class="lede sell-foot">
+        Artıq partnyorsunuzsa: <a href="/partner/login">mağaza panelinə giriş</a>
+      </p>
     </main>
     <script>
       document.querySelector("#apply").addEventListener("submit", async (e) => {

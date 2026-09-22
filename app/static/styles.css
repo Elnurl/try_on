@@ -1,12 +1,12 @@
 :root {
   color-scheme: light;
-  --bg: #f7f7f5;
+  --bg: #f4f5f7;
   --ink: #111111;
   --muted: #5c5c5c;
   --line: #e6e6e6;
-  --accent: #0a6e74;
+  --accent: #0f766e;
   --card: #ffffff;
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family: "Manrope", "Segoe UI", system-ui, sans-serif;
 }
 
 * {
@@ -711,4 +711,122 @@ body.engine-deepar #camera {
   .split {
     grid-template-columns: 1fr;
   }
+}
+
+.sell-body {
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, #d8efe9 0%, transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, #e8eef5 0%, transparent 50%),
+    var(--bg);
+}
+
+.sell-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 18px 20px 0;
+}
+
+.sell-logo {
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.sell-top nav {
+  display: flex;
+  gap: 16px;
+}
+
+.sell-top a {
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.sell-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+.sell-hero h1 {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  max-width: 16ch;
+}
+
+.sell-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 28px;
+}
+
+.sell-foot {
+  margin-top: 8px;
+}
+
+.upload-preview {
+  margin: 8px 0 12px;
+  padding: 10px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.upload-preview img {
+  max-height: 120px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+}
+
+.listing-card img {
+  width: 88px;
+  height: 64px;
+  object-fit: contain;
+  background: #f7f7f7;
+  border-radius: 8px;
+}
+
+.listing-card .badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eee;
+  color: var(--muted);
+  margin: 4px 0 8px;
+}
+
+.listing-card .badge.on {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.listing-card .price-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.listing-card .price-row input {
+  max-width: 140px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.listing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
 }

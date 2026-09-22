@@ -4,10 +4,24 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Eynək.com — Optika marketplace</title>
+    <meta
+      name="description"
+      content="Azərbaycanda eynək marketplace: optik və günəş eynəkləri, Virtual Try-On, etibarlı satıcılar."
+    />
+    <meta property="og:title" content="Eynək.com — Optika marketplace" />
+    <meta
+      property="og:description"
+      content="Eynəkləri bir yerdə gəz, Virtual Try-On ilə sına, sifariş et."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://xn--eynk-x6b.com/shop" />
+    <meta property="og:image" content="https://xn--eynk-x6b.com/static/images/hero-model.jpg" />
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href="https://xn--eynk-x6b.com/shop" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/shop.css?v=50" />
+    <link rel="stylesheet" href="/static/shop.css?v=51" />
   </head>
   <body class="g-body">
     <div class="g-ribbon">
@@ -16,7 +30,7 @@
 
     <header class="g-header">
       <div class="g-wrap g-header-top">
-        <a class="g-logo" href="/shop">EYNƏK</a>
+        <a class="g-logo" href="/">EYNƏK</a>
         <label class="g-search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="m21 21-4.34-4.34" /><circle cx="11" cy="11" r="8" />
@@ -26,7 +40,7 @@
         <div class="g-header-tools">
           <a class="g-tool" href="/partner/login">Giriş</a>
           <button type="button" class="g-tool" data-open-saved>Seçilmişlər</button>
-          <a class="g-tool" href="/">Sat</a>
+          <a class="g-tool" href="/sell">Sat</a>
           <a class="g-tool g-tool-cart" href="/cart" aria-label="Səbət">
             Səbət
             <span class="g-count" data-cart-count>0</span>
@@ -162,7 +176,7 @@
         </div>
         <div>
           <strong>Satıcılar</strong>
-          <p><a href="/">Mağaza aç</a></p>
+          <p><a href="/sell">Mağaza aç</a></p>
           <p><a href="/partner/login">Satıcı paneli</a></p>
           <p>hello@eynək.com</p>
         </div>
@@ -174,6 +188,6 @@
       window.SHOP_PRODUCTS = {{PRODUCTS_JSON}};
       window.SHOP_STORES = {{STORES_JSON}};
     </script>
-    <script src="/static/shop.js?v=50"></script>
+    <script src="/static/shop.js?v=51"></script>
   </body>
 </html>
