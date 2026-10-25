@@ -10,7 +10,16 @@ Yerli optika üçün **no-code Virtual Try-On integrator**. 2D overlay (MediaPip
 4. Render dashboard → Environment → `DEEPAR_LICENSE_KEY` = həmin açar → **Save** (servis yenidən start olur).
 5. Lokal: `.env.example` → `.env` kopyala, açarı yapışdır (`python-dotenv` avtomatik oxuyur).
 
-Açar yoxdursa sayt 2D demo ilə işləməyə davam edir. **QL2009:** açar olanda, `.deepar` hələ yoxdursa, app avtomatik **production GLB** (`/ql2009/QL2009_C1.glb`) + MediaPipe mesh VTO istifadə edir; Studio export bitəndə eyni URL ilə DeepAR 3D-ə keçir.
+Açar yoxdursa sayt 2D demo ilə işləməyə davam edir. **QL2009:** açar olanda belə, `.deepar` olmasa avtomatik **GLB mesh VTO** işləyir — satıcı DeepAR Studio görmür.
+
+## Satıcı axını — tam avtomatik VTO (manual .deepar yox)
+
+1. **[/studio](https://tryon-wa.onrender.com/studio)** aç.
+2. **Ön şəkil** yüklə (məcburi); istəsən ≤6 əlavə bucaq — yalnız vitrin üçün.
+3. **VTO hazır et** — server PNG + GLB yaradır, kataloqa yazır, link verir.
+4. **Kamerada yoxla** — sənin şəklin üzündə **3D mesh** (MediaPipe), DeepAR aviator demo deyil.
+
+**Sən etmirsən:** Blender, DeepAR Studio, `.deepar` export, Git push. Bu yol hər yeni model üçün eynidir. QL2009 kimi fabrik modelləri repoda GLB ilə gəlir; premium `.deepar` yalnız daxili keyfiyyət addımıdır, satıcı prosesi deyil.
 
 ## 3 komponent
 

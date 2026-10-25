@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+ROOT = Path(__file__).resolve().parent.parent
 FRAMES_DIR = Path(__file__).resolve().parent / "data" / "frames"
+QL2009_THUMB_SOURCES = (
+    ROOT / "assets" / "ql2009" / "front-product.png",
+    ROOT / "assets" / "ql2009" / "2009 C1 (2).png",
+)
 
 
 def _blank(size: int = 900) -> tuple[Image.Image, ImageDraw.ImageDraw]:
@@ -88,11 +94,25 @@ GENERATORS = {
 ASSET_VERSION = "2"
 
 
+def ensure_ql2009_thumb() -> None:
+    """Catalog thumbnail for NN OPTIC QL2009 (from product photo in repo / Docker image)."""
+    FRAMES_DIR.mkdir(parents=True, exist_ok=True)
+    dest = FRAMES_DIR / "ql2009-c1.png"
+    if dest.exists():
+        return
+    for src in QL2009_THUMB_SOURCES:
+        if src.is_file():
+            shutil.copyfile(src, dest)
+            return
+
+
 def ensure_frame_assets() -> None:
     FRAMES_DIR.mkdir(parents=True, exist_ok=True)
     marker = FRAMES_DIR / f".v{ASSET_VERSION}"
     if marker.exists() and all((FRAMES_DIR / f"{sku}.png").exists() for sku in GENERATORS):
+        ensure_ql2009_thumb()
         return
     for sku, fn in GENERATORS.items():
         fn().save(FRAMES_DIR / f"{sku}.png")
     marker.write_text(ASSET_VERSION, encoding="utf-8")
+    ensure_ql2009_thumb()

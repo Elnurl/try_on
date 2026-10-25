@@ -112,7 +112,20 @@ async function deeparEffectReady(item) {
 
 async function shouldUseDeepAR(item) {
   if (tryonConfig.engine !== "deepar" || !tryonConfig.licenseKey) return false;
-  if (!item || !item.effect_url) return true;
+  if (!item) return false;
+  // Studio / photo pipeline: mesh VTO from uploaded GLB unless a real .deepar is deployed.
+  if (item.model_url || item.digitized || item.custom) {
+    if (
+      item.effect_url &&
+      tryonConfig.deeparEffects &&
+      Object.prototype.hasOwnProperty.call(tryonConfig.deeparEffects, item.id)
+    ) {
+      return !!tryonConfig.deeparEffects[item.id];
+    }
+    if (item.effect_url) return deeparEffectReady(item);
+    return false;
+  }
+  if (!item.effect_url) return false;
   return deeparEffectReady(item);
 }
 
