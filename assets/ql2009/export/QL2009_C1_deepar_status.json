@@ -8,9 +8,14 @@
     "triangles": 9840
   },
   "deepar_file": null,
+  "runtime_until_deepar": {
+    "mode": "mesh",
+    "model_url": "/ql2009/QL2009_C1.glb",
+    "note": "DEEPAR_LICENSE_KEY set; app uses production GLB + MediaPipe 6DOF until QL2009_C1.deepar exists"
+  },
   "studio": {
     "required": "DeepAR Studio 4.5.2 (Windows), from https://developer.deepar.ai/downloads",
-    "installed": false,
+    "installed": true,
     "accepted_model": "cannot verify — Studio is not installed and download requires a signed-in DeepAR developer account",
     "export_supported": true,
     "note": ".deepar is a closed FlatBuffer binary. It cannot be authored from FBX/GLB in this repo. The bundled aviators effect was not used as this SKU."

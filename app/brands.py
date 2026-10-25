@@ -21,7 +21,10 @@ def list_brands() -> list[dict]:
 
 def _with_image(slug: str, item: dict) -> dict:
     if item.get("custom"):
-        return {**item, "image_url": f"/media/{slug}/{item['id']}.png"}
+        out = {**item, "image_url": f"/media/{slug}/{item['id']}.png"}
+        if item.get("model_url") or item.get("digitized"):
+            out["model_url"] = item.get("model_url") or f"/media/{slug}/{item['id']}.glb"
+        return out
     return {**item, "image_url": f"/frames/{item['id']}.png"}
 
 

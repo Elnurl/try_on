@@ -8,8 +8,9 @@ Yerli optika üçün **no-code Virtual Try-On integrator**. 2D overlay (MediaPip
 2. Project yarat → Web app əlavə et. Domain: `tryon-wa.onrender.com` **və** `localhost`.
 3. License key-i kopyala.
 4. Render dashboard → Environment → `DEEPAR_LICENSE_KEY` = həmin açar → **Save** (servis yenidən start olur).
+5. Lokal: `.env.example` → `.env` kopyala, açarı yapışdır (`python-dotenv` avtomatik oxuyur).
 
-Açar yoxdursa sayt 2D demo ilə işləməyə davam edir. Hər real eynək üçün sonradan DeepAR Studio-da `.deepar` 3D effekt lazımdır — PNG kifayət etmir.
+Açar yoxdursa sayt 2D demo ilə işləməyə davam edir. **QL2009:** açar olanda, `.deepar` hələ yoxdursa, app avtomatik **production GLB** (`/ql2009/QL2009_C1.glb`) + MediaPipe mesh VTO istifadə edir; Studio export bitəndə eyni URL ilə DeepAR 3D-ə keçir.
 
 ## 3 komponent
 

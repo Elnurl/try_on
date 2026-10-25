@@ -6,6 +6,11 @@ import mimetypes
 import os
 from io import BytesIO
 from pathlib import Path
+from typing import Annotated
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 from urllib.parse import urlparse
 
 import qrcode
@@ -23,6 +28,7 @@ from fastapi.staticfiles import StaticFiles
 from app.auth import (
     COOKIE_NAME,
     PARTNER_COOKIE,
+    auth_enabled,
     check_password,
     is_authed,
     partner_cookie_value,
@@ -31,6 +37,7 @@ from app.auth import (
 )
 from app.brands import brand_payload, get_brand, list_brands
 from app.catalog import get_catalog, get_frame
+from app.digitize25 import VTO25_DIR, load_manifest, prepare_bytes
 from app.frames import FRAMES_DIR, ensure_frame_assets
 from app.overlay import NoFaceError, overlay_bytes
 from app.vendor_assets import ensure_vendor
@@ -102,6 +109,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.mount("/frames", StaticFiles(directory=FRAMES_DIR), name="frames")
+app.mount("/vto25", StaticFiles(directory=VTO25_DIR), name="vto25")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
@@ -122,6 +130,21 @@ def require_store_access(request: Request, slug: str) -> None:
     if is_authed(request) or partner_slug(request) == slug:
         return
     raise HTTPException(status_code=401, detail="Giriş tələb olunur.")
+
+
+def require_studio_upload(request: Request) -> None:
+    """Photo → VTO studio: open when no admin password, or STUDIO_PUBLIC_UPLOAD=1, or logged in."""
+    if not auth_enabled():
+        return
+    if is_authed(request):
+        return
+    public = os.environ.get("STUDIO_PUBLIC_UPLOAD", "1").strip().lower()
+    if public in ("1", "true", "yes", "on"):
+        return
+    raise HTTPException(
+        status_code=401,
+        detail="Studio upload üçün /admin/login ilə daxil olun və ya STUDIO_PUBLIC_UPLOAD=1 təyin edin.",
+    )
 
 
 def render_tryon(slug: str, mode: str, sku: str = "") -> str:
@@ -145,6 +168,24 @@ def home() -> RedirectResponse:
 def sell_landing() -> str:
     """Seller / partner apply page."""
     return (STATIC / "landing.html").read_text(encoding="utf-8")
+
+
+@app.get("/studio", response_class=HTMLResponse)
+def vto_studio() -> str:
+    """Upload a glasses photo and preview it on a model face."""
+    return (STATIC / "studio.html").read_text(encoding="utf-8")
+
+
+@app.get("/engine", response_class=HTMLResponse)
+def vto_engine() -> str:
+    """Owned try-on SDK demo — MediaPipe + parametric 3D frames."""
+    return (STATIC / "engine.html").read_text(encoding="utf-8")
+
+
+@app.get("/try", response_class=HTMLResponse)
+def vto_try_page() -> str:
+    """Own engine: uploaded glasses photo placed on the user's face."""
+    return (STATIC / "try.html").read_text(encoding="utf-8")
 
 
 @app.get("/robots.txt")
@@ -580,7 +621,13 @@ async def upload_frame(
     price: str = Form(""),
     category: str = Form("optical"),
     marketplace: str = Form(""),
+    scale: str = Form(""),
+    offset_x: str = Form(""),
+    offset_y: str = Form(""),
+    tryon: str = Form(""),
     file: UploadFile = File(...),
+    model: UploadFile | None = File(None),
+    extra: Annotated[list[UploadFile] | None, File()] = None,
 ) -> dict:
     require_store_access(request, slug)
     if get_brand(slug) is None:
@@ -594,6 +641,25 @@ async def upload_frame(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="Qiymət düzgün deyil.") from exc
     published = marketplace.strip().lower() in ("1", "true", "yes", "on")
+    tryon_on = tryon.strip().lower() in ("1", "true", "yes", "on")
+
+    def _opt_float(raw: str) -> float | None:
+        text = (raw or "").strip().replace(",", ".")
+        if not text:
+            return None
+        try:
+            return float(text)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Kalibr rəqəmi düzgün deyil.") from exc
+
+    glb_bytes = await model.read() if model is not None else None
+    if glb_bytes == b"":
+        glb_bytes = None
+    extra_png: list[bytes] = []
+    for upload in extra or []:
+        chunk = await upload.read()
+        if chunk:
+            extra_png.append(chunk)
     try:
         return save_uploaded_frame(
             slug,
@@ -604,6 +670,12 @@ async def upload_frame(
             price=price_val,
             filter_key=category.strip() or "optical",
             published=published,
+            scale=_opt_float(scale),
+            offset_x=_opt_float(offset_x),
+            offset_y=_opt_float(offset_y),
+            tryon=True if tryon_on else None,
+            glb_bytes=glb_bytes,
+            extra_png_bytes=extra_png,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -612,6 +684,75 @@ async def upload_frame(
             status_code=400,
             detail="Şəkil açılmadı — şəffaf fonlu PNG və ya JPG yükləyin.",
         ) from exc
+
+
+@app.post("/api/studio/publish")
+async def studio_publish(
+    request: Request,
+    slug: str = Form("demo"),
+    sku: str = Form(...),
+    name: str = Form(...),
+    brand: str = Form("Studio"),
+    scale: str = Form(""),
+    offset_x: str = Form("0"),
+    offset_y: str = Form(""),
+    file: UploadFile = File(...),
+    model: UploadFile | None = File(None),
+    extra: Annotated[list[UploadFile] | None, File()] = None,
+) -> dict:
+    """Şəkil → kataloq + VTO link (studio axını, cədvəl addım 1–3)."""
+    require_studio_upload(request)
+    if get_brand(slug) is None:
+        raise HTTPException(status_code=404, detail="Brend tapılmadı.")
+
+    def _opt_float(raw: str) -> float | None:
+        text = (raw or "").strip().replace(",", ".")
+        if not text:
+            return None
+        try:
+            return float(text)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Kalibr rəqəmi düzgün deyil.") from exc
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Ön şəkil boşdur.")
+    glb_bytes = await model.read() if model is not None else None
+    if glb_bytes == b"":
+        glb_bytes = None
+    if not glb_bytes:
+        raise HTTPException(status_code=400, detail="VTO modeli (GLB) yoxdur — ön şəkli yenidən yükləyin.")
+    extra_png: list[bytes] = []
+    for upload in extra or []:
+        chunk = await upload.read()
+        if chunk:
+            extra_png.append(chunk)
+    try:
+        item = save_uploaded_frame(
+            slug.strip(),
+            sku.strip(),
+            name.strip(),
+            brand.strip(),
+            data,
+            tryon=True,
+            scale=_opt_float(scale),
+            offset_x=_opt_float(offset_x),
+            offset_y=_opt_float(offset_y),
+            glb_bytes=glb_bytes,
+            extra_png_bytes=extra_png,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail="Şəkil emal olunmadı.") from exc
+    tryon_path = f"/t/{slug.strip()}?sku={item['id']}"
+    return {
+        "ok": True,
+        "sku": item["id"],
+        "tryon_url": tryon_path,
+        "angles": len(item.get("angles") or []),
+        "item": item,
+    }
 
 
 @app.post("/api/brand/{slug}/frames/{sku}/marketplace")
@@ -644,7 +785,8 @@ def media(slug: str, filename: str) -> FileResponse:
     path = media_path(slug, filename)
     if path is None:
         raise HTTPException(status_code=404, detail="Fayl yoxdur.")
-    return FileResponse(path, media_type="image/png")
+    media = "model/gltf-binary" if filename.endswith(".glb") else "image/png"
+    return FileResponse(path, media_type=media)
 
 
 @app.get("/api/brands")
@@ -652,9 +794,7 @@ def api_brands() -> list[dict]:
     return list_brands()
 
 
-@app.get("/ql2009/{filename}")
-def ql2009_asset(filename: str) -> FileResponse:
-    """Serve the QL2009 C1 production-test 3D / DeepAR files only."""
+def _ql2009_file(filename: str) -> FileResponse:
     if filename not in QL2009_PUBLIC:
         raise HTTPException(status_code=404, detail="Fayl yoxdur.")
     path = QL2009_EXPORT / filename
@@ -664,9 +804,43 @@ def ql2009_asset(filename: str) -> FileResponse:
     return FileResponse(path, media_type=media, filename=filename)
 
 
+@app.get("/ql2009/{filename}")
+def ql2009_asset(filename: str) -> FileResponse:
+    """Serve the QL2009 C1 production-test 3D / DeepAR files only."""
+    return _ql2009_file(filename)
+
+
+@app.head("/ql2009/{filename}")
+def ql2009_asset_head(filename: str) -> FileResponse:
+    return _ql2009_file(filename)
+
+
 @app.get("/api/vto/status")
 def vto_status() -> dict:
     return {"configured": tryoncloud_configured(), "provider": "tryoncloud"}
+
+
+@app.post("/api/vto/prepare")
+async def vto_prepare(
+    photo: UploadFile = File(...),
+    width_mm: float = Form(135),
+) -> dict:
+    """Photo → 3D digitize: cutout, contour, rim, hinges, manifest."""
+    data = await photo.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Şəkil boşdur.")
+    try:
+        return prepare_bytes(data, width_mm=max(80.0, min(180.0, width_mm)), filename=photo.filename or "g.png")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/vto/asset/{out_id}")
+def vto_asset(out_id: str) -> dict:
+    manifest = load_manifest(out_id)
+    if manifest is None:
+        raise HTTPException(status_code=404, detail="Asset tapılmadı.")
+    return manifest
 
 
 @app.post("/api/vto/try")
@@ -701,11 +875,15 @@ async def vto_try(
 def tryon_config() -> dict:
     """Client reads this before starting AR. License key is domain-locked by DeepAR."""
     key = os.environ.get("DEEPAR_LICENSE_KEY", "").strip()
+    ql_deepar = (QL2009_EXPORT / "QL2009_C1.deepar").is_file()
     return {
         "engine": "deepar" if key else "overlay",
         "licenseKey": key or None,
         "rootPath": "/static/vendor/deepar/",
         "defaultEffect": "/static/vendor/deepar/effects/aviators",
+        "deeparEffects": {
+            "ql2009-c1": ql_deepar,
+        },
     }
 
 

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Virtual Try-On</title>
-    <link rel="stylesheet" href="/static/styles.css?v=8" />
+    <link rel="stylesheet" href="/static/styles.css?v=9" />
   </head>
   <body data-slug="{{SLUG}}" data-mode="{{MODE}}" data-sku="{{SKU}}" class="studio">
     <div class="studio-shell">
@@ -12,6 +12,7 @@
         <span class="studio-mark">VTO Studio</span>
         <video id="camera" playsinline muted autoplay></video>
         <canvas id="stage"></canvas>
+        <canvas id="stage3d"></canvas>
         <div id="ar-preview" class="ar-preview" hidden></div>
         <div id="idle-hint" class="idle-hint">
           <div class="face-guide" aria-hidden="true"></div>
@@ -61,6 +62,14 @@
         </div>
       </div>
     </div>
-    <script type="module" src="/static/live.js?v=10"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.1/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.1/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module" src="/static/live.js?v=13"></script>
   </body>
 </html>

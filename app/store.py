@@ -122,12 +122,22 @@ def save_uploaded_frame(
     filter_key: str = "optical",
     published: bool = False,
     currency: str = "AZN",
+    scale: float | None = None,
+    offset_x: float | None = None,
+    offset_y: float | None = None,
+    tryon: bool | None = None,
+    glb_bytes: bytes | None = None,
+    extra_png_bytes: list[bytes] | None = None,
 ) -> dict:
     if not SKU_RE.match(sku):
         raise ValueError("SKU yalnız hərf, rəqəm, - və _ ola bilər.")
     img = Image.open(BytesIO(png_bytes)).convert("RGBA")
-    out = store_dir(slug) / "frames" / f"{sku}.png"
+    frames = store_dir(slug) / "frames"
+    frames.mkdir(parents=True, exist_ok=True)
+    out = frames / f"{sku}.png"
     img.save(out)
+    if glb_bytes:
+        (frames / f"{sku}.glb").write_bytes(glb_bytes)
     existing = next((row for row in extra_catalog(slug) if row["id"] == sku), None)
     filt = (filter_key or "optical").strip().lower()
     if filt not in ("sunglasses", "optical", "luxury", "sports"):
@@ -161,9 +171,9 @@ def save_uploaded_frame(
         "name_az": name or sku,
         "brand": brand or slug,
         "model": sku.upper(),
-        "scale": float(existing["scale"]) if existing else 2.4,
-        "offset_x": float(existing["offset_x"]) if existing else 0.0,
-        "offset_y": float(existing["offset_y"]) if existing else -0.1,
+        "scale": float(scale) if scale is not None else (float(existing["scale"]) if existing else (1.18 if glb_bytes else 2.4)),
+        "offset_x": float(offset_x) if offset_x is not None else (float(existing["offset_x"]) if existing else 0.0),
+        "offset_y": float(offset_y) if offset_y is not None else (float(existing["offset_y"]) if existing else -0.1),
         "lenses": ["#eef2f4", "#6b4f2a", "#2f4a3a", "#3b2d5c"],
         "custom": True,
         "image_url": f"/media/{slug}/{sku}.png",
@@ -175,8 +185,26 @@ def save_uploaded_frame(
         "marketplace": bool(published),
         "stock": stock_val if stock_val > 0 else (1 if published else 0),
         "status": status,
-        "tryon": bool(existing.get("tryon")) if existing else False,
+        "tryon": bool(tryon) if tryon is not None else (bool(existing.get("tryon")) if existing else False),
+        "model_url": f"/media/{slug}/{sku}.glb" if glb_bytes or (existing and existing.get("model_url")) else None,
+        "digitized": bool(glb_bytes or (existing and existing.get("digitized"))),
+        "frame_width_mm": float(existing.get("frame_width_mm") or 140) if existing else 140.0,
+        "mesh_scale": float(existing.get("mesh_scale") or 1) if existing else 1.0,
     }
+    if glb_bytes:
+        item["tryon"] = True
+        item["digitized"] = True
+        item["model_url"] = f"/media/{slug}/{sku}.glb"
+    for raw in extra_png_bytes or []:
+        if len(item["angles"]) >= MAX_ANGLES:
+            break
+        extra_img = Image.open(BytesIO(raw)).convert("RGBA")
+        n = 1
+        while (frames / f"{sku}--a{n}.png").exists():
+            n += 1
+        filename = f"{sku}--a{n}.png"
+        extra_img.save(frames / filename)
+        item["angles"].append(f"/media/{slug}/{filename}")
     items = [row for row in extra_catalog(slug) if row["id"] != sku]
     items.append(item)
     _write_catalog(slug, items)
@@ -837,7 +865,9 @@ def update_seller_settings(slug: str, payload: dict) -> dict:
 
 
 def media_path(slug: str, filename: str) -> Path | None:
-    if "/" in filename or "\\" in filename or not filename.endswith(".png"):
+    if "/" in filename or "\\" in filename:
+        return None
+    if not filename.endswith((".png", ".glb")):
         return None
     path = store_dir(slug) / "frames" / filename
     if not path.exists():

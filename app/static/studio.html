@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VTO yarat — şəkildən hazır try-on</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/studio-make.css?v=2" />
+  </head>
+  <body>
+    <header class="make-top">
+      <a href="/shop" class="make-back">← Ana səhifə</a>
+      <div>
+        <p class="make-kicker">Virtual Try-On</p>
+        <h1>Şəkil → VTO hazır</h1>
+      </div>
+    </header>
+
+    <main class="make-grid">
+      <section class="make-card">
+        <ol class="make-flow">
+          <li><strong>Ön şəkil</strong> (mütləq) — sistem VTO modelini yaradır</li>
+          <li><strong>Əlavə şəkillər</strong> (istəyə görə) — yan, 3/4, detal</li>
+          <li>Ölçünü yoxla → <strong>VTO hazır et</strong></li>
+          <li>Link ilə kamerada sına</li>
+        </ol>
+
+        <h2>1. Ön şəkil (mütləq)</h2>
+        <p class="make-help">
+          Eynək birbaşa öndən, mümkün qədər açıq fonda. Bu şəkil kəsilir və canlı try-on
+          modelinə çevrilir — əl ilə 3D model yaratmaq lazım deyil.
+        </p>
+        <label class="make-drop">
+          <input id="file" type="file" accept="image/png,image/jpeg,image/webp" required />
+          <span id="drop-label">Ön şəkli seç və ya buraya at</span>
+        </label>
+        <div class="make-cutout" id="cutout-wrap" hidden>
+          <img id="cutout-preview" alt="Kəsilmiş eynək" />
+        </div>
+
+        <h2 class="make-sub">2. Əlavə şəkillər (istəyə görə)</h2>
+        <p class="make-help">
+          Müştəri vitrinində «Məhsul görünüşləri» kimi görünür; try-on ön şəkildən işləyir.
+          Maksimum 6 əlavə.
+        </p>
+        <label class="make-drop make-drop-ghost">
+          <input id="extra-files" type="file" accept="image/png,image/jpeg,image/webp" multiple />
+          <span id="extra-label">Yan / 3/4 / detal — bir və ya bir neçə şəkil</span>
+        </label>
+        <ul id="extra-list" class="make-extra-list" hidden></ul>
+
+        <label class="make-field">
+          Ad
+          <input id="name" type="text" placeholder="Aviator Classic" />
+        </label>
+        <label class="make-field">
+          Ölçü (try-on)
+          <input id="scale" type="range" min="0.85" max="1.65" step="0.03" value="1.18" />
+        </label>
+        <label class="make-field">
+          Yuxarı / aşağı
+          <input id="offset-y" type="range" min="-0.4" max="0.3" step="0.02" value="-0.1" />
+        </label>
+        <p id="status" class="make-status" hidden></p>
+        <div class="make-actions">
+          <button id="save" type="button" class="make-btn" disabled>VTO hazır et</button>
+          <a id="live" class="make-btn ghost" hidden href="#">Kamerada yoxla</a>
+        </div>
+      </section>
+
+      <section class="make-card preview">
+        <div class="make-preview-head">
+          <h2>Müştəri belə görəcək</h2>
+        </div>
+        <div class="make-stage">
+          <canvas id="preview" width="720" height="960"></canvas>
+          <canvas id="preview3d" width="720" height="960"></canvas>
+          <p class="make-watermark">Avtomatik VTO</p>
+        </div>
+      </section>
+    </main>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.1/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.1/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module" src="/static/studio.js?v=6"></script>
+  </body>
+</html>
+

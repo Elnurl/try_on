@@ -4,6 +4,7 @@
  * Video/photos stay on-device; only anonymous usage counters hit the server.
  */
 import { createTryonEngine } from "./tryon-adapter.js?v=2";
+import { createFaceOverlay3D } from "./digitize3d.js";
 
 const body = document.body;
 const slug = body.dataset.slug || "demo";
@@ -11,6 +12,8 @@ const mode = body.dataset.mode || "page";
 
 const canvas = document.querySelector("#stage");
 const ctx = canvas.getContext("2d");
+const stage3d = document.querySelector("#stage3d");
+const overlay3d = stage3d ? createFaceOverlay3D(stage3d) : null;
 const video = document.querySelector("#camera");
 const framesEl = document.querySelector("#frames");
 const statusEl = document.querySelector("#status");
@@ -41,6 +44,17 @@ let trackedTryon = false;
 let tryonConfig = { engine: "overlay" };
 let brandMeta = {};
 let consented = false;
+let loadedModelUrl = "";
+let meshLoadError = "";
+let lastFacePose = null;
+
+function usesMeshVto() {
+  return !!(selected && selected.model_url);
+}
+
+function meshReady() {
+  return usesMeshVto() && loadedModelUrl === selected.model_url && !meshLoadError;
+}
 
 function track(event) {
   const body = new URLSearchParams({ event });
@@ -83,19 +97,50 @@ async function waitPng(img) {
   }
 }
 
-async function loadEngine() {
-  if (engine) return engine;
+async function deeparEffectReady(item) {
+  if (!item || !item.effect_url) return false;
+  if (tryonConfig.deeparEffects && Object.prototype.hasOwnProperty.call(tryonConfig.deeparEffects, item.id)) {
+    return !!tryonConfig.deeparEffects[item.id];
+  }
+  try {
+    const res = await fetch(item.effect_url, { method: "HEAD" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function shouldUseDeepAR(item) {
+  if (tryonConfig.engine !== "deepar" || !tryonConfig.licenseKey) return false;
+  if (!item || !item.effect_url) return true;
+  return deeparEffectReady(item);
+}
+
+function syncEngineClasses() {
+  document.body.classList.toggle("engine-deepar", !!(engine && engine.kind === "deepar"));
+  document.body.classList.toggle(
+    "engine-mesh",
+    !!(engine && engine.kind === "overlay" && selected && selected.model_url),
+  );
+}
+
+async function loadEngine(forceReload = false) {
+  if (engine && !forceReload) return engine;
   setStatus("Model yüklənir…");
   if (!tryonConfig.engine) {
     tryonConfig = await (await fetch("/api/tryon-config")).json();
   }
+  const useDeepar = await shouldUseDeepAR(selected);
   engine = await createTryonEngine({
     config: tryonConfig,
     preview: arPreview,
+    forceOverlay: !useDeepar,
   });
+  syncEngineClasses();
   if (engine.kind === "deepar") {
-    document.body.classList.add("engine-deepar");
     if (arPreview) arPreview.hidden = false;
+  } else if (arPreview) {
+    arPreview.hidden = true;
   }
   return engine;
 }
@@ -188,15 +233,29 @@ async function loadBrand() {
       btn.className = "related-item" + (item.id === selected.id ? " on" : "");
       btn.innerHTML = `<img alt="" src="${item.image_url}" /><span>${item.model || item.name}</span><small>${item.brand || ""}</small>`;
       btn.addEventListener("click", () => {
-        selected = item;
-        lensColor = null;
-        framesEl.querySelectorAll(".related-item").forEach((el) => el.classList.remove("on"));
-        btn.classList.add("on");
-        syncProduct();
-        if (engine && engine.kind === "deepar") {
-          engine.setItem(item).catch((err) => console.warn(err));
-        }
-        if (view === "photo") renderPhoto();
+        void (async () => {
+          selected = item;
+          lensColor = null;
+          framesEl.querySelectorAll(".related-item").forEach((el) => el.classList.remove("on"));
+          btn.classList.add("on");
+          syncProduct();
+          await sync3DModel().catch((err) => console.warn(err));
+          if (view === "live" && engine) {
+            const wantDeepar = await shouldUseDeepAR(selected);
+            const haveDeepar = engine.kind === "deepar";
+            if (wantDeepar !== haveDeepar) {
+              stopCamera();
+              engine = null;
+              await startCamera().catch((err) => console.warn(err));
+              return;
+            }
+          }
+          if (engine && engine.kind === "deepar") {
+            engine.setItem(item).catch((err) => console.warn(err));
+          }
+          syncEngineClasses();
+          if (view === "photo") renderPhoto();
+        })();
       });
       framesEl.appendChild(btn);
       // Non-fatal: one broken image must not take the whole catalog down.
@@ -206,7 +265,32 @@ async function loadBrand() {
     })
   );
   syncProduct();
+  sync3DModel().catch((err) => console.warn(err));
   track("open");
+}
+
+async function sync3DModel() {
+  if (!overlay3d || !selected) return;
+  const url = selected.model_url;
+  meshLoadError = "";
+  if (!url) {
+    overlay3d.clearGlasses();
+    loadedModelUrl = "";
+    overlay3d.render();
+    return;
+  }
+  if (url === loadedModelUrl) return;
+  setStatus("3D eynək yüklənir…");
+  try {
+    await overlay3d.loadUrl(url, { frameWidthMm: selected.frame_width_mm });
+    loadedModelUrl = url;
+    setStatus("");
+  } catch (err) {
+    console.error(err);
+    loadedModelUrl = "";
+    meshLoadError = err.message || "load failed";
+    setStatus("3D model yüklənmədi — səhifəni yeniləyin.");
+  }
 }
 
 function glassesLayer() {
@@ -226,8 +310,32 @@ function glassesLayer() {
   return c;
 }
 
-function drawGlasses(left, right) {
+function drawGlasses(left, right, pose) {
   if (!selected) return false;
+  if (usesMeshVto()) {
+    if (!meshReady()) return false;
+    overlay3d.resize(canvas.width, canvas.height);
+    overlay3d.place(
+      left,
+      right,
+      selected.mesh_scale ?? selected.scale,
+      selected.offset_y || 0,
+      pose || lastFacePose,
+      canvas.width,
+      canvas.height,
+      selected,
+    );
+    overlay3d.render();
+    if (!trackedTryon) {
+      trackedTryon = true;
+      track("tryon");
+    }
+    return true;
+  }
+  if (overlay3d && !selected.model_url) {
+    overlay3d.resize(canvas.width, canvas.height);
+    overlay3d.render();
+  }
   const png = glassesLayer();
   if (!png) return false;
 
@@ -290,6 +398,30 @@ function loop() {
   canvas.height = video.videoHeight;
   const w = canvas.width;
   const h = canvas.height;
+  const meshMode = meshReady();
+
+  if (meshMode && overlay3d) {
+    overlay3d.resize(w, h);
+    overlay3d.setBackground(video, true);
+    if (video.currentTime === lastVideoTime) {
+      if (smooth) drawGlasses(smooth.left, smooth.right, lastFacePose);
+      else overlay3d.render();
+      return;
+    }
+    lastVideoTime = video.currentTime;
+    const pose = engine.detectVideo(video, performance.now());
+    if (!pose) {
+      setStatus("Üzü kadra gətirin");
+      overlay3d.render();
+      return;
+    }
+    if (!meshLoadError) setStatus("");
+    lastFacePose = pose;
+    const eyes = poseToPixels(pose, w, h, true);
+    smooth = smooth ? smoothPose(smooth, eyes) : eyes;
+    drawGlasses(smooth.left, smooth.right, pose);
+    return;
+  }
 
   ctx.save();
   ctx.translate(w, 0);
@@ -298,7 +430,7 @@ function loop() {
   ctx.restore();
 
   if (video.currentTime === lastVideoTime) {
-    if (smooth) drawGlasses(smooth.left, smooth.right);
+    if (smooth) drawGlasses(smooth.left, smooth.right, lastFacePose);
     return;
   }
   lastVideoTime = video.currentTime;
@@ -309,14 +441,18 @@ function loop() {
     return;
   }
   setStatus("");
+  lastFacePose = pose;
   const eyes = poseToPixels(pose, w, h, true);
   smooth = smooth ? smoothPose(smooth, eyes) : eyes;
-  drawGlasses(smooth.left, smooth.right);
+  drawGlasses(smooth.left, smooth.right, pose);
 }
 
 async function startCamera() {
   setStatus("Kamera açılır…");
   await loadEngine();
+  if (usesMeshVto()) {
+    await sync3DModel();
+  }
   if (engine.kind === "deepar") {
     photoBitmap = null;
     setIdle(false);
@@ -366,7 +502,12 @@ async function renderPhoto() {
   if (!photoBitmap || !engine) return;
   canvas.width = photoBitmap.width;
   canvas.height = photoBitmap.height;
-  ctx.drawImage(photoBitmap, 0, 0);
+  if (meshReady() && overlay3d) {
+    overlay3d.resize(canvas.width, canvas.height);
+    overlay3d.setBackground(photoBitmap, false);
+  } else {
+    ctx.drawImage(photoBitmap, 0, 0);
+  }
   let pose;
   try {
     pose = engine.detectImage(photoBitmap);
@@ -377,15 +518,17 @@ async function renderPhoto() {
     setStatus("Üz tapılmadı — öndən, işıqlı selfie seçin. Şəkil görünür, eynək oturmadı.");
     return;
   }
+  lastFacePose = pose;
   const eyes = poseToPixels(pose, canvas.width, canvas.height, false);
-  const ok = drawGlasses(eyes.left, eyes.right);
+  const ok = drawGlasses(eyes.left, eyes.right, pose);
   setStatus(ok ? "" : "Eynək şəkli hələ yüklənməyib, yenidən yoxlayın.");
 }
 
 async function tryPhoto(file) {
   setStatus("Şəkil hazırlanır…");
   stopCamera();
-  await loadEngine();
+  engine = null;
+  await loadEngine(true);
   if (engine.kind === "deepar") {
     const img = new Image();
     img.onload = () => {
