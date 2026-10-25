@@ -8,6 +8,7 @@ first boot) from a machine that can reach npm/Google.
 from __future__ import annotations
 
 import logging
+import shutil
 import tarfile
 import tempfile
 import urllib.request
@@ -20,6 +21,8 @@ VENDOR = STATIC_VENDOR / "mediapipe"
 WASM = VENDOR / "wasm"
 DEEPAR = STATIC_VENDOR / "deepar"
 DEEPAR_TGZ = "https://registry.npmjs.org/deepar/-/deepar-5.6.22.tgz"
+THREE = STATIC_VENDOR / "three"
+THREE_TGZ = "https://registry.npmjs.org/three/-/three-0.160.1.tgz"
 VERSION = "0.10.21"
 UNPKG = f"https://unpkg.com/@mediapipe/tasks-vision@{VERSION}"
 MODEL_URL = (
@@ -63,6 +66,7 @@ def ensure_vendor() -> None:
                 raise
     log.info("MediaPipe vendor assets ready in %s", VENDOR)
     ensure_deepar()
+    ensure_three()
 
 
 def ensure_deepar() -> None:
@@ -110,3 +114,30 @@ def ensure_deepar() -> None:
     if nested.exists() and not marker.exists():
         ensure_deepar()
     log.info("DeepAR vendor assets ready in %s", DEEPAR)
+
+
+def ensure_three() -> None:
+    """Self-host three.js — unpkg is often blocked (same reason as MediaPipe)."""
+    marker = THREE / "build" / "three.module.js"
+    if marker.exists() and marker.stat().st_size > 100_000:
+        return
+    THREE.mkdir(parents=True, exist_ok=True)
+    tgz = THREE / "three.tgz"
+    log.info("Downloading three.js for mesh VTO")
+    _fetch(THREE_TGZ, tgz)
+    with tarfile.open(tgz, "r:gz") as tar:
+        tar.extractall(THREE)
+    tgz.unlink(missing_ok=True)
+    pkg = THREE / "package"
+    for sub in ("build", "examples"):
+        src = pkg / sub
+        dest = THREE / sub
+        if not src.exists():
+            continue
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(src, dest)
+    shutil.rmtree(pkg, ignore_errors=True)
+    if not marker.exists():
+        raise RuntimeError("three.js vendor install failed")
+    log.info("three.js vendor assets ready in %s", THREE)

@@ -41,12 +41,36 @@ let photoBitmap = null;
 let view = "idle";
 let catalog = [];
 let trackedTryon = false;
-let tryonConfig = { engine: "overlay" };
+let tryonConfig = null;
 let brandMeta = {};
 let consented = false;
 let loadedModelUrl = "";
 let meshLoadError = "";
 let lastFacePose = null;
+
+async function ensureTryonConfig() {
+  if (tryonConfig) return tryonConfig;
+  try {
+    tryonConfig = await (await fetch("/api/tryon-config")).json();
+  } catch {
+    tryonConfig = { engine: "overlay" };
+  }
+  return tryonConfig;
+}
+
+function pickFrame(items, wanted) {
+  if (wanted) {
+    const hit = items.find((item) => item.id === wanted);
+    if (hit) return hit;
+  }
+  const uploads = items.filter((item) => item.custom && item.model_url && item.tryon !== false);
+  if (uploads.length) return uploads[uploads.length - 1];
+  const ql = items.find((item) => item.id === "ql2009-c1" && item.model_url);
+  if (ql) return ql;
+  const mesh = items.find((item) => item.model_url);
+  if (mesh) return mesh;
+  return items[0];
+}
 
 function usesMeshVto() {
   return !!(selected && selected.model_url);
@@ -140,9 +164,7 @@ function syncEngineClasses() {
 async function loadEngine(forceReload = false) {
   if (engine && !forceReload) return engine;
   setStatus("Model yüklənir…");
-  if (!tryonConfig.engine) {
-    tryonConfig = await (await fetch("/api/tryon-config")).json();
-  }
+  await ensureTryonConfig();
   const useDeepar = await shouldUseDeepAR(selected);
   engine = await createTryonEngine({
     config: tryonConfig,
@@ -161,6 +183,7 @@ async function loadEngine(forceReload = false) {
 function syncProduct() {
   if (!selected) return;
   productModel.textContent = selected.model || selected.name;
+  syncEngineClasses();
   productBrand.textContent = selected.brand || "";
   renderAngles();
   lensesEl.innerHTML = "";
@@ -215,6 +238,7 @@ function renderAngles() {
 }
 
 async function loadBrand() {
+  await ensureTryonConfig();
   const res = await fetch(`/api/brand/${slug}`);
   if (!res.ok) throw new Error("Brend tapılmadı");
   const data = await res.json();
@@ -232,7 +256,7 @@ async function loadBrand() {
   }
   if (privacyEl) privacyEl.textContent = data.privacy;
   const wanted = body.dataset.sku || new URLSearchParams(location.search).get("sku");
-  selected = catalog.find((item) => item.id === wanted) || catalog[0];
+  selected = pickFrame(catalog, wanted);
   lensColor = null;
   framesEl.innerHTML = "";
   await Promise.all(
@@ -465,6 +489,11 @@ async function startCamera() {
   await loadEngine();
   if (usesMeshVto()) {
     await sync3DModel();
+    if (meshLoadError) {
+      setStatus("3D eynək yüklənmədi — səhifəni yeniləyin və ya studio-dan yenidən VTO hazır edin.");
+      setIdle(true);
+      return;
+    }
   }
   if (engine.kind === "deepar") {
     photoBitmap = null;
@@ -629,11 +658,6 @@ loadBrand().catch((err) => {
   productBrand.textContent = "";
   setStatus("Kataloq yüklənmədi. İnterneti yoxlayıb səhifəni yeniləyin.");
 });
-fetch("/api/tryon-config")
-  .then((res) => res.json())
-  .then((cfg) => {
-    tryonConfig = cfg;
-  })
-  .catch(() => {});
+void ensureTryonConfig().catch(() => {});
 if (mode === "embed") document.documentElement.classList.add("embed-mode");
 if (mode !== "embed" && closeBtn) closeBtn.hidden = true;
