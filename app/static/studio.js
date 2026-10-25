@@ -3,7 +3,7 @@ import {
   buildGlasses3D,
   createFaceOverlay3D,
   exportGlb,
-} from "./digitize3d.js";
+} from "./digitize3d.js?v=7";
 
 const FACE_URL = "/static/studio-face.jpg";
 const SLUG = "demo";

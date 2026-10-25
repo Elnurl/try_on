@@ -72,6 +72,7 @@ export function buildGlasses3D(cutoutCanvas) {
   group.add(left, right);
 
   group.userData.frameWidthCm = 14;
+  group.userData.digitizedPhoto = true;
   return group;
 }
 
@@ -239,13 +240,34 @@ export function createFaceOverlay3D(canvas) {
     smooth.ready = false;
   }
 
+  function isDigitizedPhotoMesh(root) {
+    if (!root) return false;
+    if (root.name === "digitized-glasses" || root.userData?.digitizedPhoto) return true;
+    let tagged = false;
+    root.traverse((child) => {
+      if (child.userData?.digitizedPhoto) tagged = true;
+    });
+    if (tagged) return true;
+    const box = new THREE.Box3().setFromObject(root);
+    const sx = box.getSize(new THREE.Vector3()).x;
+    return sx > 0.4 && sx < 1.35;
+  }
+
   function setObject(object, meta = {}) {
     clearGlasses();
     glasses = object;
-    if (glasses.name === "digitized-glasses") {
-      glasses.userData.frameWidthCm = (meta.frameWidthMm || 140) / 10;
+    const frameMm = meta.frameWidthMm || 140;
+    if (isDigitizedPhotoMesh(glasses)) {
+      const targetCm = frameMm / 10;
+      glasses.userData.frameWidthCm = targetCm;
+      glasses.userData.photoPlaneUnits = 1;
+      const box = new THREE.Box3().setFromObject(glasses);
+      const sx = box.getSize(new THREE.Vector3()).x || 1;
+      if (sx < targetCm * 0.85) {
+        glasses.scale.multiplyScalar(targetCm / sx);
+      }
     } else {
-      normalizeGlassesRoot(glasses, meta.frameWidthMm);
+      normalizeGlassesRoot(glasses, frameMm);
     }
     head.add(glasses);
   }
@@ -273,10 +295,15 @@ export function createFaceOverlay3D(canvas) {
 
   function scaleFromDist(dist, opts) {
     const widthCm = glasses?.userData?.frameWidthCm || (opts.frameWidthMm || 127) / 10;
+    let modelSpanCm = widthCm;
+    if (glasses) {
+      const box = new THREE.Box3().setFromObject(glasses);
+      modelSpanCm = Math.max(box.getSize(new THREE.Vector3()).x, 1e-4);
+    }
     return (
       dist
       * (10 / EYE_SPAN_MM)
-      * (widthCm / 14)
+      * (widthCm / modelSpanCm)
       * (opts.scale ?? 1.02)
       * (opts.meshScale ?? 1)
     );
