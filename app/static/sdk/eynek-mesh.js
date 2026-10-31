@@ -58,6 +58,9 @@ function sideTemple(cutout, sign) {
       side: THREE.DoubleSide,
     }),
   );
+  mesh.name = "side-temple";
+  mesh.userData.sideTemple = true;
+  mesh.userData.templeSide = sign;
   mesh.position.set(sign * 0.48, aspect * 0.04, -0.12);
   mesh.rotation.y = sign * 1.05;
   return mesh;
@@ -77,8 +80,8 @@ export function buildGlasses3D(cutoutCanvas, opts = {}) {
   tex.anisotropy = 8;
   tex.needsUpdate = true;
 
-  const frontGeom = new THREE.PlaneGeometry(1, aspect, 12, 6);
-  bendFront(frontGeom, 0.05);
+  const frontGeom = new THREE.PlaneGeometry(1, aspect, 16, 8);
+  bendFront(frontGeom, 0.068);
   const front = new THREE.Mesh(
     frontGeom,
     new THREE.MeshStandardMaterial({
@@ -105,9 +108,13 @@ export function buildGlasses3D(cutoutCanvas, opts = {}) {
   templeGeom.rotateX(Math.PI / 2);
 
   const left = new THREE.Mesh(templeGeom, templeMat);
+  left.userData.templeCapsule = true;
+  left.userData.templeSide = -1;
   left.position.set(-0.485, hingeY, -templeLen / 2);
   left.rotation.y = 0.1;
   const right = new THREE.Mesh(templeGeom, templeMat);
+  right.userData.templeCapsule = true;
+  right.userData.templeSide = 1;
   right.position.set(0.485, hingeY, -templeLen / 2);
   right.rotation.y = -0.1;
   group.add(left, right);
@@ -115,9 +122,15 @@ export function buildGlasses3D(cutoutCanvas, opts = {}) {
   const hookGeom = new THREE.CapsuleGeometry(0.016, 0.14, 4, 8);
   hookGeom.rotateX(Math.PI / 2);
   const leftHook = new THREE.Mesh(hookGeom, templeMat);
+  leftHook.userData.templeCapsule = true;
+  leftHook.userData.templeSide = -1;
+  leftHook.userData.hook = true;
   leftHook.position.set(-0.5, hingeY - 0.04, -templeLen - 0.02);
   leftHook.rotation.x = 0.55;
   const rightHook = new THREE.Mesh(hookGeom, templeMat);
+  rightHook.userData.templeCapsule = true;
+  rightHook.userData.templeSide = 1;
+  rightHook.userData.hook = true;
   rightHook.position.set(0.5, hingeY - 0.04, -templeLen - 0.02);
   rightHook.rotation.x = 0.55;
   group.add(leftHook, rightHook);

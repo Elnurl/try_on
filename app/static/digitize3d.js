@@ -111,10 +111,13 @@ export function createFaceOverlay3D(canvas) {
   renderer.autoClear = true;
 
   const scene = new THREE.Scene();
-  scene.add(new THREE.AmbientLight(0xffffff, 0.62));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
   const key = new THREE.DirectionalLight(0xffffff, 1.05);
   key.position.set(-0.35, 0.65, 1);
   scene.add(key);
+  const fill = new THREE.DirectionalLight(0xf4f0ff, 0.42);
+  fill.position.set(0.45, -0.15, 0.85);
+  scene.add(fill);
 
   const bgMat = new THREE.MeshBasicMaterial({ depthWrite: false });
   const bg = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), bgMat);
@@ -309,32 +312,81 @@ export function createFaceOverlay3D(canvas) {
     );
   }
 
+  function applyDigitizedDepth(pose, dist) {
+    if (!glasses?.userData?.digitizedPhoto) return;
+    const yaw = pose?.yaw || 0;
+    const pitch = pose?.pitch || 0;
+    glasses.traverse((child) => {
+      if (!child.isMesh) return;
+      if (child.userData?.sideTemple) {
+        const s = child.userData.templeSide || 1;
+        child.rotation.y = s * (1.05 + yaw * 0.72);
+        child.position.z = -0.12 - Math.abs(yaw) * 0.08;
+        return;
+      }
+      if (child.userData?.templeCapsule) {
+        const s = child.userData.templeSide || 1;
+        child.rotation.y = s * (0.12 + yaw * 0.48);
+        if (child.userData.hook) {
+          child.rotation.x = 0.55 + pitch * 0.12;
+        }
+        return;
+      }
+      const ax = Math.abs(child.position.x);
+      if (ax > 0.38 && child.position.z < -0.04) {
+        const s = child.position.x < 0 ? -1 : 1;
+        child.rotation.y += s * yaw * 0.35;
+      }
+    });
+    if (dist > 20) {
+      const u = dist * 0.0042;
+      occluder.scale.set(u * 1.05, u * 1.35, u * 0.72);
+      occluder.position.set(0, -u * 0.12, -u * 0.95);
+    }
+  }
+
   function placeFromEyePixels(left, right, opts) {
     if (!glasses || !camera || !left || !right) return false;
-    const dx = right.x - left.x;
-    const dy = right.y - left.y;
-    const dist = Math.hypot(dx, dy);
+    const left3 = new THREE.Vector3(left.x - viewW / 2, viewH / 2 - left.y, 0);
+    const right3 = new THREE.Vector3(right.x - viewW / 2, viewH / 2 - right.y, 0);
+    const pose = opts.pose;
+    let nose3 = null;
+    if (pose?.nose) {
+      const flip = opts.mirror !== false;
+      nose3 = new THREE.Vector3(
+        (flip ? 1 - pose.nose.x : pose.nose.x) * viewW - viewW / 2,
+        viewH / 2 - pose.nose.y * viewH,
+        0,
+      );
+    }
+    const xAxis = right3.clone().sub(left3);
+    const dist = xAxis.length();
     if (dist < 10) return false;
-
-    const midX = (left.x + right.x) / 2;
-    const midY = (left.y + right.y) / 2 + dist * (opts.offsetY ?? 0.02);
-    const nx = dx / dist;
-    const ny = dy / dist;
-    const zAxis = new THREE.Vector3(-ny, nx, 0.35).normalize();
-    const xAxis = new THREE.Vector3(nx, ny, 0);
+    xAxis.normalize();
+    const mid = left3.clone().add(right3).multiplyScalar(0.5);
+    mid.y += dist * (opts.offsetY ?? 0.02);
+    const upHint = new THREE.Vector3(0, 1, 0);
+    let zAxis = new THREE.Vector3().crossVectors(xAxis, upHint);
+    if (zAxis.lengthSq() < 1e-8) zAxis.set(0, 0, 1);
+    zAxis.normalize();
+    if (zAxis.z < 0) zAxis.negate();
+    if (nose3) {
+      zAxis.x += ((nose3.x - mid.x) / dist) * 0.55;
+      zAxis.normalize();
+    }
     const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
     zAxis.crossVectors(xAxis, yAxis).normalize();
-
     const quat = new THREE.Quaternion().setFromRotationMatrix(
       new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis),
     );
-    const pos = new THREE.Vector3(
-      midX - viewW / 2,
-      viewH / 2 - midY,
-      0,
-    ).add(zAxis.clone().multiplyScalar(dist * 0.04));
-
+    if (pose) {
+      const turnY = new THREE.Quaternion().setFromAxisAngle(yAxis, -(pose.yaw || 0) * 0.95);
+      const turnX = new THREE.Quaternion().setFromAxisAngle(xAxis, (pose.pitch || 0) * 0.7);
+      quat.multiply(turnY).multiply(turnX);
+    }
+    const pos = mid.clone().add(zAxis.clone().multiplyScalar(dist * 0.06));
     applySmooth(pos, quat, scaleFromDist(dist, opts));
+    applyDigitizedDepth(pose, dist);
     return true;
   }
 
@@ -432,6 +484,7 @@ export function createFaceOverlay3D(canvas) {
 
     const pos = mid.clone().add(zAxis.clone().multiplyScalar(dist * 0.06));
     applySmooth(pos, quat, scaleFromDist(dist, opts));
+    applyDigitizedDepth(pose, dist);
     return true;
   }
 
@@ -453,13 +506,13 @@ export function createFaceOverlay3D(canvas) {
       typeof right.x === "number" &&
       (left.x > 1.5 || right.x > 1.5);
     if (pixelEyes && width && height) {
-      if (placeFromEyePixels(left, right, opts)) return true;
+      if (placeFromEyePixels(left, right, { ...opts, pose })) return true;
+    }
+    if (left && right && typeof left.x === "number") {
+      if (placeFromEyePixels(left, right, { ...opts, pose })) return true;
     }
     if (pose && width && height) {
       return placeFromPose(pose, width, height, opts);
-    }
-    if (left && right && typeof left.x === "number") {
-      return placeFromEyePixels(left, right, opts);
     }
     return false;
   }
