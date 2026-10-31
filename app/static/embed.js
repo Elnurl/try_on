@@ -1,4 +1,4 @@
-import { strings, pickLang } from "./embed-i18n.js?v=1";
+import { strings, pickLang } from "./embed-i18n.js?v=2";
 import { createFaceTracker } from "./sdk/face-tracker.js?v=1";
 import { createTryOn } from "./sdk/vto-core.js?v=1";
 
@@ -56,19 +56,58 @@ function icon(path, size = 28) {
   el.innerHTML = `<path d="${path}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
   return el;
 }
-const ICON_CAMERA = "M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.2-2h6.6l1.2 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5zM12 16.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z";
-const ICON_BLOCKED = "M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.2-2h6.6l1.2 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5zM4 4l16 16";
 const ICON_INFO = "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01";
 
+const ART_FACE = `<svg viewBox="0 0 240 200" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect x="38" y="14" width="104" height="172" rx="16"/><path d="M80 24h20"/>
+  <path d="M90 58c-17 0-27 13-27 31 0 22 12 40 27 40s27-18 27-40c0-18-10-31-27-31z" stroke-width="1.6" opacity=".55"/>
+  <circle cx="77" cy="92" r="11"/><circle cx="103" cy="92" r="11"/><path d="M88 91c1.5-2 2.5-2 4 0M66 90l-8-3M114 90l8-3"/>
+  <path d="M84 113c4 3 8 3 12 0" stroke-width="1.6" opacity=".55"/>
+  <g stroke-width="1.8" opacity=".5"><path d="M176 52l6-6 6 6"/><path d="M176 152l6 6 6-6"/></g>
+  <g stroke-width="1.8"><rect x="162" y="66" width="13" height="10" rx="4" opacity=".45"/><rect x="189" y="66" width="13" height="10" rx="4" opacity=".45"/><path d="M175 70h14" opacity=".45"/>
+  <circle cx="170" cy="102" r="7"/><circle cx="194" cy="102" r="7"/><path d="M177 101h10"/>
+  <rect x="162" y="126" width="13" height="10" rx="2" opacity=".45"/><rect x="189" y="126" width="13" height="10" rx="2" opacity=".45"/><path d="M175 130h14" opacity=".45"/></g></svg>`;
+const ART_CAMERA = `<svg viewBox="0 0 240 200" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect x="44" y="58" width="152" height="104" rx="18"/><path d="M92 58l10-18h36l10 18"/>
+  <circle cx="120" cy="110" r="30"/><circle cx="120" cy="110" r="16" stroke-width="1.6" opacity=".55"/>
+  <circle cx="172" cy="80" r="3" fill="currentColor" stroke="none"/>
+  <path d="M184 150c10 0 18 6 18 6v12c0 9-8 14-18 18-10-4-18-9-18-18v-12s8-6 18-6z" fill="#fff"/><path d="M177 168l5 5 9-10"/></svg>`;
+const ART_BLOCKED = `<svg viewBox="0 0 240 200" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect x="44" y="58" width="152" height="104" rx="18" opacity=".45"/><path d="M92 58l10-18h36l10 18" opacity=".45"/>
+  <circle cx="120" cy="110" r="30" opacity=".45"/><path d="M52 40l136 136" stroke-width="2.6"/></svg>`;
+const ICON_TICK = "M12 3l7 3v5.5c0 4.4-3 8-7 9.5-4-1.5-7-5.1-7-9.5V6zM8.8 12.2l2.2 2.2 4.4-4.6";
+
+function closeButton() {
+  return embedded
+    ? h("button", { type: "button", class: "close-corner", "aria-label": T.close, onclick: closeWidget }, icon("M6 6l12 12M18 6L6 18", 18))
+    : null;
+}
+
 function showScreen(...children) {
-  const body = h("div", { class: "screen-body" }, ...children);
-  if (embedded) {
-    const close = h("button", { type: "button", class: "icon-btn close-corner", "aria-label": T.close, onclick: closeWidget }, icon("M6 6l12 12M18 6L6 18", 20));
-    screenEl.replaceChildren(close, body);
-  } else {
-    screenEl.replaceChildren(body);
-  }
+  screenEl.replaceChildren(...[closeButton(), h("div", { class: "center" }, ...children)].filter(Boolean));
   screenEl.hidden = false;
+}
+
+function svg(markup) {
+  const wrap = document.createElement("div");
+  wrap.innerHTML = markup;
+  return wrap.firstElementChild;
+}
+
+function showSplit({ art, caption, title, lead, body = [], actions = [] }) {
+  const artPane = h("aside", { class: "split-art" }, h("div", { class: "brand-tag" }, "EYNƏK", h("i", {}, ".")), svg(art), caption);
+  const main = h(
+    "section",
+    { class: "split-main" },
+    h("div", { class: "split-body" }, h("h2", {}, title), lead ? h("p", {}, lead) : null, ...body),
+    actions.length ? h("div", { class: "split-actions" }, ...actions) : null,
+  );
+  screenEl.replaceChildren(...[closeButton(), h("div", { class: "split" }, artPane, main)].filter(Boolean));
+  screenEl.hidden = false;
+}
+
+function pointList(items) {
+  return h("ul", { class: "points" }, items.map((t) => h("li", {}, h("span", { class: "tick" }, icon(ICON_TICK, 16)), t)));
 }
 
 function hideScreen() {
@@ -140,49 +179,58 @@ function termsVersion() {
   return `${TERMS_VERSION}:${host.termsVersion || ""}`;
 }
 
+function termsNotice() {
+  const [before, after = ""] = T.termsRead.split("{link}");
+  const link = host.termsUrl
+    ? h("a", { href: host.termsUrl, target: "_blank", rel: "noopener" }, T.termsLink)
+    : h("b", {}, T.termsLink);
+  return h("p", {}, before, link, after);
+}
+
 function askTerms() {
   return new Promise((resolve) => {
-    const box = h("input", { type: "checkbox", id: "termsBox" });
-    const go = h("button", { type: "button", class: "btn btn-full", disabled: true }, T.continue);
-    box.addEventListener("change", () => (go.disabled = !box.checked));
-    go.addEventListener("click", () => {
+    const agree = () => {
       try {
         localStorage.setItem(TERMS_KEY, termsVersion());
       } catch {
         /* storage blocked: ask again next time */
       }
       resolve();
+    };
+    const decline = () => {
+      if (embedded) closeWidget();
+      else showMessage(T.declined, { retry: () => askTerms().then(resolve), photo: false });
+    };
+    showSplit({
+      art: ART_FACE,
+      caption: h("p", {}, T.termsCaption),
+      title: T.termsTitle,
+      body: [pointList(host.termsPoints || T.termsPoints), termsNotice()],
+      actions: [
+        h("button", { type: "button", class: "btn btn-secondary", onclick: decline }, T.termsDecline),
+        h("button", { type: "button", class: "btn", onclick: agree }, T.termsAgree),
+      ],
     });
-    const label = h("label", { class: "check", for: "termsBox" }, box, h("span", {}, T.termsAccept));
-    if (host.termsUrl) {
-      label.lastChild.append(" · ", h("a", { href: host.termsUrl, target: "_blank", rel: "noopener" }, T.termsLink));
-    }
-    showScreen(
-      h("div", { class: "glyph" }, icon(ICON_INFO)),
-      h("h2", {}, T.termsTitle),
-      h("p", {}, T.termsLead),
-      h("ul", { class: "points" }, (host.termsPoints || T.termsPoints).map((t) => h("li", {}, t))),
-      label,
-      go,
-    );
   });
 }
 
 /* ---------- camera ---------- */
 
-function photoButton(cls = "btn btn-secondary btn-full") {
+function photoButton(cls = "btn btn-secondary") {
   const input = h("input", { type: "file", accept: "image/*", hidden: true });
   input.addEventListener("change", () => usePhoto(input.files && input.files[0]));
   return h("label", { class: cls }, T.uploadPhoto, input);
 }
 
 function askCamera() {
-  showScreen(
-    h("div", { class: "glyph" }, icon(ICON_CAMERA)),
-    h("h2", {}, T.camTitle),
-    h("p", {}, T.camText),
-    h("div", { class: "stack" }, h("button", { type: "button", class: "btn btn-full", onclick: startCamera }, T.camOpen), photoButton()),
-  );
+  showSplit({
+    art: ART_CAMERA,
+    caption: h("p", {}, T.camCaption),
+    title: T.camTitle,
+    lead: T.camText,
+    body: [pointList(T.camPoints)],
+    actions: [photoButton(), h("button", { type: "button", class: "btn", onclick: startCamera }, T.camOpen)],
+  });
 }
 
 function platformSteps() {
@@ -193,25 +241,25 @@ function platformSteps() {
 }
 
 function showDenied() {
-  showScreen(
-    h("div", { class: "glyph" }, icon(ICON_BLOCKED)),
-    h("h2", {}, T.deniedTitle),
-    h("p", {}, T.deniedText),
-    h("ol", { class: "steps" }, platformSteps().map((s) => h("li", {}, s))),
-    h("div", { class: "stack" }, h("button", { type: "button", class: "btn btn-full", onclick: startCamera }, T.retry), photoButton()),
-  );
+  showSplit({
+    art: ART_BLOCKED,
+    caption: h("p", {}, T.deniedCaption),
+    title: T.deniedTitle,
+    lead: T.deniedText,
+    body: [h("ol", { class: "steps" }, platformSteps().map((s) => h("li", {}, s)))],
+    actions: [photoButton(), h("button", { type: "button", class: "btn", onclick: startCamera }, T.retry)],
+  });
 }
 
 function showMessage(text, { retry = null, photo = true } = {}) {
+  const buttons = [
+    photo && current ? photoButton() : null,
+    retry ? h("button", { type: "button", class: "btn", onclick: retry }, T.retry) : null,
+  ].filter(Boolean);
   showScreen(
     h("div", { class: "glyph" }, icon(ICON_INFO)),
-    h("p", { style: "color:var(--ink);font-size:14px" }, text),
-    h(
-      "div",
-      { class: "stack" },
-      retry ? h("button", { type: "button", class: "btn btn-full", onclick: retry }, T.retry) : null,
-      photo && current ? photoButton() : null,
-    ),
+    h("p", {}, text),
+    buttons.length ? h("div", { class: "split-actions", style: "border:0;padding:0;width:100%;grid-template-columns:repeat(" + buttons.length + ",1fr)" }, ...buttons) : null,
   );
 }
 
@@ -361,8 +409,7 @@ function renderHead() {
   const cart = $("cartBtn");
   const unavailable = i.available === false;
   cart.disabled = unavailable;
-  const price = priceText(i);
-  cart.textContent = unavailable ? T.outOfStock : price ? `${T.addToCart} · ${price}` : T.addToCart;
+  cart.textContent = unavailable ? T.outOfStock : T.addToCart;
 }
 
 function renderStrip() {
@@ -460,9 +507,10 @@ function applyStatic() {
   document.documentElement.lang = pickLang(host.lang || params.get("lang"));
   document.title = T.title;
   $("closeBtn").setAttribute("aria-label", T.close);
-  $("selfieBtn").firstChild.textContent = T.selfie;
-  $("camBtn").textContent = T.camera;
-  $("shotBtn").textContent = T.snapshot;
+  for (const [id, text] of [["shotBtn", T.snapshot], ["selfieBtn", T.selfie], ["camBtn", T.camera]]) {
+    $(id).setAttribute("aria-label", text);
+    $(id).querySelector(".rail-label").textContent = text;
+  }
   $("viewCartBtn").textContent = T.viewCart;
   $("closeBtn").hidden = !embedded;
   const cartOff = params.get("cart") === "0" || host.cart === false;
