@@ -5,6 +5,7 @@
  */
 import { createTryonEngine } from "./tryon-adapter.js?v=3";
 import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=15";
+import { maskSideTemples } from "./frame-mask.js";
 
 const body = document.body;
 const slug = body.dataset.slug || "demo";
@@ -47,6 +48,7 @@ let consented = false;
 let loadedModelUrl = "";
 let meshLoadError = "";
 let lastFacePose = null;
+const tryonFrameCache = new Map();
 
 async function ensureTryonConfig() {
   if (tryonConfig) return tryonConfig;
