@@ -88,14 +88,16 @@ export function buildGlasses3D(cutoutCanvas, opts = {}) {
     new THREE.MeshStandardMaterial({
       map: tex,
       transparent: true,
-      alphaTest: 0.04,
+      alphaTest: 0.03,
       roughness: 0.32,
       metalness: 0.16,
       side: THREE.FrontSide,
-      depthWrite: true,
+      depthWrite: false,
+      opacity: 1,
     }),
   );
   front.position.z = 0.02;
+  front.renderOrder = 2;
   group.add(front);
 
   if (opts.liveMinimal) {

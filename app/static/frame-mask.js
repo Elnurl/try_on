@@ -61,3 +61,44 @@ export function maskSideTemples(canvas, insetRatio = 0.16) {
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
+
+/** Dark lens areas in product PNG → semi-transparent so eyes show through. */
+export function makeLensesTranslucent(canvas, alphaMul = 0.38) {
+  const w = canvas.width;
+  const h = canvas.height;
+  if (w < 8 || h < 8) return canvas;
+  const ctx = canvas.getContext("2d");
+  const img = ctx.getImageData(0, 0, w, h);
+  const px = img.data;
+  let minX = w;
+  let maxX = 0;
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (px[(y * w + x) * 4 + 3] > 30) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+      }
+    }
+  }
+  const span = maxX - minX + 1;
+  if (span < 4) return canvas;
+  const y0 = Math.floor(h * 0.22);
+  const y1 = Math.ceil(h * 0.78);
+  for (let y = y0; y < y1; y += 1) {
+    for (let x = minX; x <= maxX; x += 1) {
+      const i = (y * w + x) * 4;
+      const a = px[i + 3];
+      if (a < 25) continue;
+      const lum = (px[i] + px[i + 1] + px[i + 2]) / 3;
+      const nx = (x - minX) / span;
+      const inLens = (nx > 0.08 && nx < 0.46) || (nx > 0.54 && nx < 0.92);
+      const isRim = lum < 55 && !inLens;
+      if (isRim) continue;
+      if (inLens || lum < 115) {
+        px[i + 3] = Math.max(28, Math.round(a * alphaMul));
+      }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}

@@ -4,8 +4,8 @@
  * Video/photos stay on-device; only anonymous usage counters hit the server.
  */
 import { createTryonEngine } from "./tryon-adapter.js?v=3";
-import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=15";
-import { maskSideTemples } from "./frame-mask.js";
+import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=16";
+import { makeLensesTranslucent, maskSideTemples } from "./frame-mask.js";
 
 const body = document.body;
 const slug = body.dataset.slug || "demo";
@@ -74,15 +74,12 @@ function pickFrame(items, wanted) {
   return items[0];
 }
 
-/** Studio / uploaded frames: clean photo overlay (same math as /studio). */
 function usesPhotoVto() {
-  return !!(selected && (selected.custom || selected.digitized) && selected.image_url);
+  return false;
 }
 
 function usesMeshVto() {
-  if (!selected?.model_url) return false;
-  if (usesPhotoVto()) return false;
-  return true;
+  return !!(selected && selected.model_url);
 }
 
 function meshKeyFor(item) {
@@ -116,13 +113,8 @@ async function buildStudioMesh(item) {
   if (!img) throw new Error("Frame PNG not loaded");
   await waitPng(img);
   const frontCanvas = imageToCanvas(img);
-  const angles = item.angles || [];
-  let leftCanvas = null;
-  let rightCanvas = null;
-  if (angles.length >= 2) {
-    leftCanvas = await loadAngleCanvas(angles[0]);
-    rightCanvas = await loadAngleCanvas(angles[1]);
-  }
+  maskSideTemples(frontCanvas, 0.17);
+  makeLensesTranslucent(frontCanvas, 0.4);
   const mm = item.frame_width_mm || 140;
   return buildGlasses3D(frontCanvas, {
     frameWidthMm: mm,
@@ -402,17 +394,22 @@ async function sync3DModel() {
 function glassesLayer() {
   const png = frameImages.get(selected.id);
   if (!png || !png.naturalWidth) return null;
+  const cacheKey = `${selected.id}:${lensColor || ""}`;
+  if (tryonFrameCache.has(cacheKey)) return tryonFrameCache.get(cacheKey);
   const c = document.createElement("canvas");
   c.width = png.naturalWidth;
   c.height = png.naturalHeight;
   const g = c.getContext("2d");
   g.drawImage(png, 0, 0);
+  maskSideTemples(c, 0.17);
+  makeLensesTranslucent(c, 0.4);
   if (lensColor) {
     g.globalCompositeOperation = "source-atop";
     g.fillStyle = lensColor;
     g.globalAlpha = 0.35;
     g.fillRect(0, 0, c.width, c.height);
   }
+  tryonFrameCache.set(cacheKey, c);
   return c;
 }
 

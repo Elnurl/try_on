@@ -4,7 +4,7 @@ import {
   createFaceOverlay3D,
   exportGlb,
 } from "./digitize3d.js?v=13";
-import { maskSideTemples } from "./frame-mask.js";
+import { makeLensesTranslucent, maskSideTemples } from "./frame-mask.js";
 
 const FACE_URL = "/static/studio-face.jpg";
 const SLUG = "demo";
@@ -284,6 +284,7 @@ async function rebuildVtoModel() {
   try {
     cutoutFront = await loadCutout(f);
     maskSideTemples(cutoutFront, 0.17);
+    makeLensesTranslucent(cutoutFront, 0.4);
     cutoutLeft = await loadCutout(l);
     cutoutRight = await loadCutout(r);
     const mm = frameWidthMm();

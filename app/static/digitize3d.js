@@ -389,9 +389,11 @@ export function createFaceOverlay3D(canvas) {
     const quat = new THREE.Quaternion().setFromRotationMatrix(
       new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis),
     );
-    if (pose && !opts.skipFacialMatrix) {
-      const turnY = new THREE.Quaternion().setFromAxisAngle(yAxis, -(pose.yaw || 0) * 0.95);
-      const turnX = new THREE.Quaternion().setFromAxisAngle(xAxis, (pose.pitch || 0) * 0.7);
+    if (pose) {
+      const yawK = opts.skipFacialMatrix ? 1.25 : 0.95;
+      const pitchK = opts.skipFacialMatrix ? 0.92 : 0.7;
+      const turnY = new THREE.Quaternion().setFromAxisAngle(yAxis, -(pose.yaw || 0) * yawK);
+      const turnX = new THREE.Quaternion().setFromAxisAngle(xAxis, (pose.pitch || 0) * pitchK);
       quat.multiply(turnY).multiply(turnX);
     }
     const pos = mid.clone().add(zAxis.clone().multiplyScalar(dist * 0.06));
@@ -489,9 +491,11 @@ export function createFaceOverlay3D(canvas) {
 
     const basis = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
     const quat = new THREE.Quaternion().setFromRotationMatrix(basis);
-    if (!opts.skipFacialMatrix) {
-      const turnY = new THREE.Quaternion().setFromAxisAngle(yAxis, -(pose.yaw || 0) * 0.95);
-      const turnX = new THREE.Quaternion().setFromAxisAngle(xAxis, (pose.pitch || 0) * 0.7);
+    if (pose) {
+      const yawK = opts.skipFacialMatrix ? 1.25 : 0.95;
+      const pitchK = opts.skipFacialMatrix ? 0.92 : 0.7;
+      const turnY = new THREE.Quaternion().setFromAxisAngle(yAxis, -(pose.yaw || 0) * yawK);
+      const turnX = new THREE.Quaternion().setFromAxisAngle(xAxis, (pose.pitch || 0) * pitchK);
       quat.multiply(turnY).multiply(turnX);
     }
 
