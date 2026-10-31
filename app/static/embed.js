@@ -1,5 +1,5 @@
 import { createFaceTracker } from "./sdk/face-tracker.js?v=1";
-import { createTryOn } from "./sdk/vto-core.js?v=3";
+import { createTryOn } from "./sdk/vto-core.js?v=1";
 
 const params = new URLSearchParams(location.search);
 const store = params.get("store") || params.get("brand") || "demo";
