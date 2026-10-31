@@ -413,6 +413,16 @@ body.engine-mesh #stage3d {
   visibility: visible;
 }
 
+body.engine-photo-vto #stage3d {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body.engine-photo-vto #stage {
+  visibility: visible;
+  z-index: 2;
+}
+
 .studio-mark {
   position: absolute;
   left: 14px;

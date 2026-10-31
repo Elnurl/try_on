@@ -72,8 +72,15 @@ function pickFrame(items, wanted) {
   return items[0];
 }
 
+/** Studio / uploaded frames: clean photo overlay (same math as /studio). */
+function usesPhotoVto() {
+  return !!(selected && (selected.custom || selected.digitized) && selected.image_url);
+}
+
 function usesMeshVto() {
-  return !!(selected && selected.model_url);
+  if (!selected?.model_url) return false;
+  if (usesPhotoVto()) return false;
+  return true;
 }
 
 function meshKeyFor(item) {
@@ -198,10 +205,11 @@ function syncEngineClasses() {
   const deepar = !!(engine && engine.kind === "deepar");
   const mesh =
     !deepar &&
-    !!(selected && selected.model_url) &&
+    usesMeshVto() &&
     (!engine || engine.kind === "overlay");
   document.body.classList.toggle("engine-deepar", deepar);
   document.body.classList.toggle("engine-mesh", mesh);
+  document.body.classList.toggle("engine-photo-vto", usesPhotoVto());
 }
 
 async function loadEngine(forceReload = false) {
@@ -406,8 +414,54 @@ function glassesLayer() {
   return c;
 }
 
+function drawPhotoGlasses(left, right, pose, width, height) {
+  const png = glassesLayer();
+  if (!png || !left || !right) return false;
+  let lx = left.x;
+  let ly = left.y;
+  let rx = right.x;
+  let ry = right.y;
+  if (lx > rx) {
+    let t = lx;
+    lx = rx;
+    rx = t;
+    t = ly;
+    ly = ry;
+    ry = t;
+  }
+  const dx = rx - lx;
+  const dy = ry - ly;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 8) return false;
+  const mm = selected.frame_width_mm || 140;
+  const scaleMul = (selected.scale ?? 1.18) * (mm / 140) * 1.38;
+  const angle = Math.atan2(dy, dx);
+  let midX = (lx + rx) / 2;
+  let midY = (ly + ry) / 2;
+  if (pose?.bridge) {
+    midX = (1 - pose.bridge.x) * width;
+    midY = pose.bridge.y * height;
+  }
+  midY += dist * (selected.offset_y ?? 0.1);
+  const targetW = dist * scaleMul;
+  const targetH = (png.height / png.width) * targetW;
+  ctx.save();
+  ctx.translate(midX, midY);
+  ctx.rotate(angle);
+  ctx.drawImage(png, -targetW / 2, -targetH / 2, targetW, targetH);
+  ctx.restore();
+  if (!trackedTryon) {
+    trackedTryon = true;
+    track("tryon");
+  }
+  return true;
+}
+
 function drawGlasses(left, right, pose) {
   if (!selected) return false;
+  if (usesPhotoVto()) {
+    return drawPhotoGlasses(left, right, pose, canvas.width, canvas.height);
+  }
   if (usesMeshVto()) {
     if (!meshReady()) {
       const png = glassesLayer();

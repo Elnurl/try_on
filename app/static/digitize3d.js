@@ -311,7 +311,7 @@ export function createFaceOverlay3D(canvas) {
         * (frameMm / EYE_SPAN_MM)
         * (opts.scale ?? 1.02)
         * (opts.meshScale ?? 1)
-        * 1.38
+        * 1.42
       );
     }
     const widthCm = frameMm / 10;
@@ -358,11 +358,12 @@ export function createFaceOverlay3D(canvas) {
     let dist = xAxis.length();
     if (dist < 10) return false;
     xAxis.normalize();
+    let scaleDist = dist;
     if (pose?.leftInner && pose?.rightInner) {
       const li = normToThree(pose.leftInner, opts.mirror);
       const ri = normToThree(pose.rightInner, opts.mirror);
       const inner = li.distanceTo(ri);
-      if (inner > 8) dist = inner * 1.05;
+      if (inner > 8) scaleDist = inner * 1.22;
     }
     const mid = left3.clone().add(right3).multiplyScalar(0.5);
     if (pose?.bridge) {
@@ -394,7 +395,7 @@ export function createFaceOverlay3D(canvas) {
       quat.multiply(turnY).multiply(turnX);
     }
     const pos = mid.clone().add(zAxis.clone().multiplyScalar(dist * 0.06));
-    applySmooth(pos, quat, scaleFromDist(dist, opts));
+    applySmooth(pos, quat, scaleFromDist(scaleDist, opts));
     return true;
   }
 
