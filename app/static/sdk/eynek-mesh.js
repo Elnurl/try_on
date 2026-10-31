@@ -82,7 +82,7 @@ export function buildGlasses3D(cutoutCanvas, opts = {}) {
   tex.needsUpdate = true;
 
   const frontGeom = new THREE.PlaneGeometry(1, aspect, 16, 8);
-  bendFront(frontGeom, 0.068);
+  bendFront(frontGeom, opts.liveMinimal ? 0.02 : 0.068);
   const front = new THREE.Mesh(
     frontGeom,
     new THREE.MeshStandardMaterial({

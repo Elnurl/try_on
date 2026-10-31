@@ -4,8 +4,7 @@
  * Video/photos stay on-device; only anonymous usage counters hit the server.
  */
 import { createTryonEngine } from "./tryon-adapter.js?v=3";
-import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=16";
-import { prepareLiveVtoTexture } from "./frame-mask.js";
+import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=17";
 
 const body = document.body;
 const slug = body.dataset.slug || "demo";
@@ -112,7 +111,7 @@ async function buildStudioMesh(item) {
   const img = frameImages.get(item.id);
   if (!img) throw new Error("Frame PNG not loaded");
   await waitPng(img);
-  const frontCanvas = prepareLiveVtoTexture(imageToCanvas(img));
+  const frontCanvas = imageToCanvas(img);
   const mm = item.frame_width_mm || 140;
   return buildGlasses3D(frontCanvas, {
     frameWidthMm: mm,
@@ -399,10 +398,7 @@ function glassesLayer() {
   c.height = png.naturalHeight;
   const g = c.getContext("2d");
   g.drawImage(png, 0, 0);
-  let out = c;
-  if (selected?.custom || selected?.digitized) {
-    out = prepareLiveVtoTexture(c);
-  }
+  const out = c;
   if (lensColor) {
     const g2 = out.getContext("2d");
     g2.globalCompositeOperation = "source-atop";
