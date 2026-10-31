@@ -357,6 +357,25 @@ export function createFaceOverlay3D(canvas) {
     const xAxis = right3.clone().sub(left3);
     let dist = xAxis.length();
     if (dist < 10) return false;
+    if (opts.skipFacialMatrix && pose) {
+      const yaw = THREE.MathUtils.clamp(pose.yaw || 0, -1, 1);
+      const pitch = THREE.MathUtils.clamp(pose.pitch || 0, -1, 1);
+      const roll = Math.atan2(b.y - a.y, b.x - a.x);
+      const foreshorten = Math.max(0.42, Math.cos(yaw * 1.15));
+      const stable = dist / foreshorten;
+      const mid = left3.clone().add(right3).multiplyScalar(0.5);
+      if (pose.bridge) {
+        const bridge3 = normToThree(pose.bridge, opts.mirror);
+        mid.x = bridge3.x;
+        mid.y = bridge3.y;
+      }
+      mid.y -= stable * (opts.offsetY ?? 0.1);
+      const quat = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(pitch * 0.85, -yaw * 0.95, -roll, "YXZ"),
+      );
+      applySmooth(mid, quat, scaleFromDist(stable, opts));
+      return true;
+    }
     xAxis.normalize();
     let scaleDist = dist;
     if (pose?.leftInner && pose?.rightInner) {

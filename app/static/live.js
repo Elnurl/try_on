@@ -4,7 +4,7 @@
  * Video/photos stay on-device; only anonymous usage counters hit the server.
  */
 import { createTryonEngine } from "./tryon-adapter.js?v=3";
-import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=17";
+import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=18";
 
 const body = document.body;
 const slug = body.dataset.slug || "demo";
