@@ -40,6 +40,8 @@ function toPose(result) {
   return {
     left,
     right,
+    leftInner: pt(lm, LEFT_INNER),
+    rightInner: pt(lm, RIGHT_INNER),
     bridge: bridge || {
       x: ((lm[LEFT_INNER] && lm[LEFT_INNER].x) + (lm[RIGHT_INNER] && lm[RIGHT_INNER].x)) / 2,
       y: ((lm[LEFT_INNER] && lm[LEFT_INNER].y) + (lm[RIGHT_INNER] && lm[RIGHT_INNER].y)) / 2,

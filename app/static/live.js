@@ -3,8 +3,8 @@
  * Face tracking goes through tryon-adapter.js (engine-agnostic interface).
  * Video/photos stay on-device; only anonymous usage counters hit the server.
  */
-import { createTryonEngine } from "./tryon-adapter.js?v=2";
-import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=14";
+import { createTryonEngine } from "./tryon-adapter.js?v=3";
+import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=15";
 
 const body = document.body;
 const slug = body.dataset.slug || "demo";
@@ -117,9 +117,7 @@ async function buildStudioMesh(item) {
   const mm = item.frame_width_mm || 140;
   return buildGlasses3D(frontCanvas, {
     frameWidthMm: mm,
-    leftCanvas,
-    rightCanvas,
-    compactTemples: !(leftCanvas && rightCanvas),
+    liveMinimal: true,
   });
 }
 
@@ -444,7 +442,7 @@ function drawGlasses(left, right, pose) {
       left,
       right,
       selected.mesh_scale ?? selected.scale,
-      selected.offset_y ?? -0.1,
+      selected.offset_y ?? 0.1,
       pose || lastFacePose,
       canvas.width,
       canvas.height,

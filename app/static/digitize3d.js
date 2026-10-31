@@ -254,6 +254,9 @@ export function createFaceOverlay3D(canvas) {
       glasses.position.sub(center);
       // Unit frame width (1.0) — live scale maps eye span px → frame mm.
       glasses.scale.multiplyScalar(1 / sx);
+      if (glasses.userData.pivotY == null) {
+        glasses.userData.pivotY = box.getSize(new THREE.Vector3()).y * 0.06;
+      }
       tagDigitizedMaterials(glasses);
       glasses.traverse((child) => {
         if (!child.isMesh) return;
@@ -282,7 +285,7 @@ export function createFaceOverlay3D(canvas) {
     head.quaternion.copy(smooth.quat);
     head.scale.setScalar(smooth.scale);
     if (glasses) {
-      glasses.position.set(0, 0, 0);
+      glasses.position.set(0, glasses.userData?.pivotY || 0, 0);
       glasses.quaternion.identity();
       glasses.scale.setScalar(1);
       if (glasses.userData?.digitizedPhoto) {
@@ -326,40 +329,51 @@ export function createFaceOverlay3D(canvas) {
     );
   }
 
+  function normToThree(p, mirror) {
+    const flip = mirror !== false;
+    return new THREE.Vector3(
+      (flip ? 1 - p.x : p.x) * viewW - viewW / 2,
+      viewH / 2 - p.y * viewH,
+      0,
+    );
+  }
+
   function placeFromEyePixels(left, right, opts) {
     if (!glasses || !camera || !left || !right) return false;
-    const left3 = new THREE.Vector3(left.x - viewW / 2, viewH / 2 - left.y, 0);
-    const right3 = new THREE.Vector3(right.x - viewW / 2, viewH / 2 - right.y, 0);
+    let a = left;
+    let b = right;
+    if (a.x > b.x) {
+      const t = a;
+      a = b;
+      b = t;
+    }
+    const left3 = new THREE.Vector3(a.x - viewW / 2, viewH / 2 - a.y, 0);
+    const right3 = new THREE.Vector3(b.x - viewW / 2, viewH / 2 - b.y, 0);
     const pose = opts.pose;
     let nose3 = null;
     if (pose?.nose) {
-      const flip = opts.mirror !== false;
-      nose3 = new THREE.Vector3(
-        (flip ? 1 - pose.nose.x : pose.nose.x) * viewW - viewW / 2,
-        viewH / 2 - pose.nose.y * viewH,
-        0,
-      );
+      nose3 = normToThree(pose.nose, opts.mirror);
     }
     const xAxis = right3.clone().sub(left3);
-    const dist = xAxis.length();
+    let dist = xAxis.length();
     if (dist < 10) return false;
     xAxis.normalize();
+    if (pose?.leftInner && pose?.rightInner) {
+      const li = normToThree(pose.leftInner, opts.mirror);
+      const ri = normToThree(pose.rightInner, opts.mirror);
+      const inner = li.distanceTo(ri);
+      if (inner > 8) dist = inner * 1.05;
+    }
     const mid = left3.clone().add(right3).multiplyScalar(0.5);
     if (pose?.bridge) {
-      const flip = opts.mirror !== false;
-      const bx = (flip ? 1 - pose.bridge.x : pose.bridge.x) * viewW - viewW / 2;
-      const by = viewH / 2 - pose.bridge.y * viewH;
-      mid.x = bx;
-      if (opts.skipFacialMatrix) {
-        mid.y = by * 0.84 + mid.y * 0.16;
-      } else {
-        mid.y = (mid.y + by) * 0.5;
-      }
+      const bridge3 = normToThree(pose.bridge, opts.mirror);
+      mid.x = bridge3.x;
+      mid.y = opts.skipFacialMatrix ? bridge3.y : bridge3.y * 0.72 + mid.y * 0.28;
     } else if (opts.skipFacialMatrix) {
-      mid.y -= dist * 0.06;
+      mid.y -= dist * 0.12;
     }
-    // Same as studio canvas: midCanvasY += dist * offsetY (y down) → Three Y subtracts.
-    mid.y -= dist * (opts.offsetY ?? -0.1);
+    // Studio slider: +offset = aşağı (burun), canvas y down → Three Y minus.
+    mid.y -= dist * (opts.offsetY ?? 0.1);
     const upHint = new THREE.Vector3(0, 1, 0);
     let zAxis = new THREE.Vector3().crossVectors(xAxis, upHint);
     if (zAxis.lengthSq() < 1e-8) zAxis.set(0, 0, 1);
@@ -458,7 +472,7 @@ export function createFaceOverlay3D(canvas) {
     } else if (opts.skipFacialMatrix) {
       mid.y -= dist * 0.06;
     }
-    mid.y -= dist * (opts.offsetY ?? -0.1);
+    mid.y -= dist * (opts.offsetY ?? (opts.skipFacialMatrix ? 0.1 : -0.1));
 
     const upHint = new THREE.Vector3(0, 1, 0);
     let zAxis = new THREE.Vector3().crossVectors(xAxis, upHint);
@@ -488,7 +502,9 @@ export function createFaceOverlay3D(canvas) {
   function place(left, right, scale, offsetY, pose, width, height, item) {
     const opts = {
       scale: typeof scale === "number" ? scale : 1.02,
-      offsetY: offsetY ?? -0.1,
+      offsetY:
+        offsetY ??
+        (item?.digitized || item?.custom ? 0.1 : -0.1),
       frameWidthMm: item?.frame_width_mm || item?.frameWidthMm || 140,
       meshScale: item?.mesh_scale ?? 1,
       mirror: item?.mirror !== false,

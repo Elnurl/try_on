@@ -98,6 +98,12 @@ export function buildGlasses3D(cutoutCanvas, opts = {}) {
   front.position.z = 0.02;
   group.add(front);
 
+  if (opts.liveMinimal) {
+    group.userData.liveMinimal = true;
+    group.userData.pivotY = aspect * 0.07;
+    return group;
+  }
+
   const templeMat = new THREE.MeshStandardMaterial({
     color: rim,
     roughness: 0.38,

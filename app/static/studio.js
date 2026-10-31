@@ -1,4 +1,4 @@
-import { createTryonEngine } from "./tryon-adapter.js?v=2";
+import { createTryonEngine } from "./tryon-adapter.js?v=3";
 import {
   buildGlasses3D,
   createFaceOverlay3D,
