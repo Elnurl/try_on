@@ -3,6 +3,7 @@ venv/
 __pycache__/
 *.pyc
 .git/
-models/
-app/data/stores/
+.env
+app/data/
+tmp_*/
 README.md

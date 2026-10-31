@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Eynek VTO — eynək üçün virtual sınaq SDK</title>
+    <meta name="description" content="Məhsul şəkillərindən 2.5D virtual eynək sınağı. İstənilən sayta bir sətir kodla qoşulur." />
+    <link rel="icon" href="/static/favicon.svg" />
+    <link rel="stylesheet" href="/static/app.css?v=1" />
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="top">
+        <div class="brand">EYNƏK VTO</div>
+        <div style="display: flex; gap: 14px"><a href="/studio">Studio</a><a href="/admin" class="muted">Admin</a></div>
+      </div>
+
+      <section class="card">
+        <h1>Şəkildən virtual eynək sınağı</h1>
+        <p class="lead">
+          Satıcı 3 məhsul şəkli yükləyir: öndən, soldan, sağdan. Sistem fonu silir, linzaları şəffaf edir, çərçivənin real
+          ölçüsünü hesablayır və 3D qollar qurur. Alıcı kamerada başını çevirdikdə eynək də onunla birlikdə dönür.
+        </p>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap">
+          <button class="btn" data-eynek-vto="ql2009-c1" data-store="demo" data-eynek-cart="0">Demo: üzündə yoxla</button>
+          <a class="btn ghost" href="/studio">Öz məhsulunu yüklə</a>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Sayta qoşmaq</h2>
+        <p class="muted">1. Səhifəyə SDK skriptini əlavə edin (<code>data-store</code> = mağaza ID):</p>
+        <pre class="code" id="snippet1"></pre>
+        <p class="muted">2. Düymə əlavə edin. <code>data-eynek-hide-missing</code> olsa, VTO-su olmayan məhsulda düymə gizlənir:</p>
+        <pre class="code">&lt;button data-eynek-vto="SKU" data-eynek-hide-missing&gt;Üzündə yoxla&lt;/button&gt;</pre>
+        <p class="muted">React / SPA üçün JavaScript API:</p>
+        <pre class="code">EynekVTO.open({ sku: "SKU" });
+EynekVTO.isAvailable("SKU").then((ok) =&gt; { /* düyməni göstər */ });
+EynekVTO.on("add-to-cart", ({ sku }) =&gt; addToCart(sku));
+
+// TINT ilə eyni element interfeysi:
+// &lt;eynek-vto variant-id="SKU"&gt;&lt;/eynek-vto&gt;  →  document.querySelector("eynek-vto").open()</pre>
+      </section>
+
+      <section class="card">
+        <h2>Server API (marketplace inteqrasiyası)</h2>
+        <pre class="code">POST /v1/products              X-Api-Key: …   multipart: sku, name, sizes=49-18-142, front, left, right
+GET  /v1/products              X-Api-Key: …   mağazanın bütün VTO məhsulları
+DELETE /v1/products/{sku}      X-Api-Key: …
+POST /v1/upload-tokens         X-Api-Key: …   {"seller": "satıcı-id"} → satıcı üçün /studio?token=… linki
+GET  /v1/stores/{store}/products/{sku}        açıq: VTO manifesti (404 = VTO yoxdur)</pre>
+        <p class="muted">
+          Marketplace-də satıcı paneli <code>/v1/upload-tokens</code> ilə link alır və studionu açır. Satıcı yalnız öz
+          məhsullarını görür və dəyişir.
+        </p>
+      </section>
+    </div>
+    <script src="/sdk/eynek-vto.js" data-store="demo" defer></script>
+    <script>
+      document.getElementById("snippet1").textContent =
+        `<script src="${location.origin}/sdk/eynek-vto.js" data-store="MAĞAZA_ID" async><\/script>`;
+    </script>
+  </body>
+</html>

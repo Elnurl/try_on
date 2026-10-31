@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Virtual sınaq</title>
+    <link rel="icon" href="/static/favicon.svg" />
+    <link rel="stylesheet" href="/static/embed.css?v=1" />
+    <script type="importmap">
+      { "imports": { "three": "/static/vendor/three/build/three.module.js" } }
+    </script>
+  </head>
+  <body>
+    <main class="vto">
+      <div class="stage" id="stage">
+        <video id="video" playsinline muted></video>
+        <canvas id="canvas"></canvas>
+        <div class="hint" id="hint" hidden></div>
+        <div class="panel" id="panel">
+          <div class="spinner" id="spinner"></div>
+          <p id="panelText">Hazırlanır…</p>
+          <div class="panel-actions" id="panelActions" hidden>
+            <button type="button" class="btn primary" id="retryCam">Kameranı aç</button>
+            <label class="btn">Selfi yüklə<input type="file" id="photoInputPanel" accept="image/*" hidden /></label>
+          </div>
+        </div>
+      </div>
+
+      <header class="topbar">
+        <div class="title">
+          <strong id="productName">Virtual sınaq</strong>
+          <span id="productMeta"></span>
+        </div>
+        <button type="button" class="icon" id="closeBtn" aria-label="Bağla" hidden>×</button>
+      </header>
+
+      <footer class="bottombar">
+        <div class="strip" id="strip"></div>
+        <div class="actions">
+          <label class="btn ghost" title="Kamerasız sınaq">Selfi<input type="file" id="photoInput" accept="image/*" hidden /></label>
+          <button type="button" class="btn ghost" id="camBtn" hidden>Kamera</button>
+          <button type="button" class="btn ghost" id="shotBtn">Şəkil çək</button>
+          <button type="button" class="btn primary" id="cartBtn" hidden>Səbətə əlavə et</button>
+        </div>
+      </footer>
+    </main>
+    <script type="module" src="/static/embed.js?v=1"></script>
+  </body>
+</html>

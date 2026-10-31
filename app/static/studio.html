@@ -3,101 +3,83 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>VTO yarat — şəkildən hazır try-on</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/studio-make.css?v=4" />
+    <title>Eynek VTO Studio</title>
+    <link rel="icon" href="/static/favicon.svg" />
+    <link rel="stylesheet" href="/static/app.css?v=1" />
+    <script type="importmap">
+      { "imports": { "three": "/static/vendor/three/build/three.module.js" } }
+    </script>
   </head>
   <body>
-    <header class="make-top">
-      <a href="/shop" class="make-back">← Ana səhifə</a>
-      <div>
-        <p class="make-kicker">Virtual Try-On</p>
-        <h1>Şəkil → VTO hazır</h1>
+    <div class="wrap">
+      <div class="top">
+        <div class="brand">EYNƏK VTO <small>Studio</small></div>
+        <div id="who" class="muted"></div>
       </div>
-    </header>
 
-    <main class="make-grid">
-      <section class="make-card">
-        <ol class="make-flow">
-          <li><strong>3 bucaq</strong> (ön + sol + sağ) — Banuba tipli 2.5D model</li>
-          <li>Çərçivə eni (mm) və ölçünü yoxla</li>
-          <li><strong>VTO hazır et</strong> → kataloq + link</li>
-          <li><strong>Kamerada yoxla</strong></li>
-        </ol>
+      <section class="card" id="authCard" hidden>
+        <h2>Mağaza girişi</h2>
+        <p class="muted">Mağazanızın API açarını daxil edin. Açarı platforma administratoru verir.</p>
+        <form id="authForm" class="row">
+          <label class="field">API açarı<input type="password" id="apiKey" autocomplete="off" required /></label>
+          <div style="align-self: end"><button class="btn" type="submit">Daxil ol</button></div>
+        </form>
+        <p class="error" id="authError"></p>
+      </section>
 
-        <h2>1. Eynək şəkilləri (hamısı mütləq)</h2>
-        <p class="make-help">
-          Açıq fon, eynək düz. Ön — tam frontal; sol/sağ — temple görünən yan bucaq (təxminən 3/4).
+      <div id="app" hidden>
+        <h1>Məhsulu virtual sınağa hazırla</h1>
+        <p class="lead">
+          3 şəkil yükləyin: düz öndən, soldan və sağdan. Ən yaxşı nəticə ağ fonda alınır. Ölçüləri eynəyin qolunun
+          daxilindən yazın, məsələn <b>49-18-142</b>. Onda eynək üzdə real ölçüsündə görünür.
         </p>
-        <label class="make-drop">
-          <input id="file-front" type="file" accept="image/png,image/jpeg,image/webp" required />
-          <span id="label-front">Ön şəkil</span>
-        </label>
-        <label class="make-drop make-drop-ghost">
-          <input id="file-left" type="file" accept="image/png,image/jpeg,image/webp" required />
-          <span id="label-left">Sol yan (temple görünür)</span>
-        </label>
-        <label class="make-drop make-drop-ghost">
-          <input id="file-right" type="file" accept="image/png,image/jpeg,image/webp" required />
-          <span id="label-right">Sağ yan (temple görünür)</span>
-        </label>
-        <div class="make-cutout" id="cutout-wrap" hidden>
-          <img id="cutout-preview" alt="Kəsilmiş ön eynək" />
-        </div>
 
-        <h2 class="make-sub">2. Vitrin (istəyə görə)</h2>
-        <p class="make-help">Mağaza kartında əlavə bucaqlar; try-on 3 şəkildən qurulur.</p>
-        <label class="make-drop make-drop-ghost">
-          <input id="extra-files" type="file" accept="image/png,image/jpeg,image/webp" multiple />
-          <span id="extra-label">Detal / 3/4 — maks. 6</span>
-        </label>
-        <ul id="extra-list" class="make-extra-list" hidden></ul>
+        <form class="card" id="uploadForm">
+          <div class="row">
+            <label class="field">SKU (məhsul kodu)<input type="text" id="sku" required placeholder="RB3447-001" /></label>
+            <label class="field">Ad<input type="text" id="name" placeholder="Ray-Ban Round Metal" /></label>
+            <label class="field">Ölçülər (linza-körpü-qol)<input type="text" id="sizes" placeholder="49-18-142" /></label>
+            <label class="field">Çərçivə eni, mm (istəyə görə)<input type="number" id="widthMm" min="100" max="175" step="0.5" /></label>
+          </div>
+          <div class="drops">
+            <label class="drop" data-slot="front"><span><b>Ön şəkil *</b>Düz öndən, eynək tam görünsün</span><input type="file" accept="image/*" /></label>
+            <label class="drop" data-slot="left"><span><b>Sol tərəf</b>Soldan və ya 3/4 bucaqdan</span><input type="file" accept="image/*" /></label>
+            <label class="drop" data-slot="right"><span><b>Sağ tərəf</b>Sağdan və ya 3/4 bucaqdan</span><input type="file" accept="image/*" /></label>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
+            <button class="btn" type="submit" id="submitBtn">VTO hazırla</button>
+            <span class="muted" id="progress"></span>
+          </div>
+          <p class="error" id="uploadError"></p>
+        </form>
 
-        <label class="make-field">
-          Ad
-          <input id="name" type="text" placeholder="QL2009 C1" />
-        </label>
-        <label class="make-field">
-          Çərçivə eni (mm)
-          <input id="frame-mm" type="number" min="80" max="180" step="0.1" value="140" />
-        </label>
-        <label class="make-field">
-          Ölçü (try-on)
-          <input id="scale" type="range" min="0.85" max="1.65" step="0.03" value="1.18" />
-        </label>
-        <label class="make-field">
-          Yuxarı / aşağı
-          <input id="offset-y" type="range" min="-0.4" max="0.3" step="0.02" value="-0.1" />
-        </label>
-        <p id="status" class="make-status" hidden></p>
-        <div class="make-actions">
-          <button id="save" type="button" class="make-btn" disabled>VTO hazır et</button>
-          <a id="live" class="make-btn ghost" hidden href="#">Kamerada yoxla</a>
-        </div>
-      </section>
+        <section class="card" id="resultCard" hidden>
+          <h2 id="resultTitle">Nəticə</h2>
+          <div class="grid2">
+            <div>
+              <canvas id="preview3d"></canvas>
+              <p class="muted">3D önizləmə: ön hissə sizin şəklinizdən, qollar ölçülərə görə qurulub.</p>
+            </div>
+            <div>
+              <div class="checker"><img id="texture" alt="Emal olunmuş ön görünüş" /></div>
+              <div class="stats" id="stats"></div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <button class="btn" type="button" id="tryBtn">Kamerada yoxla</button>
+                <button class="btn ghost" type="button" id="codeBtn">Sayt üçün kod</button>
+              </div>
+              <pre class="code" id="code" hidden></pre>
+            </div>
+          </div>
+        </section>
 
-      <section class="make-card preview">
-        <div class="make-preview-head">
-          <h2>Müştəri belə görəcək</h2>
-        </div>
-        <div class="make-stage">
-          <canvas id="preview" width="720" height="960"></canvas>
-          <canvas id="preview3d" width="720" height="960"></canvas>
-          <p class="make-watermark">Avtomatik VTO</p>
-        </div>
-      </section>
-    </main>
-
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "/static/vendor/three/build/three.module.js",
-          "three/addons/": "/static/vendor/three/examples/jsm/"
-        }
-      }
-    </script>
-    <script type="module" src="/static/studio.js?v=15"></script>
+        <section class="card">
+          <h2>Məhsullarım</h2>
+          <div class="list" id="list"></div>
+          <p class="muted" id="emptyList" hidden>Hələ məhsul yoxdur.</p>
+        </section>
+      </div>
+    </div>
+    <script src="/sdk/eynek-vto.js" defer></script>
+    <script type="module" src="/static/studio.js?v=1"></script>
   </body>
 </html>

@@ -1,6 +1,5 @@
 FROM python:3.10-slim
 
-# mediapipe wheel pulls in OpenCV which needs these system libs
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
@@ -10,10 +9,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
-COPY assets/ql2009/export/QL2009_C1.glb assets/ql2009/export/QL2009_C1.glb
-COPY ["assets/ql2009/2009 C1 (2).png", "assets/ql2009/front-product.png"]
 RUN python -c "from app.vendor_assets import ensure_vendor; ensure_vendor()"
 
 ENV PORT=8000
 EXPOSE 8000
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*'"]

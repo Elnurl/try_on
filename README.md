@@ -1,86 +1,55 @@
-# tryon-wa — white-label VTO
+# Eynek VTO
 
-Yerli optika üçün **no-code Virtual Try-On integrator**. 2D overlay (MediaPipe) default-dur. Realistik 3D üçün DeepAR Web SDK adapter arxasındadır — `DEEPAR_LICENSE_KEY` olanda avtomatik yandırılır.
+Eyewear virtual try-on service: product photos → 2.5D try-on asset → one-script SDK for any website.
 
-## 3D (DeepAR) — sən etməlisən
+- **Pipeline** (`app/pipeline.py`): background removal (uniform-background cut, `rembg` fallback), temple-tip crop,
+  lens detection (clear lenses become see-through, tinted lenses stay translucent), real frame width from the
+  lens size (`49-18-142`), hinge height, frame/temple colour and finish from the side photos.
+- **Runtime** (`app/static/sdk/vto-core.js`): MediaPipe Face Landmarker pose (eye line + facial matrix), mm-accurate
+  scale, bent photo front with lens glare and contact shadow, extruded 3D temples that splay to the ears, invisible
+  head occluder so far temples hide behind the head, One Euro smoothing.
+- **Embed** (`/embed?store=&sku=`): camera try-on, selfie fallback, product strip, snapshot, add-to-cart message.
+- **SDK** (`/sdk/eynek-vto.js`): modal iframe, `data-eynek-vto` buttons, `<eynek-vto variant-id>` element
+  (TINT-compatible), `EynekVTO.open / isAvailable / products / on`.
+- **Studio** (`/studio`): sellers upload 3 photos + sizes, see a 3D preview, try it on camera, manage products.
+- **Admin** (`/admin`): create stores, rotate API keys, issue seller upload links.
 
-1. https://developer.deepar.ai/signup — hesab aç (10 MAU pulsuz).
-2. Project yarat → Web app əlavə et. Domain: `tryon-wa.onrender.com` **və** `localhost`.
-3. License key-i kopyala.
-4. Render dashboard → Environment → `DEEPAR_LICENSE_KEY` = həmin açar → **Save** (servis yenidən start olur).
-5. Lokal: `.env.example` → `.env` kopyala, açarı yapışdır (`python-dotenv` avtomatik oxuyur).
-
-Açar yoxdursa sayt 2D demo ilə işləməyə davam edir. **QL2009:** açar olanda belə, `.deepar` olmasa avtomatik **GLB mesh VTO** işləyir — satıcı DeepAR Studio görmür.
-
-## Satıcı axını — tam avtomatik VTO (manual .deepar yox)
-
-1. **[/studio](https://tryon-wa.onrender.com/studio)** aç.
-2. **Ön şəkil** yüklə (məcburi); istəsən ≤6 əlavə bucaq — yalnız vitrin üçün.
-3. **VTO hazır et** — server PNG + GLB yaradır, kataloqa yazır, link verir.
-4. **Kamerada yoxla** — sənin şəklin üzündə **3D mesh** (MediaPipe), DeepAR aviator demo deyil.
-
-**Sən etmirsən:** Blender, DeepAR Studio, `.deepar` export, Git push. Bu yol hər yeni model üçün eynidir. QL2009 kimi fabrik modelləri repoda GLB ilə gəlir; premium `.deepar` yalnız daxili keyfiyyət addımıdır, satıcı prosesi deyil.
-
-## 3 komponent
-
-1. **Engine** — `/embed` canlı kamera (müştəri səhifəsində WASM yox, iframe)
-2. **Widget** — 1 sətir JS: `/vto-widget.js` + `.try-on-btn[data-sku]`
-3. **Kanal 2** — WhatsApp/DM üçün `POST /api/tryon` (şəkil overlay). Admin dashboard sonra.
-
-## Demo
-
-```powershell
-cd C:\Users\Elnur\Projects\tryon-wa
-.\.venv\Scripts\uvicorn.exe app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-- Mağaza saytı (widget): http://127.0.0.1:8000/shop-demo
-- Bio səhifə: http://127.0.0.1:8000/t/demo
-- Brend snippet: http://127.0.0.1:8000/for-brands
-- Platform admin (brend yarat): http://127.0.0.1:8000/admin
-- Brend paneli: http://127.0.0.1:8000/admin/demo — kataloq, kalibr, QR kod, statistika, domen whitelist
-
-## Arxitektura qeydləri
-
-- **Engine adapter**: üz izləmə yalnız `app/static/tryon-adapter.js` üzərindən çağırılır
-  (unified `createTryonEngine()` interfeysi). MediaPipe-dan DeepAR/Fittingbox-a keçmək =
-  yalnız bu faylı dəyişmək; `live.js`, kataloq və panellər toxunulmaz qalır.
-- **QR kod**: `GET /api/brand/{slug}/qr.png` → `/t/{slug}` mikro-səhifəyə yönləndirir.
-- **Domen whitelist**: brend paneldən doldurulur; `/embed` Referer-i yoxlayır (boşdursa hər yerdə işləyir).
-- **Statistika**: `open` / `tryon` / `click` hadisələri `POST /api/brand/{slug}/track` ilə sayılır
-  (billing üçün baza). Video/şəkil heç vaxt serverə getmir.
-- **Admin auth**: `ADMIN_PASSWORD` env dəyişəni təyin olunanda `/admin*` səhifələri və bütün
-  dəyişiklik edən API-lar login tələb edir (session cookie, 7 gün). Lokal dev-də boş saxla —
-  qorunma sönülü qalır.
-
-## Deploy (Render — Vercel YOX)
-
-Vercel serverless-dir: diskdə saxlanan brend kataloqları/PNG-lər itər, mediapipe da limitə sığmır.
-Uzunömürlü server + persistent disk lazımdır → Render (və ya Railway/Fly.io).
-
-1. Kodu GitHub-a push et.
-2. render.com → New → Blueprint → repo seç (`render.yaml` avtomatik oxunur).
-3. Dashboard-da `ADMIN_PASSWORD` və (3D üçün) `DEEPAR_LICENSE_KEY` təyin et.
-4. Custom domain bağla (Render HTTPS-i avtomatik verir).
-
-`Dockerfile` lokal yoxlama üçün: `docker build -t tryon-wa . && docker run -p 8000:8000 -e ADMIN_PASSWORD=test tryon-wa`
-
-## Backlog (Faza 3+ — indi yox, amma unutma)
-
-- **Widget whitelist-i gücləndir**: Referer yoxlaması pilot üçün kifayətdir, amma Referer
-  silinə/saxtalaşdırıla bilər. Pullu müştərilərdə → `Origin` header + hər brendin `embed_key`-i
-  (artıq `brands.json`-da yaradılır, hələ yoxlanmır) widget script-ə parametr kimi əlavə olunsun.
-- **DeepAR-a keçiddə kommersiya sualı**: DeepAR lisenziya açarı adətən bir domenə/layihəyə bağlıdır,
-  bizim modeldə isə widget onlarla brend domenində işləyir. İlk "premium engine" istəyən brend
-  gələndə DeepAR-dan birbaşa soruş: *"bir hesab/açar altında neçə fərqli domen/tenant dəstəklənir?"*
-  Texniki keçid adapter sayəsində asandır — məsələ yalnız qiymət/şərtdir.
-- Billing (Stripe və ya yerli ödəniş), brend-səviyyəli login (hər brend öz panelini görsün).
-
-## Merchant kodu
+## Website integration
 
 ```html
-<script src="http://127.0.0.1:8000/vto-widget.js" data-store-id="demo"></script>
-<button class="try-on-btn" data-sku="round-black">Virtual sına</button>
+<script src="https://tryon-wa.onrender.com/sdk/eynek-vto.js" data-store="STORE_ID" async></script>
+<button data-eynek-vto="SKU" data-eynek-hide-missing>Üzündə yoxla</button>
 ```
 
-Canlı saytda `https` + öz domen. WooCommerce/Shopify plugin wrapper növbəti addımdır, eyni widget-i sarınır.
+```js
+EynekVTO.open({ sku: "SKU" });
+EynekVTO.isAvailable("SKU").then((ok) => {});
+EynekVTO.on("add-to-cart", ({ sku }) => addToCart(sku));
+```
+
+## API
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| POST | `/v1/products` | store key or upload token | multipart `sku, name, sizes, width_mm, front, left, right` |
+| GET | `/v1/products` | store key or upload token | own products |
+| DELETE | `/v1/products/{sku}` | store key or upload token | remove |
+| POST | `/v1/upload-tokens` | store key | `{seller, ttl}` → `studioUrl` for a seller |
+| GET | `/v1/stores/{store}/products[/{sku}]` | public | product list / manifest (404 = no VTO) |
+| * | `/v1/admin/stores…` | `X-Admin-Password` | stores, keys, upload links |
+
+Store keys go in `X-Api-Key` (or `Authorization: Bearer`). Upload tokens go in `X-Upload-Token` or `?token=`.
+A token holder only sees and changes products uploaded with the same seller id.
+
+## Run locally
+
+```powershell
+python -m venv .venv; .venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\python -m uvicorn app.main:app --reload --port 8000
+```
+
+Environment: `ADMIN_PASSWORD` (protects admin), `VTO_SECRET` (signs upload tokens; otherwise `data/secret.key`),
+`PUBLIC_URL` (absolute asset URLs), `VTO_DATA_DIR` (defaults to `app/data`).
+
+Data lives on disk: `data/stores.json` and `data/products/{store}/{sku}/` (manifest, processed front, thumbnail,
+original photos). On Render this is the persistent disk mounted at `/srv/app/data`.

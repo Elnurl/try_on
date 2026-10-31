@@ -1,63 +1,46 @@
-"""Single-admin session auth.
-
-Production: set ADMIN_PASSWORD env var → /admin routes require login.
-Local dev: leave it unset → admin panels open without login (a warning is logged).
-Session cookie is an HMAC of a per-process random secret, so restarting the
-server invalidates old sessions — acceptable for a single-admin MVP.
-"""
+"""Request authentication: admin password, store API keys, seller upload tokens."""
 
 from __future__ import annotations
 
 import hmac
 import logging
 import os
-import secrets
-from hashlib import sha256
 
-from fastapi import Request
+from fastapi import HTTPException, Request
+
+from app.storage import read_upload_token, store_for_key
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
-COOKIE_NAME = "vto_admin"
-PARTNER_COOKIE = "vto_partner"
-_SESSION_SECRET = secrets.token_bytes(32)
 
 if not ADMIN_PASSWORD:
-    logging.getLogger("tryon").warning(
-        "ADMIN_PASSWORD təyin olunmayıb — admin panel qorunmur (yalnız lokal dev üçün)."
-    )
+    logging.getLogger("vto").warning("ADMIN_PASSWORD təyin olunmayıb — admin API qorunmur (yalnız lokal dev).")
 
 
-def auth_enabled() -> bool:
-    return bool(ADMIN_PASSWORD)
+def require_admin(request: Request) -> None:
+    if not ADMIN_PASSWORD:
+        return
+    given = request.headers.get("x-admin-password", "")
+    if not given or not hmac.compare_digest(given, ADMIN_PASSWORD):
+        raise HTTPException(status_code=401, detail="Admin parolu yanlışdır.")
 
 
-def session_token() -> str:
-    return hmac.new(_SESSION_SECRET, b"admin-session", sha256).hexdigest()
+def _bearer(request: Request) -> str:
+    auth = request.headers.get("authorization", "")
+    return auth[7:].strip() if auth.lower().startswith("bearer ") else ""
 
 
-def check_password(password: str) -> bool:
-    return auth_enabled() and hmac.compare_digest(password, ADMIN_PASSWORD)
-
-
-def is_authed(request: Request) -> bool:
-    if not auth_enabled():
-        return True
-    return hmac.compare_digest(request.cookies.get(COOKIE_NAME, ""), session_token())
-
-
-def partner_token(slug: str) -> str:
-    return hmac.new(_SESSION_SECRET, f"partner:{slug}".encode(), sha256).hexdigest()
-
-
-def partner_cookie_value(slug: str) -> str:
-    return f"{slug}.{partner_token(slug)}"
-
-
-def partner_slug(request: Request) -> str | None:
-    raw = request.cookies.get(PARTNER_COOKIE, "")
-    if "." not in raw:
-        return None
-    slug, token = raw.rsplit(".", 1)
-    if not slug or not hmac.compare_digest(token, partner_token(slug)):
-        return None
-    return slug
+def caller(request: Request) -> dict:
+    """{store, seller}; seller is None for full store keys, a string for upload tokens."""
+    key = request.headers.get("x-api-key", "") or _bearer(request)
+    if key:
+        store = store_for_key(key)
+        if store:
+            return {"store": store, "seller": None}
+        raise HTTPException(status_code=401, detail="API açarı yanlışdır.")
+    token = request.headers.get("x-upload-token", "") or request.query_params.get("token", "")
+    if token:
+        data = read_upload_token(token)
+        if data:
+            return data
+        raise HTTPException(status_code=401, detail="Yükləmə linkinin vaxtı bitib və ya yanlışdır.")
+    raise HTTPException(status_code=401, detail="API açarı və ya yükləmə tokeni lazımdır.")
