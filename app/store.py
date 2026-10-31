@@ -128,6 +128,7 @@ def save_uploaded_frame(
     tryon: bool | None = None,
     glb_bytes: bytes | None = None,
     extra_png_bytes: list[bytes] | None = None,
+    frame_width_mm: float | None = None,
 ) -> dict:
     if not SKU_RE.match(sku):
         raise ValueError("SKU yalnız hərf, rəqəm, - və _ ola bilər.")
@@ -188,7 +189,11 @@ def save_uploaded_frame(
         "tryon": bool(tryon) if tryon is not None else (bool(existing.get("tryon")) if existing else False),
         "model_url": f"/media/{slug}/{sku}.glb" if glb_bytes or (existing and existing.get("model_url")) else None,
         "digitized": bool(glb_bytes or (existing and existing.get("digitized"))),
-        "frame_width_mm": float(existing.get("frame_width_mm") or 140) if existing else 140.0,
+        "frame_width_mm": (
+            float(frame_width_mm)
+            if frame_width_mm is not None
+            else (float(existing.get("frame_width_mm") or 140) if existing else 140.0)
+        ),
         "mesh_scale": float(existing.get("mesh_scale") or 1) if existing else 1.0,
     }
     if glb_bytes:

@@ -3,19 +3,24 @@ import {
   buildGlasses3D,
   createFaceOverlay3D,
   exportGlb,
-} from "./digitize3d.js?v=7";
+} from "./digitize3d.js?v=8";
 
 const FACE_URL = "/static/studio-face.jpg";
 const SLUG = "demo";
 
-const fileInput = document.querySelector("#file");
+const fileFront = document.querySelector("#file-front");
+const fileLeft = document.querySelector("#file-left");
+const fileRight = document.querySelector("#file-right");
+const labelFront = document.querySelector("#label-front");
+const labelLeft = document.querySelector("#label-left");
+const labelRight = document.querySelector("#label-right");
 const extraInput = document.querySelector("#extra-files");
 const extraLabel = document.querySelector("#extra-label");
 const extraList = document.querySelector("#extra-list");
-const dropLabel = document.querySelector("#drop-label");
 const cutoutWrap = document.querySelector("#cutout-wrap");
 const cutoutPreview = document.querySelector("#cutout-preview");
 const nameInput = document.querySelector("#name");
+const frameMmInput = document.querySelector("#frame-mm");
 const scaleInput = document.querySelector("#scale");
 const offsetYInput = document.querySelector("#offset-y");
 const statusEl = document.querySelector("#status");
@@ -32,10 +37,17 @@ faceImg.crossOrigin = "anonymous";
 let engine = null;
 let posePx = null;
 let facePose = null;
-let glassesCanvas = null;
+let cutoutFront = null;
+let cutoutLeft = null;
+let cutoutRight = null;
 let glasses3d = null;
 let savedSku = "";
 let extraFiles = [];
+
+function frameWidthMm() {
+  const v = Number(frameMmInput.value);
+  return Number.isFinite(v) && v >= 80 && v <= 180 ? v : 140;
+}
 
 function setStatus(msg, kind = "") {
   statusEl.hidden = !msg;
@@ -181,7 +193,11 @@ function drawPreview() {
       pose,
       canvas.width,
       canvas.height,
-      { frame_width_mm: 140, mesh_scale: 1, mirror: false },
+      {
+        frame_width_mm: frameWidthMm(),
+        mesh_scale: 1,
+        mirror: false,
+      },
     );
   }
   overlay3d.render();
@@ -223,36 +239,68 @@ async function loadFace() {
   drawPreview();
 }
 
-async function onFile(file) {
-  if (!file) return;
-  setStatus("Addım 1: ön şəkil kəsilir, VTO modeli hazırlanır…");
+async function loadCutout(file) {
+  const img = new Image();
+  img.src = URL.createObjectURL(file);
+  await img.decode();
+  return cutoutGlasses(img);
+}
+
+async function rebuildVtoModel() {
   saveBtn.disabled = true;
   liveLink.hidden = true;
   savedSku = "";
 
-  const img = new Image();
-  img.src = URL.createObjectURL(file);
-  await img.decode();
-  try {
-    glassesCanvas = cutoutGlasses(img);
-    glasses3d = buildGlasses3D(glassesCanvas);
-    overlay3d.setObject(glasses3d, { frameWidthMm: 140 });
-  } catch (err) {
-    glassesCanvas = null;
+  const f = fileFront.files && fileFront.files[0];
+  const l = fileLeft.files && fileLeft.files[0];
+  const r = fileRight.files && fileRight.files[0];
+  if (!f || !l || !r) {
     glasses3d = null;
+    cutoutFront = null;
     overlay3d.clearGlasses();
-    setStatus(err.message || "Şəkil emal olunmadı.", "error");
+    drawPreview();
+    saveBtn.disabled = true;
+    const missing = [!f && "ön", !l && "sol", !r && "sağ"].filter(Boolean).join(", ");
+    if (missing) setStatus(`VTO üçün 3 şəkil lazımdır: ${missing}.`, "");
     return;
   }
-  cutoutPreview.src = glassesCanvas.toDataURL("image/png");
+
+  setStatus("3 şəkil emal olunur, 2.5D model qurulur…");
+  try {
+    cutoutFront = await loadCutout(f);
+    cutoutLeft = await loadCutout(l);
+    cutoutRight = await loadCutout(r);
+    const mm = frameWidthMm();
+    glasses3d = buildGlasses3D(cutoutFront, {
+      leftCanvas: cutoutLeft,
+      rightCanvas: cutoutRight,
+      frameWidthMm: mm,
+    });
+    overlay3d.setObject(glasses3d, { frameWidthMm: mm });
+  } catch (err) {
+    glasses3d = null;
+    cutoutFront = null;
+    overlay3d.clearGlasses();
+    setStatus(err.message || "Şəkil emal olunmadı.", "error");
+    saveBtn.disabled = true;
+    return;
+  }
+
+  cutoutPreview.src = cutoutFront.toDataURL("image/png");
   cutoutWrap.hidden = false;
-  dropLabel.textContent = file.name;
+  labelFront.textContent = `Ön: ${f.name}`;
+  labelLeft.textContent = `Sol: ${l.name}`;
+  labelRight.textContent = `Sağ: ${r.name}`;
   if (!nameInput.value.trim()) {
-    nameInput.value = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
+    nameInput.value = f.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
   }
   saveBtn.disabled = false;
-  setStatus("VTO modeli hazırdır. Ölçünü yoxla, sonra «VTO hazır et».");
+  setStatus("VTO modeli hazırdır. Ölçünü yoxla, «VTO hazır et».");
   drawPreview();
+}
+
+function onViewFilesChanged() {
+  void rebuildVtoModel();
 }
 
 function renderExtraList() {
@@ -277,13 +325,15 @@ function renderExtraList() {
   extraLabel.textContent = `${Math.min(extraFiles.length, 6)} əlavə şəkil seçildi`;
 }
 
-fileInput.addEventListener("change", () => {
-  void onFile(fileInput.files && fileInput.files[0]);
-});
-
+fileFront.addEventListener("change", onViewFilesChanged);
+fileLeft.addEventListener("change", onViewFilesChanged);
+fileRight.addEventListener("change", onViewFilesChanged);
 extraInput.addEventListener("change", () => {
   extraFiles = Array.from(extraInput.files || []);
   renderExtraList();
+});
+frameMmInput.addEventListener("change", () => {
+  if (cutoutFront) void rebuildVtoModel();
 });
 scaleInput.addEventListener("input", drawPreview);
 offsetYInput.addEventListener("input", drawPreview);
@@ -310,6 +360,7 @@ async function buildPublishForm(sku, name, blob, glb) {
   fd.append("scale", scaleInput.value);
   fd.append("offset_x", "0");
   fd.append("offset_y", offsetYInput.value);
+  fd.append("frame_width_mm", String(frameWidthMm()));
   fd.append("tryon", "1");
   fd.append("file", blob, `${sku}.png`);
   fd.append("model", glb, `${sku}.glb`);
@@ -345,8 +396,8 @@ async function publishVto(sku, name, blob, glb) {
 }
 
 saveBtn.addEventListener("click", async () => {
-  if (!glassesCanvas || !glasses3d) {
-    setStatus("Əvvəl ön şəkil yükləyin.", "error");
+  if (!cutoutFront || !glasses3d) {
+    setStatus("Əvvəl 3 bucaq şəkil yükləyin (ön, sol, sağ).", "error");
     return;
   }
   const name = nameInput.value.trim() || "Demo eynək";
@@ -356,7 +407,7 @@ saveBtn.addEventListener("click", async () => {
 
   try {
     const blob = await new Promise((resolve, reject) => {
-      glassesCanvas.toBlob((b) => (b ? resolve(b) : reject(new Error("PNG yaradılmadı"))), "image/png");
+      cutoutFront.toBlob((b) => (b ? resolve(b) : reject(new Error("PNG yaradılmadı"))), "image/png");
     });
     const glb = await exportGlb(glasses3d);
     const { res, payload } = await publishVto(sku, name, blob, glb);

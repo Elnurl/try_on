@@ -39,11 +39,38 @@ function bendFront(geom, amount = 0.055) {
   geom.computeVertexNormals();
 }
 
-export function buildGlasses3D(cutoutCanvas) {
+function sideTemple(cutout, sign) {
+  if (!cutout) return null;
+  const aspect = cutout.height / cutout.width;
+  const tex = new THREE.CanvasTexture(cutout);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  const w = 0.22;
+  const h = w * aspect;
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, h),
+    new THREE.MeshStandardMaterial({
+      map: tex,
+      transparent: true,
+      alphaTest: 0.04,
+      roughness: 0.36,
+      metalness: 0.12,
+      side: THREE.DoubleSide,
+    }),
+  );
+  mesh.position.set(sign * 0.48, aspect * 0.04, -0.12);
+  mesh.rotation.y = sign * 1.05;
+  return mesh;
+}
+
+export function buildGlasses3D(cutoutCanvas, opts = {}) {
   const aspect = cutoutCanvas.height / cutoutCanvas.width;
   const rim = sampleRimColor(cutoutCanvas);
   const group = new THREE.Group();
   group.name = "digitized-glasses";
+  const frameMm = opts.frameWidthMm || 140;
+  group.userData.frameWidthCm = frameMm / 10;
+  group.userData.digitizedPhoto = true;
 
   const tex = new THREE.CanvasTexture(cutoutCanvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -94,6 +121,11 @@ export function buildGlasses3D(cutoutCanvas) {
   rightHook.position.set(0.5, hingeY - 0.04, -templeLen - 0.02);
   rightHook.rotation.x = 0.55;
   group.add(leftHook, rightHook);
+
+  const sideL = sideTemple(opts.leftCanvas, -1);
+  const sideR = sideTemple(opts.rightCanvas, 1);
+  if (sideL) group.add(sideL);
+  if (sideR) group.add(sideR);
 
   return group;
 }

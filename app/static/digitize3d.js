@@ -36,45 +36,7 @@ function makeFrontTexture(canvas) {
   return tex;
 }
 
-export function buildGlasses3D(cutoutCanvas) {
-  const aspect = cutoutCanvas.height / cutoutCanvas.width;
-  const rim = sampleRimColor(cutoutCanvas);
-  const group = new THREE.Group();
-  group.name = "digitized-glasses";
-
-  const tex = makeFrontTexture(cutoutCanvas);
-  const front = new THREE.Mesh(
-    new THREE.PlaneGeometry(1, aspect),
-    new THREE.MeshStandardMaterial({
-      map: tex,
-      transparent: true,
-      alphaTest: 0.12,
-      roughness: 0.35,
-      metalness: 0.08,
-      side: THREE.DoubleSide,
-    }),
-  );
-  front.position.z = 0.02;
-  group.add(front);
-
-  const templeMat = new THREE.MeshStandardMaterial({
-    color: rim,
-    roughness: 0.4,
-    metalness: 0.1,
-  });
-  const templeGeom = new THREE.BoxGeometry(0.055, 0.032, 0.38);
-  const left = new THREE.Mesh(templeGeom, templeMat);
-  left.position.set(-0.5, aspect * 0.03, -0.18);
-  left.rotation.y = 0.22;
-  const right = new THREE.Mesh(templeGeom, templeMat);
-  right.position.set(0.5, aspect * 0.03, -0.18);
-  right.rotation.y = -0.22;
-  group.add(left, right);
-
-  group.userData.frameWidthCm = 14;
-  group.userData.digitizedPhoto = true;
-  return group;
-}
+export { buildGlasses3D } from "./sdk/eynek-mesh.js";
 
 export function exportGlb(object) {
   return new Promise((resolve, reject) => {

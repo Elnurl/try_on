@@ -696,6 +696,7 @@ async def studio_publish(
     scale: str = Form(""),
     offset_x: str = Form("0"),
     offset_y: str = Form(""),
+    frame_width_mm: str = Form(""),
     file: UploadFile = File(...),
     model: UploadFile | None = File(None),
     extra: Annotated[list[UploadFile] | None, File()] = None,
@@ -740,6 +741,7 @@ async def studio_publish(
             offset_y=_opt_float(offset_y),
             glb_bytes=glb_bytes,
             extra_png_bytes=extra_png,
+            frame_width_mm=_opt_float(frame_width_mm),
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
