@@ -1,4 +1,4 @@
-import { strings, pickLang } from "./embed-i18n.js?v=2";
+import { strings, pickLang } from "./embed-i18n.js?v=3";
 import { createFaceTracker } from "./sdk/face-tracker.js?v=1";
 import { createTryOn } from "./sdk/vto-core.js?v=1";
 
@@ -58,15 +58,18 @@ function icon(path, size = 28) {
 }
 const ICON_INFO = "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01";
 
-const ART_FACE = `<svg viewBox="0 0 240 200" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <rect x="38" y="14" width="104" height="172" rx="16"/><path d="M80 24h20"/>
-  <path d="M90 58c-17 0-27 13-27 31 0 22 12 40 27 40s27-18 27-40c0-18-10-31-27-31z" stroke-width="1.6" opacity=".55"/>
-  <circle cx="77" cy="92" r="11"/><circle cx="103" cy="92" r="11"/><path d="M88 91c1.5-2 2.5-2 4 0M66 90l-8-3M114 90l8-3"/>
-  <path d="M84 113c4 3 8 3 12 0" stroke-width="1.6" opacity=".55"/>
-  <g stroke-width="1.8" opacity=".5"><path d="M176 52l6-6 6 6"/><path d="M176 152l6 6 6-6"/></g>
-  <g stroke-width="1.8"><rect x="162" y="66" width="13" height="10" rx="4" opacity=".45"/><rect x="189" y="66" width="13" height="10" rx="4" opacity=".45"/><path d="M175 70h14" opacity=".45"/>
-  <circle cx="170" cy="102" r="7"/><circle cx="194" cy="102" r="7"/><path d="M177 101h10"/>
-  <rect x="162" y="126" width="13" height="10" rx="2" opacity=".45"/><rect x="189" y="126" width="13" height="10" rx="2" opacity=".45"/><path d="M175 130h14" opacity=".45"/></g></svg>`;
+const ART_FACE = `<svg viewBox="0 0 240 200" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect x="52" y="18" width="88" height="164" rx="18"/>
+  <path d="M88 28h16" opacity=".45"/>
+  <circle cx="96" cy="92" r="28" opacity=".35"/>
+  <path d="M72 88h10M110 88h10M82 88a14 8 0 0 0 28 0" />
+  <g opacity=".55">
+    <path d="M168 58h28M168 100h28M168 142h28"/>
+    <circle cx="174" cy="58" r="6"/><circle cx="196" cy="58" r="6"/>
+    <circle cx="174" cy="100" r="6"/><circle cx="196" cy="100" r="6"/>
+    <circle cx="174" cy="142" r="6"/><circle cx="196" cy="142" r="6"/>
+  </g>
+</svg>`;
 const ART_CAMERA = `<svg viewBox="0 0 240 200" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <rect x="44" y="58" width="152" height="104" rx="18"/><path d="M92 58l10-18h36l10 18"/>
   <circle cx="120" cy="110" r="30"/><circle cx="120" cy="110" r="16" stroke-width="1.6" opacity=".55"/>
@@ -509,7 +512,7 @@ function applyStatic() {
   $("closeBtn").setAttribute("aria-label", T.close);
   for (const [id, text] of [["shotBtn", T.snapshot], ["selfieBtn", T.selfie], ["camBtn", T.camera]]) {
     $(id).setAttribute("aria-label", text);
-    $(id).querySelector(".rail-label").textContent = text;
+    $(id).querySelector(".tool-label").textContent = text;
   }
   $("viewCartBtn").textContent = T.viewCart;
   $("closeBtn").hidden = !embedded;

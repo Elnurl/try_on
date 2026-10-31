@@ -44,9 +44,9 @@
     if (modal) return;
     var style = document.createElement("style");
     style.textContent =
-      ".evto-modal{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:22px;background:rgba(17,18,20,.62);animation:evto-fade .2s ease both}" +
+      ".evto-modal{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:28px;background:rgba(17,18,20,.48);animation:evto-fade .2s ease both}" +
       ".evto-modal[hidden]{display:none}" +
-      ".evto-sheet{position:relative;width:min(900px,100%);height:min(720px,92vh);height:min(720px,92dvh);border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 16px 45px rgba(17,18,20,.22)}" +
+      ".evto-sheet{position:relative;width:min(1120px,100%);height:min(760px,90vh);height:min(760px,90dvh);border-radius:20px;overflow:hidden;background:#f3f3f1;box-shadow:0 24px 60px rgba(17,18,20,.22)}" +
       ".evto-sheet iframe{display:block;width:100%;height:100%;border:0}" +
       "@keyframes evto-fade{from{opacity:0}}" +
       "@media (max-width:640px){.evto-modal{padding:0}.evto-sheet{width:100vw;height:100%;border-radius:0}}";
