@@ -208,26 +208,50 @@ export function createFaceOverlay3D(canvas) {
     let tagged = false;
     root.traverse((child) => {
       if (child.userData?.digitizedPhoto) tagged = true;
+      if ((child.name || "").includes("digitized-glasses")) tagged = true;
     });
     if (tagged) return true;
     const box = new THREE.Box3().setFromObject(root);
     const sx = box.getSize(new THREE.Vector3()).x;
-    return sx > 0.4 && sx < 1.35;
+    // Studio GLB includes temples (~2 units wide); still photo-derived mesh.
+    return sx > 0.35 && sx < 2.85;
+  }
+
+  function tagDigitizedMaterials(root) {
+    root.traverse((child) => {
+      if (!child.isMesh || !child.material) return;
+      child.renderOrder = 2;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      mats.forEach((mat) => {
+        mat.transparent = mat.transparent || mat.opacity < 1;
+        mat.depthTest = true;
+        mat.depthWrite = true;
+        const name = (mat.name || child.name || "").toLowerCase();
+        if (name.includes("lens")) {
+          mat.transparent = true;
+          mat.opacity = Math.min(mat.opacity || 1, 0.28);
+          mat.depthWrite = false;
+          mat.renderOrder = 3;
+        }
+      });
+    });
   }
 
   function setObject(object, meta = {}) {
     clearGlasses();
     glasses = object;
     const frameMm = meta.frameWidthMm || 140;
-    if (isDigitizedPhotoMesh(glasses)) {
-      const targetCm = frameMm / 10;
-      glasses.userData.frameWidthCm = targetCm;
-      glasses.userData.photoPlaneUnits = 1;
+    const digitized = meta.digitized || meta.custom || isDigitizedPhotoMesh(glasses);
+    if (digitized) {
+      glasses.userData.digitizedPhoto = true;
+      glasses.userData.frameWidthCm = frameMm / 10;
       const box = new THREE.Box3().setFromObject(glasses);
+      const center = box.getCenter(new THREE.Vector3());
       const sx = box.getSize(new THREE.Vector3()).x || 1;
-      if (sx < targetCm * 0.85) {
-        glasses.scale.multiplyScalar(targetCm / sx);
-      }
+      glasses.position.sub(center);
+      // Unit frame width (1.0) — live scale maps eye span px → frame mm.
+      glasses.scale.multiplyScalar(1 / sx);
+      tagDigitizedMaterials(glasses);
     } else {
       normalizeGlassesRoot(glasses, frameMm);
     }
@@ -256,7 +280,21 @@ export function createFaceOverlay3D(canvas) {
   }
 
   function scaleFromDist(dist, opts) {
-    const widthCm = glasses?.userData?.frameWidthCm || (opts.frameWidthMm || 127) / 10;
+    const frameMm =
+      opts.frameWidthMm ||
+      (glasses?.userData?.frameWidthCm ? glasses.userData.frameWidthCm * 10 : null) ||
+      140;
+    if (glasses?.userData?.digitizedPhoto || isDigitizedPhotoMesh(glasses)) {
+      // Orthographic units = pixels: outer eye span (dist px) ↔ EYE_SPAN_MM, frame ↔ frameMm.
+      return (
+        dist
+        * (frameMm / EYE_SPAN_MM)
+        * (opts.scale ?? 1.02)
+        * (opts.meshScale ?? 1)
+        * 1.12
+      );
+    }
+    const widthCm = frameMm / 10;
     let modelSpanCm = widthCm;
     if (glasses) {
       const box = new THREE.Box3().setFromObject(glasses);

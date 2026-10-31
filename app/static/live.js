@@ -4,7 +4,7 @@
  * Video/photos stay on-device; only anonymous usage counters hit the server.
  */
 import { createTryonEngine } from "./tryon-adapter.js?v=2";
-import { createFaceOverlay3D } from "./digitize3d.js?v=9";
+import { createFaceOverlay3D } from "./digitize3d.js?v=10";
 
 const body = document.body;
 const slug = body.dataset.slug || "demo";
@@ -322,7 +322,11 @@ async function sync3DModel() {
   if (url === loadedModelUrl) return;
   setStatus("3D eynək yüklənir…");
   try {
-    await overlay3d.loadUrl(url, { frameWidthMm: selected.frame_width_mm });
+    await overlay3d.loadUrl(url, {
+      frameWidthMm: selected.frame_width_mm,
+      digitized: selected.digitized,
+      custom: selected.custom,
+    });
     loadedModelUrl = url;
     setStatus("");
   } catch (err) {
