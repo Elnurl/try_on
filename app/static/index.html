@@ -34,9 +34,16 @@
         <p class="muted">2. Düymə əlavə edin. <code>data-eynek-hide-missing</code> olsa, VTO-su olmayan məhsulda düymə gizlənir:</p>
         <pre class="code">&lt;button data-eynek-vto="SKU" data-eynek-hide-missing&gt;Üzündə yoxla&lt;/button&gt;</pre>
         <p class="muted">React / SPA üçün JavaScript API:</p>
-        <pre class="code">EynekVTO.open({ sku: "SKU" });
+        <pre class="code">EynekVTO.open({
+  sku: "SKU",
+  lang: "az",                                   // az | ru | en
+  product: { name, price, vendor, image, available },
+  products: [{ sku, name, price, vendor, image }], // "Oxşar modellər"
+  onAddToCart: ({ sku }) =&gt; addToCart(sku),     // { ok: false, message } = xəta
+  onViewCart: () =&gt; navigate("/cart"),
+  termsUrl: "/terms",
+});
 EynekVTO.isAvailable("SKU").then((ok) =&gt; { /* düyməni göstər */ });
-EynekVTO.on("add-to-cart", ({ sku }) =&gt; addToCart(sku));
 
 // TINT ilə eyni element interfeysi:
 // &lt;eynek-vto variant-id="SKU"&gt;&lt;/eynek-vto&gt;  →  document.querySelector("eynek-vto").open()</pre>

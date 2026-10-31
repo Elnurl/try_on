@@ -7,6 +7,14 @@
  *   <eynek-vto variant-id="SKU"></eynek-vto>  el.open()          TINT-compatible element
  *   EynekVTO.open({ sku })  EynekVTO.isAvailable(sku)  EynekVTO.on("add-to-cart", fn)
  *
+ *   EynekVTO.open({
+ *     sku, lang: "az" | "ru" | "en",
+ *     product:  { name, price, currency, vendor, image, available },   shown in the window
+ *     products: [{ sku, name, price, vendor, image, available }],      "similar models" strip
+ *     onAddToCart(detail) → optional { ok: false, message } to report a failure
+ *     onViewCart(detail), termsUrl, termsVersion, cart: false
+ *   })
+ *
  * The try-on runs in an iframe on the VTO origin, so camera/WASM never touch the host page.
  */
 (function () {
@@ -36,11 +44,12 @@
     if (modal) return;
     var style = document.createElement("style");
     style.textContent =
-      ".evto-modal{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;background:rgba(15,12,10,.6)}" +
+      ".evto-modal{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:22px;background:rgba(17,18,20,.62);animation:evto-fade .2s ease both}" +
       ".evto-modal[hidden]{display:none}" +
-      ".evto-sheet{position:relative;width:min(980px,96vw);height:min(700px,92vh);border-radius:14px;overflow:hidden;background:#0e0d0c;box-shadow:0 20px 60px rgba(0,0,0,.4)}" +
+      ".evto-sheet{position:relative;width:min(900px,100%);height:min(720px,92vh);height:min(720px,92dvh);border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 16px 45px rgba(17,18,20,.22)}" +
       ".evto-sheet iframe{display:block;width:100%;height:100%;border:0}" +
-      "@media (max-width:640px){.evto-sheet{width:100vw;height:100%;border-radius:0}}";
+      "@keyframes evto-fade{from{opacity:0}}" +
+      "@media (max-width:640px){.evto-modal{padding:0}.evto-sheet{width:100vw;height:100%;border-radius:0}}";
     document.head.appendChild(style);
     modal = document.createElement("div");
     modal.className = "evto-modal";
@@ -60,8 +69,25 @@
     var store = opts.store || defaultStore;
     if (!store) throw new Error("EynekVTO: data-store və ya open({ store }) lazımdır");
     ensureModal();
-    current = { store: store, sku: opts.sku || "" };
-    var url = origin + "/embed?store=" + encodeURIComponent(store) + "&sku=" + encodeURIComponent(current.sku);
+    var sku = opts.sku != null ? String(opts.sku) : opts.product && opts.product.sku != null ? String(opts.product.sku) : "";
+    var lang = opts.lang || document.documentElement.lang || "az";
+    current = {
+      store: store,
+      sku: sku,
+      onAddToCart: opts.onAddToCart,
+      onViewCart: opts.onViewCart,
+      config: {
+        lang: lang,
+        product: opts.product ? Object.assign({}, opts.product, { sku: sku }) : sku ? { sku: sku } : null,
+        products: opts.products || null,
+        cart: opts.cart !== false,
+        viewCart: opts.viewCart !== false,
+        termsUrl: opts.termsUrl || null,
+        termsVersion: opts.termsVersion || null,
+        termsPoints: opts.termsPoints || null,
+      },
+    };
+    var url = origin + "/embed?store=" + encodeURIComponent(store) + "&sku=" + encodeURIComponent(sku) + "&lang=" + encodeURIComponent(lang);
     if (opts.cart === false) url += "&cart=0";
     frame.src = url;
     modal.hidden = false;
@@ -99,11 +125,42 @@
     });
   }
 
+  function reply(message) {
+    if (frame && frame.contentWindow) frame.contentWindow.postMessage(Object.assign({ source: "eynek-vto-host" }, message), origin);
+  }
+
+  function addToCart(detail) {
+    var handlers = (listeners["add-to-cart"] || []).slice();
+    if (current && current.onAddToCart) handlers.unshift(current.onAddToCart);
+    var results = handlers.map(function (fn) {
+      try {
+        return Promise.resolve(fn(detail));
+      } catch (err) {
+        return Promise.resolve({ ok: false, message: err && err.message });
+      }
+    });
+    window.dispatchEvent(new CustomEvent("eynek-vto:add-to-cart", { detail: detail }));
+    Promise.all(results).then(function (values) {
+      var failed = values.filter(function (v) {
+        return v === false || (v && v.ok === false);
+      })[0];
+      reply({ type: "cart-result", ok: !failed, message: failed && failed.message });
+    });
+  }
+
   window.addEventListener("message", function (e) {
     if (e.origin !== origin || !e.data || e.data.source !== "eynek-vto") return;
+    if (!frame || e.source !== frame.contentWindow) return;
     var d = e.data;
-    if (d.type === "close") close();
-    else emit(d.type, { store: d.store, sku: d.sku, image: d.image, message: d.message });
+    var detail = { store: d.store, sku: d.sku, product: d.product, image: d.image, message: d.message, code: d.code };
+    if (d.type === "hello") reply({ type: "init", config: current ? current.config : {} });
+    else if (d.type === "close") close();
+    else if (d.type === "add-to-cart") addToCart(detail);
+    else if (d.type === "view-cart") {
+      if (current && current.onViewCart) current.onViewCart(detail);
+      emit("view-cart", detail);
+      close();
+    } else emit(d.type, detail);
   });
 
   document.addEventListener("keydown", function (e) {
@@ -137,11 +194,16 @@
     customElements.define(
       "eynek-vto",
       class extends HTMLElement {
-        open() {
-          open({
-            sku: this.getAttribute("variant-id") || this.getAttribute("sku") || "",
-            store: this.getAttribute("store") || undefined,
-          });
+        configure(opts) {
+          this._opts = opts || {};
+        }
+        open(extra) {
+          open(
+            Object.assign({}, this._opts, extra, {
+              sku: (extra && extra.sku) || this.getAttribute("variant-id") || this.getAttribute("sku") || "",
+              store: this.getAttribute("store") || (this._opts && this._opts.store) || undefined,
+            }),
+          );
         }
         close() {
           close();
