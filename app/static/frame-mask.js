@@ -62,43 +62,76 @@ export function maskSideTemples(canvas, insetRatio = 0.16) {
   return canvas;
 }
 
-/** Dark lens areas in product PNG → semi-transparent so eyes show through. */
-export function makeLensesTranslucent(canvas, alphaMul = 0.38) {
+function frameBounds(px, w, h) {
+  let minX = w;
+  let maxX = 0;
+  let minY = h;
+  let maxY = 0;
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (px[(y * w + x) * 4 + 3] > 30) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  return { minX, maxX, minY, maxY };
+}
+
+/** Only the two lens ellipses — rim and bridge stay opaque. */
+export function makeLensesTranslucent(canvas, alphaMul = 0.42) {
   const w = canvas.width;
   const h = canvas.height;
   if (w < 8 || h < 8) return canvas;
   const ctx = canvas.getContext("2d");
   const img = ctx.getImageData(0, 0, w, h);
   const px = img.data;
-  let minX = w;
-  let maxX = 0;
+  const { minX, maxX, minY, maxY } = frameBounds(px, w, h);
+  const span = maxX - minX + 1;
+  const vspan = maxY - minY + 1;
+  if (span < 8 || vspan < 8) return canvas;
+
+  const lenses = [
+    { cx: minX + span * 0.27, cy: minY + vspan * 0.52, rx: span * 0.17, ry: vspan * 0.28 },
+    { cx: minX + span * 0.73, cy: minY + vspan * 0.52, rx: span * 0.17, ry: vspan * 0.28 },
+  ];
+
   for (let y = 0; y < h; y += 1) {
     for (let x = 0; x < w; x += 1) {
-      if (px[(y * w + x) * 4 + 3] > 30) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
+      let inside = false;
+      for (const L of lenses) {
+        const dx = (x - L.cx) / L.rx;
+        const dy = (y - L.cy) / L.ry;
+        if (dx * dx + dy * dy <= 1) {
+          inside = true;
+          break;
+        }
       }
-    }
-  }
-  const span = maxX - minX + 1;
-  if (span < 4) return canvas;
-  const y0 = Math.floor(h * 0.22);
-  const y1 = Math.ceil(h * 0.78);
-  for (let y = y0; y < y1; y += 1) {
-    for (let x = minX; x <= maxX; x += 1) {
+      if (!inside) continue;
       const i = (y * w + x) * 4;
       const a = px[i + 3];
-      if (a < 25) continue;
-      const lum = (px[i] + px[i + 1] + px[i + 2]) / 3;
-      const nx = (x - minX) / span;
-      const inLens = (nx > 0.08 && nx < 0.46) || (nx > 0.54 && nx < 0.92);
-      const isRim = lum < 55 && !inLens;
-      if (isRim) continue;
-      if (inLens || lum < 115) {
-        px[i + 3] = Math.max(28, Math.round(a * alphaMul));
-      }
+      if (a < 20) continue;
+      px[i + 3] = Math.max(32, Math.round(a * alphaMul));
     }
   }
   ctx.putImageData(img, 0, 0);
   return canvas;
+}
+
+export function cloneCanvas(source) {
+  const c = document.createElement("canvas");
+  c.width = source.width;
+  c.height = source.height;
+  c.getContext("2d").drawImage(source, 0, 0);
+  return c;
+}
+
+/** Live camera only — do not run on studio preview source. */
+export function prepareLiveVtoTexture(sourceCanvas) {
+  const c = cloneCanvas(sourceCanvas);
+  maskSideTemples(c, 0.11);
+  makeLensesTranslucent(c, 0.42);
+  return c;
 }

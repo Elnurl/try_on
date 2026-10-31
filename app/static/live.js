@@ -5,7 +5,7 @@
  */
 import { createTryonEngine } from "./tryon-adapter.js?v=3";
 import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=16";
-import { makeLensesTranslucent, maskSideTemples } from "./frame-mask.js";
+import { prepareLiveVtoTexture } from "./frame-mask.js";
 
 const body = document.body;
 const slug = body.dataset.slug || "demo";
@@ -112,9 +112,7 @@ async function buildStudioMesh(item) {
   const img = frameImages.get(item.id);
   if (!img) throw new Error("Frame PNG not loaded");
   await waitPng(img);
-  const frontCanvas = imageToCanvas(img);
-  maskSideTemples(frontCanvas, 0.17);
-  makeLensesTranslucent(frontCanvas, 0.4);
+  const frontCanvas = prepareLiveVtoTexture(imageToCanvas(img));
   const mm = item.frame_width_mm || 140;
   return buildGlasses3D(frontCanvas, {
     frameWidthMm: mm,
@@ -401,16 +399,19 @@ function glassesLayer() {
   c.height = png.naturalHeight;
   const g = c.getContext("2d");
   g.drawImage(png, 0, 0);
-  maskSideTemples(c, 0.17);
-  makeLensesTranslucent(c, 0.4);
-  if (lensColor) {
-    g.globalCompositeOperation = "source-atop";
-    g.fillStyle = lensColor;
-    g.globalAlpha = 0.35;
-    g.fillRect(0, 0, c.width, c.height);
+  let out = c;
+  if (selected?.custom || selected?.digitized) {
+    out = prepareLiveVtoTexture(c);
   }
-  tryonFrameCache.set(cacheKey, c);
-  return c;
+  if (lensColor) {
+    const g2 = out.getContext("2d");
+    g2.globalCompositeOperation = "source-atop";
+    g2.fillStyle = lensColor;
+    g2.globalAlpha = 0.35;
+    g2.fillRect(0, 0, out.width, out.height);
+  }
+  tryonFrameCache.set(cacheKey, out);
+  return out;
 }
 
 function drawPhotoGlasses(left, right, pose, width, height) {
