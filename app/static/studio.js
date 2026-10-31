@@ -1,4 +1,4 @@
-import { createTryOn } from "./sdk/vto-core.js?v=1";
+import { createTryOn } from "./sdk/vto-core.js?v=3";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);

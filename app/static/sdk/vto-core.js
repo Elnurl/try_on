@@ -1,13 +1,15 @@
 /**
  * Eynek VTO runtime: 2.5D glasses (photo front + 3D temples) placed on a tracked face.
  *
- * Scene units: the camera is orthographic in video pixels; the `head` group carries
- * the face pose and is scaled px-per-mm, so everything under it is modelled in mm.
+ * Scene units: video pixels. The live camera is a webcam-like perspective whose z = 0
+ * plane maps 1:1 onto the video, and the head sits on that plane at the eye corners; the
+ * `head` group carries the face pose and is scaled px-per-mm, so its children are in mm.
  * Head-local axes: x → wearer's left (screen right), y → up, z → out of the face.
  */
 import * as THREE from "three";
 
 const EYE_SPAN_MM = 88;
+const WEBCAM_FOV_DEG = 46;
 const PANTO_TILT = THREE.MathUtils.degToRad(7);
 const FRAME_GAP_MM = 3;
 const LOST_FACE_MS = 350;
@@ -265,15 +267,13 @@ export function createTryOn(canvas) {
   key.position.set(0.35, 0.7, 1);
   scene.add(key);
 
-  const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 8000);
-  ortho.position.z = 4000;
+  const live = new THREE.PerspectiveCamera(WEBCAM_FOV_DEG, 1, 1, 10000);
   const persp = new THREE.PerspectiveCamera(28, 1, 10, 4000);
   persp.position.set(0, 34, 330);
   persp.lookAt(0, 0, 0);
 
   const bgMat = new THREE.MeshBasicMaterial({ depthWrite: false, depthTest: false });
   const bg = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), bgMat);
-  bg.position.z = -3000;
   bg.renderOrder = -10;
   scene.add(bg);
 
@@ -298,7 +298,6 @@ export function createTryOn(canvas) {
   const filters = {
     x: new OneEuro(1.2, 0.012),
     y: new OneEuro(1.2, 0.012),
-    z: new OneEuro(1.0, 0.01),
     s: new OneEuro(0.9, 0.6),
     zf: new OneEuro(0.4, 0),
     ear: new OneEuro(0.3, 0),
@@ -320,11 +319,29 @@ export function createTryOn(canvas) {
     viewW = Math.max(2, Math.round(width));
     viewH = Math.max(2, Math.round(height));
     renderer.setSize(viewW, viewH, false);
-    Object.assign(ortho, { left: -viewW / 2, right: viewW / 2, top: viewH / 2, bottom: -viewH / 2 });
-    ortho.updateProjectionMatrix();
+    aimLive(0, 0);
     persp.aspect = viewW / viewH;
     persp.updateProjectionMatrix();
     bg.scale.set(viewW, viewH, 1);
+  }
+
+  // Optical axis through the face, frustum sheared so the z = 0 plane still covers the video
+  // exactly: perspective (temples converging behind the lenses) stays symmetric on the face.
+  function aimLive(cx, cy) {
+    const focal = viewH / 2 / Math.tan(THREE.MathUtils.degToRad(WEBCAM_FOV_DEG) / 2);
+    const near = focal * 0.05;
+    const k = near / focal;
+    live.position.set(cx, cy, focal);
+    live.updateMatrixWorld();
+    live.projectionMatrix.makePerspective(
+      (-viewW / 2 - cx) * k,
+      (viewW / 2 - cx) * k,
+      (viewH / 2 - cy) * k,
+      (-viewH / 2 - cy) * k,
+      near,
+      focal * 4,
+    );
+    live.projectionMatrixInverse.copy(live.projectionMatrix).invert();
   }
 
   function setSource(source, opts = {}) {
@@ -415,7 +432,8 @@ export function createTryOn(canvas) {
     have = true;
 
     head.visible = true;
-    head.position.set(filters.x.filter(o.x, dt), filters.y.filter(o.y, dt), filters.z.filter(o.z, dt));
+    head.position.set(filters.x.filter(o.x, dt), filters.y.filter(o.y, dt), 0);
+    aimLive(head.position.x, head.position.y);
     head.quaternion.copy(smoothQ);
     head.scale.setScalar(filters.s.filter(pxPerMm, dt));
 
@@ -466,7 +484,7 @@ export function createTryOn(canvas) {
 
   function render(t = performance.now()) {
     if (mode === "preview") posePreview(Math.sin(t / 1600) * 0.95);
-    renderer.render(scene, mode === "preview" ? persp : ortho);
+    renderer.render(scene, mode === "preview" ? persp : live);
   }
 
   function snapshot(type = "image/jpeg", quality = 0.92) {
