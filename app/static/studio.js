@@ -3,7 +3,8 @@ import {
   buildGlasses3D,
   createFaceOverlay3D,
   exportGlb,
-} from "./digitize3d.js?v=13";
+} from "./digitize3d.js?v=19";
+import { prepareVtoTexture } from "./frame-mask.js?v=2";
 
 const FACE_URL = "/static/studio-face.jpg";
 const SLUG = "demo";
@@ -281,7 +282,7 @@ async function rebuildVtoModel() {
 
   setStatus("3 şəkil emal olunur, 2.5D model qurulur…");
   try {
-    cutoutFront = await loadCutout(f);
+    cutoutFront = prepareVtoTexture(await loadCutout(f));
     cutoutLeft = await loadCutout(l);
     cutoutRight = await loadCutout(r);
     const mm = frameWidthMm();

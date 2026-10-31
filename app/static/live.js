@@ -4,7 +4,8 @@
  * Video/photos stay on-device; only anonymous usage counters hit the server.
  */
 import { createTryonEngine } from "./tryon-adapter.js?v=3";
-import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=18";
+import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=19";
+import { prepareVtoTexture } from "./frame-mask.js?v=2";
 
 const body = document.body;
 const slug = body.dataset.slug || "demo";
@@ -111,11 +112,11 @@ async function buildStudioMesh(item) {
   const img = frameImages.get(item.id);
   if (!img) throw new Error("Frame PNG not loaded");
   await waitPng(img);
-  const frontCanvas = imageToCanvas(img);
+  const frontCanvas = prepareVtoTexture(imageToCanvas(img));
   const mm = item.frame_width_mm || 140;
   return buildGlasses3D(frontCanvas, {
     frameWidthMm: mm,
-    liveMinimal: true,
+    liveBend: true,
   });
 }
 
@@ -491,7 +492,9 @@ function drawGlasses(left, right, pose) {
     overlay3d.place(
       left,
       right,
-      selected.mesh_scale ?? selected.scale,
+      selected.custom || selected.digitized
+        ? (selected.scale ?? 1.18)
+        : (selected.mesh_scale ?? selected.scale),
       selected.offset_y ?? 0.1,
       pose || lastFacePose,
       canvas.width,

@@ -285,7 +285,7 @@ export function createFaceOverlay3D(canvas) {
     head.quaternion.copy(smooth.quat);
     head.scale.setScalar(smooth.scale);
     if (glasses) {
-      glasses.position.set(0, glasses.userData?.pivotY || 0, 0);
+      glasses.position.set(0, 0, 0);
       glasses.quaternion.identity();
       glasses.scale.setScalar(1);
       if (glasses.userData?.digitizedPhoto) {
@@ -359,9 +359,10 @@ export function createFaceOverlay3D(canvas) {
     if (dist < 10) return false;
     if (opts.skipFacialMatrix && pose) {
       const yaw = THREE.MathUtils.clamp(pose.yaw || 0, -1, 1);
-      const pitch = THREE.MathUtils.clamp(pose.pitch || 0, -1, 1);
+      // pose.pitch is nose-below-eyes ratio: ~0.65 at neutral. Remove that bias.
+      const pitchRel = THREE.MathUtils.clamp((pose.pitch || 0.65) - 0.65, -0.6, 0.6);
       const roll = Math.atan2(b.y - a.y, b.x - a.x);
-      const foreshorten = Math.max(0.42, Math.cos(yaw * 1.15));
+      const foreshorten = Math.max(0.45, Math.cos(yaw * 1.1));
       const stable = dist / foreshorten;
       const mid = left3.clone().add(right3).multiplyScalar(0.5);
       if (pose.bridge) {
@@ -369,11 +370,14 @@ export function createFaceOverlay3D(canvas) {
         mid.x = bridge3.x;
         mid.y = bridge3.y;
       }
-      mid.y -= stable * (opts.offsetY ?? 0.1);
+      // Lens centre sits ~pupil level, below the nasion landmark.
+      mid.y -= stable * (0.12 + (opts.offsetY ?? 0.1));
       const quat = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(pitch * 0.85, -yaw * 0.95, -roll, "YXZ"),
+        new THREE.Euler(pitchRel * 0.7, -yaw * 0.95, -roll, "YXZ"),
       );
-      applySmooth(mid, quat, scaleFromDist(stable, opts));
+      const frameMm = opts.frameWidthMm || 140;
+      const scl = stable * (opts.scale ?? 1.18) * (frameMm / 140) * 1.38;
+      applySmooth(mid, quat, scl);
       return true;
     }
     xAxis.normalize();
