@@ -255,6 +255,12 @@ export function createFaceOverlay3D(canvas) {
       // Unit frame width (1.0) — live scale maps eye span px → frame mm.
       glasses.scale.multiplyScalar(1 / sx);
       tagDigitizedMaterials(glasses);
+      glasses.traverse((child) => {
+        if (!child.isMesh) return;
+        child.userData._restPos = child.position.clone();
+        child.userData._restQuat = child.quaternion.clone();
+        child.userData._restScale = child.scale.clone();
+      });
     } else {
       normalizeGlassesRoot(glasses, frameMm);
     }
@@ -279,6 +285,14 @@ export function createFaceOverlay3D(canvas) {
       glasses.position.set(0, 0, 0);
       glasses.quaternion.identity();
       glasses.scale.setScalar(1);
+      if (glasses.userData?.digitizedPhoto) {
+        glasses.traverse((child) => {
+          if (!child.isMesh || !child.userData._restPos) return;
+          child.position.copy(child.userData._restPos);
+          child.quaternion.copy(child.userData._restQuat);
+          child.scale.copy(child.userData._restScale);
+        });
+      }
     }
   }
 
@@ -312,39 +326,6 @@ export function createFaceOverlay3D(canvas) {
     );
   }
 
-  function applyDigitizedDepth(pose, dist) {
-    if (!glasses?.userData?.digitizedPhoto) return;
-    const yaw = pose?.yaw || 0;
-    const pitch = pose?.pitch || 0;
-    glasses.traverse((child) => {
-      if (!child.isMesh) return;
-      if (child.userData?.sideTemple) {
-        const s = child.userData.templeSide || 1;
-        child.rotation.y = s * (1.05 + yaw * 0.72);
-        child.position.z = -0.12 - Math.abs(yaw) * 0.08;
-        return;
-      }
-      if (child.userData?.templeCapsule) {
-        const s = child.userData.templeSide || 1;
-        child.rotation.y = s * (0.12 + yaw * 0.48);
-        if (child.userData.hook) {
-          child.rotation.x = 0.55 + pitch * 0.12;
-        }
-        return;
-      }
-      const ax = Math.abs(child.position.x);
-      if (ax > 0.38 && child.position.z < -0.04) {
-        const s = child.position.x < 0 ? -1 : 1;
-        child.rotation.y += s * yaw * 0.35;
-      }
-    });
-    if (dist > 20) {
-      const u = dist * 0.0042;
-      occluder.scale.set(u * 1.05, u * 1.35, u * 0.72);
-      occluder.position.set(0, -u * 0.12, -u * 0.95);
-    }
-  }
-
   function placeFromEyePixels(left, right, opts) {
     if (!glasses || !camera || !left || !right) return false;
     const left3 = new THREE.Vector3(left.x - viewW / 2, viewH / 2 - left.y, 0);
@@ -364,6 +345,13 @@ export function createFaceOverlay3D(canvas) {
     if (dist < 10) return false;
     xAxis.normalize();
     const mid = left3.clone().add(right3).multiplyScalar(0.5);
+    if (pose?.bridge) {
+      const flip = opts.mirror !== false;
+      const bx = (flip ? 1 - pose.bridge.x : pose.bridge.x) * viewW - viewW / 2;
+      const by = viewH / 2 - pose.bridge.y * viewH;
+      mid.x = bx;
+      mid.y = (mid.y + by) * 0.5;
+    }
     mid.y += dist * (opts.offsetY ?? 0.02);
     const upHint = new THREE.Vector3(0, 1, 0);
     let zAxis = new THREE.Vector3().crossVectors(xAxis, upHint);
@@ -379,14 +367,13 @@ export function createFaceOverlay3D(canvas) {
     const quat = new THREE.Quaternion().setFromRotationMatrix(
       new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis),
     );
-    if (pose) {
+    if (pose && !opts.skipFacialMatrix) {
       const turnY = new THREE.Quaternion().setFromAxisAngle(yAxis, -(pose.yaw || 0) * 0.95);
       const turnX = new THREE.Quaternion().setFromAxisAngle(xAxis, (pose.pitch || 0) * 0.7);
       quat.multiply(turnY).multiply(turnX);
     }
     const pos = mid.clone().add(zAxis.clone().multiplyScalar(dist * 0.06));
     applySmooth(pos, quat, scaleFromDist(dist, opts));
-    applyDigitizedDepth(pose, dist);
     return true;
   }
 
@@ -478,13 +465,14 @@ export function createFaceOverlay3D(canvas) {
 
     const basis = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
     const quat = new THREE.Quaternion().setFromRotationMatrix(basis);
-    const turnY = new THREE.Quaternion().setFromAxisAngle(yAxis, -(pose.yaw || 0) * 0.95);
-    const turnX = new THREE.Quaternion().setFromAxisAngle(xAxis, (pose.pitch || 0) * 0.7);
-    quat.multiply(turnY).multiply(turnX);
+    if (!opts.skipFacialMatrix) {
+      const turnY = new THREE.Quaternion().setFromAxisAngle(yAxis, -(pose.yaw || 0) * 0.95);
+      const turnX = new THREE.Quaternion().setFromAxisAngle(xAxis, (pose.pitch || 0) * 0.7);
+      quat.multiply(turnY).multiply(turnX);
+    }
 
     const pos = mid.clone().add(zAxis.clone().multiplyScalar(dist * 0.06));
     applySmooth(pos, quat, scaleFromDist(dist, opts));
-    applyDigitizedDepth(pose, dist);
     return true;
   }
 
