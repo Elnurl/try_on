@@ -165,32 +165,18 @@ function fallbackPose() {
 }
 
 function drawPreview() {
+  canvas3d.width = canvas.width;
+  canvas3d.height = canvas.height;
   overlay3d.resize(canvas.width, canvas.height);
   overlay3d.setBackground(faceImg, false);
-  if (glasses3d && posePx) {
-    const pose = facePose || {
-      left: {
-        x: posePx.left.x / canvas.width,
-        y: posePx.left.y / canvas.height,
-        z: 0,
-      },
-      right: {
-        x: posePx.right.x / canvas.width,
-        y: posePx.right.y / canvas.height,
-        z: 0,
-      },
-      bridge: {
-        x: (posePx.left.x + posePx.right.x) / 2 / canvas.width,
-        y: (posePx.left.y + posePx.right.y) / 2 / canvas.height,
-        z: 0,
-      },
-    };
-    overlay3d.place(
-      posePx.left,
-      posePx.right,
+  if (glasses3d) {
+    const eyes = posePx || fallbackPose();
+    const placed = overlay3d.place(
+      eyes.left,
+      eyes.right,
       Number(scaleInput.value),
       Number(offsetYInput.value),
-      pose,
+      null,
       canvas.width,
       canvas.height,
       {
@@ -199,6 +185,9 @@ function drawPreview() {
         mirror: false,
       },
     );
+    if (!placed) {
+      console.warn("[studio] glasses placement failed");
+    }
   }
   overlay3d.render();
 }
@@ -295,6 +284,9 @@ async function rebuildVtoModel() {
     nameInput.value = f.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
   }
   saveBtn.disabled = false;
+  if (!posePx) {
+    await detectFace();
+  }
   setStatus("VTO modeli hazırdır. Ölçünü yoxla, «VTO hazır et».");
   drawPreview();
 }
