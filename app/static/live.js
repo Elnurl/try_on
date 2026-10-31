@@ -4,7 +4,7 @@
  * Video/photos stay on-device; only anonymous usage counters hit the server.
  */
 import { createTryonEngine } from "./tryon-adapter.js?v=2";
-import { createFaceOverlay3D } from "./digitize3d.js?v=8";
+import { createFaceOverlay3D } from "./digitize3d.js?v=9";
 
 const body = document.body;
 const slug = body.dataset.slug || "demo";
@@ -154,11 +154,13 @@ async function shouldUseDeepAR(item) {
 }
 
 function syncEngineClasses() {
-  document.body.classList.toggle("engine-deepar", !!(engine && engine.kind === "deepar"));
-  document.body.classList.toggle(
-    "engine-mesh",
-    !!(engine && engine.kind === "overlay" && selected && selected.model_url),
-  );
+  const deepar = !!(engine && engine.kind === "deepar");
+  const mesh =
+    !deepar &&
+    !!(selected && selected.model_url) &&
+    (!engine || engine.kind === "overlay");
+  document.body.classList.toggle("engine-deepar", deepar);
+  document.body.classList.toggle("engine-mesh", mesh);
 }
 
 async function loadEngine(forceReload = false) {
@@ -302,6 +304,7 @@ async function loadBrand() {
     })
   );
   syncProduct();
+  syncEngineClasses();
   sync3DModel().catch((err) => console.warn(err));
   track("open");
 }
@@ -350,7 +353,34 @@ function glassesLayer() {
 function drawGlasses(left, right, pose) {
   if (!selected) return false;
   if (usesMeshVto()) {
-    if (!meshReady()) return false;
+    if (!meshReady()) {
+      const png = glassesLayer();
+      if (png && left && right) {
+        const dx = right.x - left.x;
+        const dy = right.y - left.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist >= 8) {
+          const angle = Math.atan2(dy, dx);
+          const midX = (left.x + right.x) / 2;
+          const midY = (left.y + right.y) / 2;
+          const targetW = dist * (selected.scale ?? 1.18);
+          const targetH = (png.height / png.width) * targetW;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          const py = nx;
+          const cx = midX + nx * dist * (selected.offset_x || 0);
+          const cy =
+            midY + ny * dist * (selected.offset_x || 0) + py * dist * (selected.offset_y || 0);
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(angle);
+          ctx.drawImage(png, -targetW / 2, -targetH / 2, targetW, targetH);
+          ctx.restore();
+          return true;
+        }
+      }
+      return false;
+    }
     overlay3d.resize(canvas.width, canvas.height);
     overlay3d.place(
       left,
@@ -517,7 +547,16 @@ async function startCamera() {
     audio: false,
   });
   video.srcObject = stream;
-  await video.play();
+  try {
+    await video.play();
+  } catch (err) {
+    if (err && err.name === "AbortError") {
+      await new Promise((r) => setTimeout(r, 80));
+      await video.play();
+    } else {
+      throw err;
+    }
+  }
   view = "live";
   setIdle(false);
   setStatus("");

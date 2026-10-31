@@ -347,7 +347,9 @@ export function createFaceOverlay3D(canvas) {
 
   function placeFromPose(pose, width, height, opts = {}) {
     if (!glasses || !camera || !pose || !pose.left || !pose.right) return false;
-    if (pose.matrix && placeFromMatrix(pose, width, height, opts)) return true;
+    if (pose.matrix && !opts.skipFacialMatrix && placeFromMatrix(pose, width, height, opts)) {
+      return true;
+    }
 
     const mirror = !!opts.mirror;
     let left = toVec(pose.left, width, height, mirror);
@@ -402,7 +404,19 @@ export function createFaceOverlay3D(canvas) {
       frameWidthMm: item?.frame_width_mm || item?.frameWidthMm || 140,
       meshScale: item?.mesh_scale ?? 1,
       mirror: item?.mirror !== false,
+      skipFacialMatrix: !!(item?.digitized || item?.custom),
     };
+    // live.js passes mirrored eye pixels (canvas space). Prefer them over the facial
+    // transform matrix — matrix placement often misses for studio digitized GLBs.
+    const pixelEyes =
+      left &&
+      right &&
+      typeof left.x === "number" &&
+      typeof right.x === "number" &&
+      (left.x > 1.5 || right.x > 1.5);
+    if (pixelEyes && width && height) {
+      if (placeFromEyePixels(left, right, opts)) return true;
+    }
     if (pose && width && height) {
       return placeFromPose(pose, width, height, opts);
     }

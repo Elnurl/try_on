@@ -388,10 +388,24 @@ async function buildPublishForm(sku, name, blob, glb) {
   return fd;
 }
 
-async function fetchWithRetry(url, options, tries = 3) {
+async function waitForHealth(maxMs = 90000) {
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    try {
+      const res = await fetch("/api/health", { cache: "no-store", credentials: "same-origin" });
+      if (res.ok) return true;
+    } catch (_) {
+      /* Render deploy / cold start */
+    }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  return false;
+}
+
+async function fetchWithRetry(url, options, tries = 5) {
   let last;
   for (let i = 0; i < tries; i += 1) {
-    if (i > 0) await new Promise((r) => setTimeout(r, 4000 * i));
+    if (i > 0) await new Promise((r) => setTimeout(r, 5000 * i));
     try {
       const res = await fetch(url, options);
       if (res.status !== 502 && res.status !== 503) return res;
@@ -438,10 +452,20 @@ saveBtn.addEventListener("click", async () => {
   }
   const name = nameInput.value.trim() || "Demo eynək";
   const sku = skuFromName(name);
-  setStatus("Addım 2–3: kataloq + VTO link yaradılır…");
+  setStatus("Server yoxlanır…");
   saveBtn.disabled = true;
 
   try {
+    const up = await waitForHealth();
+    if (!up) {
+      setStatus(
+        "Server hazır deyil (502). Render deploy bitənə qədər 1–2 dəq gözlə, Ctrl+F5, yenidən cəhd et.",
+        "error",
+      );
+      saveBtn.disabled = false;
+      return;
+    }
+    setStatus("Addım 2–3: kataloq + VTO link yaradılır…");
     const blob = await new Promise((resolve, reject) => {
       cutoutFront.toBlob((b) => (b ? resolve(b) : reject(new Error("PNG yaradılmadı"))), "image/png");
     });
