@@ -17,15 +17,15 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-PIPELINE_VERSION = 2
+PIPELINE_VERSION = 3
 MAX_SIDE = 1600
 DEFAULT_WIDTH_MM = 138.0
 DEFAULT_TEMPLE_MM = 145.0
 MIN_WIDTH_MM, MAX_WIDTH_MM = 100.0, 175.0
 CLEAR_SHEEN_ALPHA = 10
-LENS_ALPHA_MIN, LENS_ALPHA_MAX = 0.10, 0.86
-LENS_GAMMA = 1.7
-LENS_COLOR_KEEP = 0.35
+LENS_ALPHA_MIN, LENS_ALPHA_MAX = 0.10, 0.74
+LENS_GAMMA = 1.0
+LENS_COLOR_KEEP = 0.45
 LENS_WIDTH_FACTOR = 1.04
 
 _REMBG_SESSION = None
@@ -159,6 +159,32 @@ def _crop_temple_tips(px: np.ndarray) -> np.ndarray:
     return _crop_alpha(px[:, x0 : x1 + 1])
 
 
+def _crop_temple_stubs(px: np.ndarray) -> np.ndarray:
+    """Temples seen in perspective stick up above the end pieces; trim to the frame's top line."""
+    h, w = px.shape[:2]
+    solid = px[..., 3] > 128
+    cols = solid.any(axis=0)
+    top = np.where(cols, solid.argmax(axis=0), h).astype(np.float32)
+    out = px.copy()
+    zone = int(w * 0.16)
+    for ref_cols, zone_cols in (
+        (np.arange(int(w * 0.16), int(w * 0.30)), np.arange(0, zone)),
+        (np.arange(int(w * 0.70), int(w * 0.84)), np.arange(w - zone, w)),
+    ):
+        ref = top[ref_cols]
+        ok = ref < h
+        if ok.sum() < 5:
+            continue
+        slope, icept = np.polyfit(ref_cols[ok], ref[ok], 1)
+        line = slope * zone_cols + icept - h * 0.015
+        if (top[zone_cols] < line - h * 0.04).sum() < w * 0.02:
+            continue
+        rows = np.arange(h, dtype=np.float32)[:, None]
+        keep = np.clip(rows - line[None, :] + 1.5, 0, 1)
+        out[:, zone_cols, 3] = (out[:, zone_cols, 3] * keep).astype(np.uint8)
+    return _crop_alpha(out)
+
+
 def _fill_holes(mask: np.ndarray) -> np.ndarray:
     contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     out = np.zeros(mask.shape, np.uint8)
@@ -263,8 +289,7 @@ def _apply_lenses(px: np.ndarray) -> tuple[np.ndarray, list[dict], int]:
             opacity = CLEAR_SHEEN_ALPHA / 255
         else:
             # A tinted lens filters light (face × transmission); with plain alpha blending that is
-            # a dark layer whose opacity is 1 − transmission. Studio photos show lenses lighter
-            # than they are on a face, hence the gamma.
+            # a dark layer whose opacity is 1 − transmission; the cap keeps eyes visible.
             transmission = np.power(rgb / 255, LENS_GAMMA)
             lens_a = np.clip(1 - transmission.mean(axis=2, keepdims=True), LENS_ALPHA_MIN, LENS_ALPHA_MAX)
             target_rgb = rgb * LENS_COLOR_KEEP
@@ -373,7 +398,7 @@ def resolve_width(lenses: list[dict], sizes: Sizes) -> tuple[float, str]:
 
 def build_asset(front: Image.Image, sides: dict[str, Image.Image], sizes: Sizes) -> Asset:
     px, bg_method = remove_background(front)
-    px = _crop_temple_tips(_crop_alpha(_drop_specks(px)))
+    px = _crop_temple_stubs(_crop_temple_tips(_crop_alpha(_drop_specks(px))))
     h, w = px.shape[:2]
     if w < 120 or w / max(h, 1) < 1.2:
         raise PipelineError("Ön şəkil düz öndən olmalıdır: eynək tam görünsün, yan bucaqdan yox.")
