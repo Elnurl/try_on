@@ -17,7 +17,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-PIPELINE_VERSION = 3
+PIPELINE_VERSION = 4
 MAX_SIDE = 1600
 DEFAULT_WIDTH_MM = 138.0
 DEFAULT_TEMPLE_MM = 145.0
@@ -243,11 +243,17 @@ def _lens_interior(blob: np.ndarray, px: np.ndarray, width: int) -> tuple[np.nda
         return np.zeros(blob.shape, bool), False
     counts = np.bincount(labels[core & (labels > 0)], minlength=n)
     seed = int(np.argmax(counts)) if counts.any() else 1 + int(np.argmax(np.bincount(labels[labels > 0])[1:]))
-    region = (labels == seed).astype(np.uint8)
+    areas = np.bincount(labels.ravel(), minlength=n)
+    pieces = [i for i in range(1, n) if i == seed or areas[i] > 0.15 * areas[seed]]
+    region = np.isin(labels, pieces).astype(np.uint8)
     rim = blob & (dt < max(2.0, dt.max() * 0.12)) & (px[..., 3] > 200)
     if rim.sum() > 30:
         rim_rgb = np.median(rgb[rim], axis=0)
         allowed = (blob & (np.linalg.norm(rgb - rim_rgb, axis=2) > 20)).astype(np.uint8)
+        # Temples seen through a tinted lens break it into pieces; the hull bridges them.
+        hull = np.zeros(blob.shape, np.uint8)
+        cv2.fillPoly(hull, [cv2.convexHull(cv2.findNonZero(region))], 1)
+        region = hull & allowed
         cross = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
         for _ in range(max(3, int(width * 0.03))):
             grown = cv2.dilate(region, cross) & allowed
@@ -267,6 +273,25 @@ def _polygon(mask: np.ndarray, w: int, h: int) -> list[list[float]]:
     cnt = max(contours, key=cv2.contourArea)
     approx = cv2.approxPolyDP(cnt, 0.006 * cv2.arcLength(cnt, True), True).reshape(-1, 2)
     return [[round(float(x) / w, 4), round(float(y) / h, 4)] for x, y in approx]
+
+
+def _smooth_tint(rgb: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """Low-order colour field over the lens: keeps the tint gradient, drops whatever the photo
+    showed through or on the lens (temples, logos, reflections)."""
+    ys, xs = np.nonzero(mask)
+    h, w = mask.shape
+    u, v = xs / w, ys / h
+    basis = np.stack([np.ones_like(u), u, v, u * u, u * v, v * v], axis=1)
+    target = rgb[ys, xs]
+    keep = np.ones(len(xs), bool)
+    for _ in range(3):
+        coef, *_ = np.linalg.lstsq(basis[keep], target[keep], rcond=None)
+        resid = np.linalg.norm(target - basis @ coef, axis=1)
+        keep = resid < max(6.0, 2.0 * float(np.median(resid[keep])) * 1.4826)
+    yy, xx = np.mgrid[0:h, 0:w]
+    uu, vv = xx / w, yy / h
+    field = np.stack([np.ones_like(uu), uu, vv, uu * uu, uu * vv, vv * vv], axis=2) @ coef
+    return np.where(mask[..., None], np.clip(field, 0, 255), rgb).astype(np.float32)
 
 
 def _apply_lenses(px: np.ndarray) -> tuple[np.ndarray, list[dict], int]:
@@ -290,6 +315,7 @@ def _apply_lenses(px: np.ndarray) -> tuple[np.ndarray, list[dict], int]:
         else:
             # A tinted lens filters light (face × transmission); with plain alpha blending that is
             # a dark layer whose opacity is 1 − transmission; the cap keeps eyes visible.
+            rgb = _smooth_tint(rgb, interior)
             transmission = np.power(rgb / 255, LENS_GAMMA)
             lens_a = np.clip(1 - transmission.mean(axis=2, keepdims=True), LENS_ALPHA_MIN, LENS_ALPHA_MAX)
             target_rgb = rgb * LENS_COLOR_KEEP
