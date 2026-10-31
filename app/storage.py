@@ -103,11 +103,23 @@ def rotate_key(store_id: str) -> str:
     return key
 
 
-def ensure_store(store_id: str, name: str) -> None:
+def ensure_store(store_id: str, name: str, key: str = "") -> None:
     with _lock:
         stores = _read_stores()
-        if store_id not in stores:
-            stores[store_id] = {"name": name, "key_hash": "", "created": int(time.time())}
+        current = stores.get(store_id)
+        if current is None:
+            stores[store_id] = {"name": name, "key_hash": _hash_key(key) if key else "", "created": int(time.time())}
+            _write_stores(stores)
+            return
+        changed = False
+        if name and current.get("name") != name:
+            current["name"] = name
+            changed = True
+        if key:
+            current["key_hash"] = _hash_key(key)
+            changed = True
+        if changed:
+            stores[store_id] = current
             _write_stores(stores)
 
 

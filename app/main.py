@@ -82,6 +82,7 @@ def _bootstrap() -> None:
 
 def seed_demo() -> None:
     ensure_store("demo", "Demo")
+    ensure_store("eynek-store", "eynek.store", os.environ.get("VTO_EYNEK_STORE_KEY", "").strip())
     current = get_product("demo", "ql2009-c1")
     if current and current.get("pipeline") == PIPELINE_VERSION:
         return

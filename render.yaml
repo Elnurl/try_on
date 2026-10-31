@@ -12,6 +12,8 @@ services:
         sync: false # signs seller upload tokens; any long random string
       - key: PUBLIC_URL
         sync: false # e.g. https://tryon-wa.onrender.com (absolute asset URLs)
+      - key: VTO_EYNEK_STORE_KEY
+        sync: false # same secret as marketplace VTO_API_KEY (ek_eynek-store_…)
     disk:
       name: tryon-data
       mountPath: /srv/app/data
