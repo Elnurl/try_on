@@ -23,7 +23,7 @@ from pydantic import BaseModel  # noqa: E402
 from starlette.concurrency import run_in_threadpool  # noqa: E402
 
 from app.auth import caller, require_admin  # noqa: E402
-from app.pipeline import PipelineError, Sizes, build_asset, load_image, parse_sizes  # noqa: E402
+from app.pipeline import PIPELINE_VERSION, PipelineError, Sizes, build_asset, load_image, parse_sizes  # noqa: E402
 from app.storage import (  # noqa: E402
     create_store,
     delete_product,
@@ -82,7 +82,8 @@ def _bootstrap() -> None:
 
 def seed_demo() -> None:
     ensure_store("demo", "Demo")
-    if get_product("demo", "ql2009-c1"):
+    current = get_product("demo", "ql2009-c1")
+    if current and current.get("pipeline") == PIPELINE_VERSION:
         return
     front = (DEMO / "ql2009-front.png").read_bytes()
     side = (DEMO / "ql2009-side.png").read_bytes()

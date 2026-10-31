@@ -17,12 +17,16 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
+PIPELINE_VERSION = 2
 MAX_SIDE = 1600
 DEFAULT_WIDTH_MM = 138.0
 DEFAULT_TEMPLE_MM = 145.0
 MIN_WIDTH_MM, MAX_WIDTH_MM = 100.0, 175.0
 CLEAR_SHEEN_ALPHA = 10
-LENS_ALPHA_MIN, LENS_ALPHA_MAX = 0.10, 0.72
+LENS_ALPHA_MIN, LENS_ALPHA_MAX = 0.10, 0.86
+LENS_GAMMA = 1.7
+LENS_COLOR_KEEP = 0.35
+LENS_WIDTH_FACTOR = 1.04
 
 _REMBG_SESSION = None
 
@@ -72,11 +76,26 @@ def _border_pixels(rgb: np.ndarray) -> np.ndarray:
 
 
 def _cut_uniform(px: np.ndarray, bg: np.ndarray) -> np.ndarray:
+    """Matte against a flat backdrop and strip the backdrop colour out of edge pixels."""
     rgb = px[..., :3].astype(np.float32)
     dist = np.linalg.norm(rgb - bg, axis=2)
-    alpha = np.clip((dist - 26) / 32, 0, 1) * 255
+    ramp = np.clip((dist - 26) / 32, 0, 1)
+    solid = (dist > 90).astype(np.float32)
+    sigma = max(2.0, max(px.shape[:2]) * 0.004)
+    weight = cv2.GaussianBlur(solid, (0, 0), sigma)
+    fg = cv2.GaussianBlur(rgb * solid[..., None], (0, 0), sigma) / np.maximum(weight, 1e-4)[..., None]
+    near = weight > 0.02
+    fg = np.where(near[..., None], fg, rgb)
+    span = fg - bg
+    span_sq = (span**2).sum(axis=2)
+    projected = np.clip(((rgb - bg) * span).sum(axis=2) / np.maximum(span_sq, 1.0), 0, 1)
+    usable = near & (span_sq > 90**2) & (solid == 0)
+    alpha = np.where(usable, projected, ramp)
+    alpha = np.where(alpha < 0.06, 0, alpha)
+    edge = usable & (alpha < 0.98)
     out = px.copy()
-    out[..., 3] = alpha.astype(np.uint8)
+    out[..., :3] = np.where(edge[..., None], np.clip(fg, 0, 255), rgb).astype(np.uint8)
+    out[..., 3] = (alpha * 255).astype(np.uint8)
     return out
 
 
@@ -189,11 +208,29 @@ def _lens_interior(blob: np.ndarray, px: np.ndarray, width: int) -> tuple[np.nda
         return interior.astype(bool) & blob, True
     dt = cv2.distanceTransform(blob.astype(np.uint8), cv2.DIST_L2, 5)
     rgb = px[..., :3].astype(np.float32)
-    core = dt > dt.max() * 0.45
+    core = dt > dt.max() * 0.6
     lens_rgb = np.median(rgb[core], axis=0)
-    close = np.linalg.norm(rgb - lens_rgb, axis=2) < 38
-    interior = (dt > max(2.0, width * 0.006)) & (close | (dt > width * 0.045))
-    interior = cv2.morphologyEx(interior.astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)).astype(bool)
+    close = (np.linalg.norm(rgb - lens_rgb, axis=2) < 34) & (dt > max(2.0, width * 0.006))
+    close = cv2.morphologyEx(close.astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    n, labels = cv2.connectedComponents(close, 8)
+    if n <= 1:
+        return np.zeros(blob.shape, bool), False
+    counts = np.bincount(labels[core & (labels > 0)], minlength=n)
+    seed = int(np.argmax(counts)) if counts.any() else 1 + int(np.argmax(np.bincount(labels[labels > 0])[1:]))
+    region = (labels == seed).astype(np.uint8)
+    rim = blob & (dt < max(2.0, dt.max() * 0.12)) & (px[..., 3] > 200)
+    if rim.sum() > 30:
+        rim_rgb = np.median(rgb[rim], axis=0)
+        allowed = (blob & (np.linalg.norm(rgb - rim_rgb, axis=2) > 20)).astype(np.uint8)
+        cross = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
+        for _ in range(max(3, int(width * 0.03))):
+            grown = cv2.dilate(region, cross) & allowed
+            if (grown == region).all():
+                break
+            region = grown
+    k = max(5, int(width * 0.02)) | 1
+    region = cv2.morphologyEx(region, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    interior = _fill_holes(region.astype(bool)) & blob
     return interior, False
 
 
@@ -225,10 +262,13 @@ def _apply_lenses(px: np.ndarray) -> tuple[np.ndarray, list[dict], int]:
             tint = "#f0f4f8"
             opacity = CLEAR_SHEEN_ALPHA / 255
         else:
-            lum = rgb.mean(axis=2, keepdims=True) / 255
-            lens_a = LENS_ALPHA_MIN + (LENS_ALPHA_MAX - LENS_ALPHA_MIN) * np.power(1 - lum, 0.9)
-            target_rgb = rgb
-            target_a = np.minimum(alpha, lens_a * 255)
+            # A tinted lens filters light (face × transmission); with plain alpha blending that is
+            # a dark layer whose opacity is 1 − transmission. Studio photos show lenses lighter
+            # than they are on a face, hence the gamma.
+            transmission = np.power(rgb / 255, LENS_GAMMA)
+            lens_a = np.clip(1 - transmission.mean(axis=2, keepdims=True), LENS_ALPHA_MIN, LENS_ALPHA_MAX)
+            target_rgb = rgb * LENS_COLOR_KEEP
+            target_a = lens_a * 255
             tint = _hex(np.median(px[..., :3][interior], axis=0))
             opacity = round(float(np.median(target_a[interior])) / 255, 3)
         out[..., :3] = rgb * (1 - weight) + target_rgb * weight
@@ -313,9 +353,7 @@ def analyze_side(img: Image.Image) -> tuple[Image.Image, dict]:
 def _width_from_lens(lenses: list[dict], lens_mm: float | None) -> float | None:
     if not lens_mm or not lenses:
         return None
-    lens_frac = float(
-        np.mean([lens["box"][2] * 1.03 if lens["clear"] else lens["outerWidth"] * 0.93 for lens in lenses])
-    )
+    lens_frac = float(np.mean([lens["box"][2] for lens in lenses])) * LENS_WIDTH_FACTOR
     if lens_frac <= 0:
         return None
     width = lens_mm / lens_frac
@@ -383,6 +421,7 @@ def build_asset(front: Image.Image, sides: dict[str, Image.Image], sizes: Sizes)
     temple_mm = sizes.temple_mm if sizes.temple_mm and 110 <= sizes.temple_mm <= 170 else DEFAULT_TEMPLE_MM
     manifest = {
         "type": "2.5d",
+        "pipeline": PIPELINE_VERSION,
         "widthMm": round(width_mm, 2),
         "heightMm": round(h * mm_per_px, 2),
         "aspect": round(w / h, 4),
