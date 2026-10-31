@@ -52,17 +52,18 @@ function sideTemple(cutout, sign) {
     new THREE.MeshStandardMaterial({
       map: tex,
       transparent: true,
-      alphaTest: 0.04,
+      alphaTest: 0.06,
       roughness: 0.36,
       metalness: 0.12,
-      side: THREE.DoubleSide,
+      side: THREE.FrontSide,
     }),
   );
   mesh.name = "side-temple";
   mesh.userData.sideTemple = true;
   mesh.userData.templeSide = sign;
-  mesh.position.set(sign * 0.48, aspect * 0.04, -0.12);
-  mesh.rotation.y = sign * 1.05;
+  mesh.position.set(sign * 0.52, aspect * 0.05, -0.2);
+  mesh.rotation.y = -sign * (Math.PI / 2 - 0.12);
+  mesh.rotation.x = -0.08;
   return mesh;
 }
 
@@ -90,7 +91,7 @@ export function buildGlasses3D(cutoutCanvas, opts = {}) {
       alphaTest: 0.04,
       roughness: 0.32,
       metalness: 0.16,
-      side: THREE.DoubleSide,
+      side: THREE.FrontSide,
       depthWrite: true,
     }),
   );
@@ -135,10 +136,14 @@ export function buildGlasses3D(cutoutCanvas, opts = {}) {
   rightHook.rotation.x = 0.55;
   group.add(leftHook, rightHook);
 
-  const sideL = sideTemple(opts.leftCanvas, -1);
-  const sideR = sideTemple(opts.rightCanvas, 1);
-  if (sideL) group.add(sideL);
-  if (sideR) group.add(sideR);
+  if (opts.leftCanvas) {
+    const sideL = sideTemple(opts.leftCanvas, -1);
+    if (sideL) group.add(sideL);
+  }
+  if (opts.rightCanvas) {
+    const sideR = sideTemple(opts.rightCanvas, 1);
+    if (sideR) group.add(sideR);
+  }
 
   return group;
 }

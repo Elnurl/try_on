@@ -4,7 +4,7 @@
  * Video/photos stay on-device; only anonymous usage counters hit the server.
  */
 import { createTryonEngine } from "./tryon-adapter.js?v=2";
-import { createFaceOverlay3D } from "./digitize3d.js?v=12";
+import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=13";
 
 const body = document.body;
 const slug = body.dataset.slug || "demo";
@@ -76,8 +76,50 @@ function usesMeshVto() {
   return !!(selected && selected.model_url);
 }
 
+function meshKeyFor(item) {
+  if (!item?.model_url) return "";
+  if (item.custom || item.digitized) return `client:${item.id}`;
+  return item.model_url;
+}
+
 function meshReady() {
-  return usesMeshVto() && loadedModelUrl === selected.model_url && !meshLoadError;
+  return usesMeshVto() && loadedModelUrl === meshKeyFor(selected) && !meshLoadError;
+}
+
+function imageToCanvas(img) {
+  const c = document.createElement("canvas");
+  c.width = img.naturalWidth;
+  c.height = img.naturalHeight;
+  c.getContext("2d").drawImage(img, 0, 0);
+  return c;
+}
+
+async function loadAngleCanvas(url) {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = url;
+  await waitPng(img);
+  return imageToCanvas(img);
+}
+
+async function buildStudioMesh(item) {
+  const img = frameImages.get(item.id);
+  if (!img) throw new Error("Frame PNG not loaded");
+  await waitPng(img);
+  const frontCanvas = imageToCanvas(img);
+  const angles = item.angles || [];
+  let leftCanvas = null;
+  let rightCanvas = null;
+  if (angles.length >= 2) {
+    leftCanvas = await loadAngleCanvas(angles[0]);
+    rightCanvas = await loadAngleCanvas(angles[1]);
+  }
+  const mm = item.frame_width_mm || 140;
+  return buildGlasses3D(frontCanvas, {
+    frameWidthMm: mm,
+    leftCanvas,
+    rightCanvas,
+  });
 }
 
 function track(event) {
@@ -319,15 +361,26 @@ async function sync3DModel() {
     overlay3d.render();
     return;
   }
-  if (url === loadedModelUrl) return;
-  setStatus("3D eynək yüklənir…");
+  const key = meshKeyFor(selected);
+  if (key === loadedModelUrl) return;
+  setStatus("2.5D eynək hazırlanır…");
   try {
-    await overlay3d.loadUrl(url, {
-      frameWidthMm: selected.frame_width_mm,
-      digitized: selected.digitized,
-      custom: selected.custom,
-    });
-    loadedModelUrl = url;
+    if (selected.custom || selected.digitized) {
+      const object = await buildStudioMesh(selected);
+      overlay3d.setObject(object, {
+        frameWidthMm: selected.frame_width_mm || 140,
+        digitized: true,
+        custom: true,
+      });
+      loadedModelUrl = key;
+    } else {
+      await overlay3d.loadUrl(url, {
+        frameWidthMm: selected.frame_width_mm,
+        digitized: selected.digitized,
+        custom: selected.custom,
+      });
+      loadedModelUrl = url;
+    }
     setStatus("");
   } catch (err) {
     console.error(err);

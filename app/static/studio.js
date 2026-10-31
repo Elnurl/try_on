@@ -3,7 +3,7 @@ import {
   buildGlasses3D,
   createFaceOverlay3D,
   exportGlb,
-} from "./digitize3d.js?v=12";
+} from "./digitize3d.js?v=13";
 
 const FACE_URL = "/static/studio-face.jpg";
 const SLUG = "demo";
@@ -372,6 +372,12 @@ function apiErrorMessage(res, payload) {
   return detail || `Server xətası (${res.status}). Yenidən cəhd edin.`;
 }
 
+async function canvasToPngBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("PNG yaradılmadı"))), "image/png");
+  });
+}
+
 async function buildPublishForm(sku, name, blob, glb) {
   const fd = new FormData();
   fd.append("sku", sku);
@@ -384,6 +390,12 @@ async function buildPublishForm(sku, name, blob, glb) {
   fd.append("tryon", "1");
   fd.append("file", blob, `${sku}.png`);
   fd.append("model", glb, `${sku}.glb`);
+  if (cutoutLeft) {
+    fd.append("extra", await canvasToPngBlob(cutoutLeft), `${sku}-profile-left.png`);
+  }
+  if (cutoutRight) {
+    fd.append("extra", await canvasToPngBlob(cutoutRight), `${sku}-profile-right.png`);
+  }
   extraFiles.slice(0, 6).forEach((f) => fd.append("extra", f, f.name));
   return fd;
 }
