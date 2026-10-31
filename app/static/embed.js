@@ -1,4 +1,4 @@
-import { strings, pickLang } from "./embed-i18n.js?v=4";
+import { strings, pickLang } from "./embed-i18n.js?v=5";
 import { createFaceTracker } from "./sdk/face-tracker.js?v=1";
 import { createTryOn } from "./sdk/vto-core.js?v=1";
 
@@ -58,18 +58,12 @@ function icon(path, size = 28) {
 }
 const ICON_INFO = "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01";
 
-const ART_FACE = `<svg viewBox="0 0 120 230" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <rect x="18" y="8" width="84" height="214" rx="18"/>
-  <path d="M50 18h20" opacity=".4"/>
-  <rect x="34" y="56" width="20" height="13" rx="3"/>
-  <rect x="66" y="56" width="20" height="13" rx="3"/>
-  <path d="M54 62h12"/>
-  <circle cx="44" cy="110" r="10"/>
-  <circle cx="76" cy="110" r="10"/>
-  <path d="M54 110h12"/>
-  <rect x="34" y="152" width="20" height="13" rx="6"/>
-  <rect x="66" y="152" width="20" height="13" rx="6"/>
-  <path d="M54 158h12"/>
+const ART_FACE = `<svg viewBox="0 0 120 230" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect x="16" y="6" width="88" height="218" rx="20"/>
+  <path d="M50 16h20" opacity=".4"/>
+  <path d="M36 72h10M36 72v10M84 72h-10M84 72v10M36 158h10M36 158v-10M84 158h-10M84 158v-10"/>
+  <circle cx="60" cy="104" r="16"/>
+  <path d="M42 140c4-14 32-14 36 0"/>
 </svg>`;
 const ART_CAMERA = `<svg viewBox="0 0 240 200" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <rect x="44" y="58" width="152" height="104" rx="18"/><path d="M92 58l10-18h36l10 18"/>
@@ -414,7 +408,7 @@ function renderHead() {
   const cart = $("cartBtn");
   const unavailable = i.available === false;
   cart.disabled = unavailable;
-  cart.textContent = unavailable ? T.outOfStock : T.addToCart;
+  $("cartLabel").textContent = unavailable ? T.outOfStock : T.addToCart;
 }
 
 function renderStrip() {

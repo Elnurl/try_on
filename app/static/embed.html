@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/embed.css?v=5" />
+    <link rel="stylesheet" href="/static/embed.css?v=6" />
     <script type="importmap">
       { "imports": { "three": "/static/vendor/three/build/three.module.js" } }
     </script>
@@ -53,7 +53,10 @@
               <div class="eyebrow" id="vendor"></div>
               <h1 id="productName"></h1>
               <p class="price" id="productPrice"></p>
-              <button type="button" class="btn" id="cartBtn" hidden></button>
+              <button type="button" class="btn btn-like" id="cartBtn" hidden>
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 20s-7-4.4-9.2-8.2C1 9.2 2.4 6 6 6c2 0 3.2 1.2 4 2.2C10.8 7.2 12 6 14 6c3.6 0 5 3.2 3.2 5.8C19 15.6 12 20 12 20z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                <span id="cartLabel"></span>
+              </button>
             </div>
             <div class="strip-wrap" id="stripWrap" hidden>
               <div class="eyebrow" id="stripLabel"></div>
@@ -70,6 +73,6 @@
       </div>
       <div class="screen" id="screen" hidden></div>
     </main>
-    <script type="module" src="/static/embed.js?v=5"></script>
+    <script type="module" src="/static/embed.js?v=6"></script>
   </body>
 </html>

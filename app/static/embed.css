@@ -69,6 +69,7 @@ button, input, label { font: inherit; }
 .product .price { margin: 0; font-size: 14px; font-weight: 700; }
 .product .price:empty, .product .eyebrow:empty { display: none; }
 .product .btn { margin-top: 8px; width: 100%; }
+.btn-like svg { flex: 0 0 auto; }
 
 .strip-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .strip { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: auto; padding: 1px; scrollbar-width: thin; }
@@ -129,15 +130,15 @@ button, input, label { font: inherit; }
 }
 .split-art svg { width: min(200px, 68%); height: auto; color: var(--ink); }
 .split-art p { margin: 0; max-width: 260px; color: var(--muted); font-size: 13px; line-height: 1.6; }
-.split-art--phone { gap: 16px; }
-.split-art--phone svg { width: min(190px, 52%); }
-.split-art--phone p { max-width: 200px; font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+.split-art--phone { justify-content: center; padding-top: 24px; gap: 18px; }
+.split-art--phone svg { width: min(220px, 62%); }
+.split-art--phone p { max-width: 220px; font-size: 12px; font-weight: 600; letter-spacing: .02em; }
 .split-art p b { color: var(--ink); font-weight: 600; }
 .brand-tag { position: absolute; top: 22px; left: 28px; font-size: 16px; font-weight: 500; letter-spacing: -.03em; }
 .brand-tag i { font-style: normal; color: var(--lime); }
 .split-art { position: relative; }
 .split-main { display: flex; flex-direction: column; min-width: 0; }
-.split-body { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 22px; padding: 72px 56px 32px; max-width: 520px; }
+.split-body { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 22px; padding: 48px 56px 48px; max-width: 520px; }
 .split-body h2 { margin: 0; font-size: 28px; font-weight: 500; letter-spacing: -.04em; line-height: 1.2; }
 .split-body > p { margin: 0; color: var(--muted); font-size: 14px; }
 .split-body a { color: var(--ink); font-weight: 700; text-underline-offset: 3px; }
@@ -175,10 +176,10 @@ button, input, label { font: inherit; }
   .split-art { flex-direction: row; justify-content: flex-start; gap: 16px; padding: 58px 20px 20px; text-align: left; }
   .split-art svg { width: 78px; flex: 0 0 auto; }
   .split-art p { font-size: 12px; }
-  .split-art--phone { flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 56px 20px 16px; }
-  .split-art--phone svg { width: 148px; }
+  .split-art--phone { flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 14px; padding: 64px 20px 8px; }
+  .split-art--phone svg { width: 176px; }
   .split-art--phone p { font-size: 11px; }
-  .split-body { padding: 24px 20px; justify-content: flex-start; max-width: none; gap: 16px; }
+  .split-body { padding: 36px 20px 24px; justify-content: flex-start; max-width: none; gap: 16px; }
   .split-body h2 { font-size: 22px; }
   .split-actions { position: sticky; bottom: 0; background: var(--paper); }
 }
