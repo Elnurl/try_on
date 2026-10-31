@@ -164,14 +164,42 @@ function fallbackPose() {
   };
 }
 
+function drawGlasses2D() {
+  if (!cutoutFront) return;
+  const eyes = posePx || fallbackPose();
+  const left = eyes.left;
+  const right = eyes.right;
+  const dx = right.x - left.x;
+  const dy = right.y - left.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 8) return;
+  const scaleMul = Number(scaleInput.value) * (frameWidthMm() / 140);
+  const angle = Math.atan2(dy, dx);
+  const midX = (left.x + right.x) / 2;
+  const midY = (left.y + right.y) / 2 + dist * Number(offsetYInput.value);
+  const targetW = dist * scaleMul * 1.38;
+  const targetH = (cutoutFront.height / cutoutFront.width) * targetW;
+  ctx.save();
+  ctx.translate(midX, midY);
+  ctx.rotate(angle);
+  ctx.drawImage(cutoutFront, -targetW / 2, -targetH / 2, targetW, targetH);
+  ctx.restore();
+}
+
 function drawPreview() {
+  if (!faceImg.naturalWidth) return;
+  canvas.width = 720;
+  canvas.height = Math.round(720 * (faceImg.naturalHeight / faceImg.naturalWidth));
+  ctx.drawImage(faceImg, 0, 0, canvas.width, canvas.height);
+  drawGlasses2D();
+
   canvas3d.width = canvas.width;
   canvas3d.height = canvas.height;
   overlay3d.resize(canvas.width, canvas.height);
   overlay3d.setBackground(faceImg, false);
   if (glasses3d) {
     const eyes = posePx || fallbackPose();
-    const placed = overlay3d.place(
+    overlay3d.place(
       eyes.left,
       eyes.right,
       Number(scaleInput.value),
@@ -185,9 +213,6 @@ function drawPreview() {
         mirror: false,
       },
     );
-    if (!placed) {
-      console.warn("[studio] glasses placement failed");
-    }
   }
   overlay3d.render();
 }
@@ -337,6 +362,9 @@ function apiErrorMessage(res, payload) {
   if (res.status === 404) {
     return "API tapılmadı — serveri yenidən başlat (uvicorn --reload).";
   }
+  if (res.status === 502 || res.status === 503) {
+    return "Server hazırlanır (502). 30 saniyə gözlə, Ctrl+F5, yenidən «VTO hazır et».";
+  }
   const detail = payload.detail;
   if (Array.isArray(detail)) {
     return detail.map((d) => d.msg || d).join(" ");
@@ -360,10 +388,26 @@ async function buildPublishForm(sku, name, blob, glb) {
   return fd;
 }
 
+async function fetchWithRetry(url, options, tries = 3) {
+  let last;
+  for (let i = 0; i < tries; i += 1) {
+    if (i > 0) await new Promise((r) => setTimeout(r, 4000 * i));
+    try {
+      const res = await fetch(url, options);
+      if (res.status !== 502 && res.status !== 503) return res;
+      last = res;
+    } catch (err) {
+      last = err;
+    }
+  }
+  if (last && last.status) return last;
+  throw last || new Error("Şəbəkə xətası");
+}
+
 async function publishVto(sku, name, blob, glb) {
   const opts = { method: "POST", credentials: "include" };
   const fd = await buildPublishForm(sku, name, blob, glb);
-  let res = await fetch(`/api/brand/${SLUG}/frames`, { ...opts, body: fd });
+  let res = await fetchWithRetry(`/api/brand/${SLUG}/frames`, { ...opts, body: fd });
   let payload = await res.json().catch(() => ({}));
   if (res.status === 404) {
     return { res, payload };
@@ -382,7 +426,7 @@ async function publishVto(sku, name, blob, glb) {
   }
   const fd2 = await buildPublishForm(sku, name, blob, glb);
   fd2.append("slug", SLUG);
-  res = await fetch("/api/studio/publish", { ...opts, body: fd2 });
+  res = await fetchWithRetry("/api/studio/publish", { ...opts, body: fd2 });
   payload = await res.json().catch(() => ({}));
   return { res, payload };
 }

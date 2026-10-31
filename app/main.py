@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import mimetypes
 import os
+import threading
 from io import BytesIO
 from pathlib import Path
 from typing import Annotated
@@ -99,9 +101,21 @@ QL2009_EXPORT = ROOT.parent / "assets" / "ql2009" / "export"
 QL2009_PUBLIC = {"QL2009_C1.deepar", "QL2009_C1.glb", "QL2009_C1.fbx"}
 
 ensure_frame_assets()
-ensure_vendor()
 
 app = FastAPI(title="tryon-wa", version="0.6.0")
+
+
+_log = logging.getLogger("tryon")
+
+
+def _bootstrap_vendor() -> None:
+    try:
+        ensure_vendor()
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("Vendor bootstrap failed (will retry on demand): %s", exc)
+
+
+threading.Thread(target=_bootstrap_vendor, name="vendor-bootstrap", daemon=True).start()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

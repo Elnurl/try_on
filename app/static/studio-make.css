@@ -189,18 +189,20 @@ h2 {
 }
 
 .make-stage canvas#preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.make-stage canvas#preview3d {
   position: absolute;
   width: 1px;
   height: 1px;
   opacity: 0;
   pointer-events: none;
-}
-
-.make-stage canvas#preview3d {
-  display: block;
-  width: 100%;
-  height: auto;
-  pointer-events: none;
+  left: 0;
+  top: 0;
 }
 
 .make-flow {
