@@ -104,37 +104,39 @@ export function buildGlasses3D(cutoutCanvas, opts = {}) {
     metalness: 0.22,
   });
   const hingeY = aspect * 0.06;
-  const templeLen = 0.58;
-  const templeGeom = new THREE.CapsuleGeometry(0.018, templeLen, 4, 8);
+  const templeLen = opts.compactTemples ? 0.44 : 0.52;
+  const templeGeom = new THREE.CapsuleGeometry(0.012, templeLen, 4, 8);
   templeGeom.rotateX(Math.PI / 2);
 
   const left = new THREE.Mesh(templeGeom, templeMat);
   left.userData.templeCapsule = true;
   left.userData.templeSide = -1;
-  left.position.set(-0.485, hingeY, -templeLen / 2);
+  left.position.set(-0.485, hingeY, -0.08 - templeLen / 2);
   left.rotation.y = 0.1;
   const right = new THREE.Mesh(templeGeom, templeMat);
   right.userData.templeCapsule = true;
   right.userData.templeSide = 1;
-  right.position.set(0.485, hingeY, -templeLen / 2);
+  right.position.set(0.485, hingeY, -0.08 - templeLen / 2);
   right.rotation.y = -0.1;
   group.add(left, right);
 
-  const hookGeom = new THREE.CapsuleGeometry(0.016, 0.14, 4, 8);
-  hookGeom.rotateX(Math.PI / 2);
-  const leftHook = new THREE.Mesh(hookGeom, templeMat);
-  leftHook.userData.templeCapsule = true;
-  leftHook.userData.templeSide = -1;
-  leftHook.userData.hook = true;
-  leftHook.position.set(-0.5, hingeY - 0.04, -templeLen - 0.02);
-  leftHook.rotation.x = 0.55;
-  const rightHook = new THREE.Mesh(hookGeom, templeMat);
-  rightHook.userData.templeCapsule = true;
-  rightHook.userData.templeSide = 1;
-  rightHook.userData.hook = true;
-  rightHook.position.set(0.5, hingeY - 0.04, -templeLen - 0.02);
-  rightHook.rotation.x = 0.55;
-  group.add(leftHook, rightHook);
+  if (!opts.compactTemples) {
+    const hookGeom = new THREE.CapsuleGeometry(0.011, 0.12, 4, 8);
+    hookGeom.rotateX(Math.PI / 2);
+    const leftHook = new THREE.Mesh(hookGeom, templeMat);
+    leftHook.userData.templeCapsule = true;
+    leftHook.userData.templeSide = -1;
+    leftHook.userData.hook = true;
+    leftHook.position.set(-0.5, hingeY - 0.04, -0.12 - templeLen - 0.06);
+    leftHook.rotation.x = 0.55;
+    const rightHook = new THREE.Mesh(hookGeom, templeMat);
+    rightHook.userData.templeCapsule = true;
+    rightHook.userData.templeSide = 1;
+    rightHook.userData.hook = true;
+    rightHook.position.set(0.5, hingeY - 0.04, -0.12 - templeLen - 0.06);
+    rightHook.rotation.x = 0.55;
+    group.add(leftHook, rightHook);
+  }
 
   if (opts.leftCanvas) {
     const sideL = sideTemple(opts.leftCanvas, -1);

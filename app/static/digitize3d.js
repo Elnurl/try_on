@@ -308,7 +308,7 @@ export function createFaceOverlay3D(canvas) {
         * (frameMm / EYE_SPAN_MM)
         * (opts.scale ?? 1.02)
         * (opts.meshScale ?? 1)
-        * 1.12
+        * 1.38
       );
     }
     const widthCm = frameMm / 10;
@@ -350,9 +350,16 @@ export function createFaceOverlay3D(canvas) {
       const bx = (flip ? 1 - pose.bridge.x : pose.bridge.x) * viewW - viewW / 2;
       const by = viewH / 2 - pose.bridge.y * viewH;
       mid.x = bx;
-      mid.y = (mid.y + by) * 0.5;
+      if (opts.skipFacialMatrix) {
+        mid.y = by * 0.84 + mid.y * 0.16;
+      } else {
+        mid.y = (mid.y + by) * 0.5;
+      }
+    } else if (opts.skipFacialMatrix) {
+      mid.y -= dist * 0.06;
     }
-    mid.y += dist * (opts.offsetY ?? 0.02);
+    // Same as studio canvas: midCanvasY += dist * offsetY (y down) → Three Y subtracts.
+    mid.y -= dist * (opts.offsetY ?? -0.1);
     const upHint = new THREE.Vector3(0, 1, 0);
     let zAxis = new THREE.Vector3().crossVectors(xAxis, upHint);
     if (zAxis.lengthSq() < 1e-8) zAxis.set(0, 0, 1);
@@ -447,9 +454,11 @@ export function createFaceOverlay3D(canvas) {
     const mid = left.clone().add(right).multiplyScalar(0.5);
     if (bridge) {
       mid.x = bridge.x;
-      mid.y = (mid.y + bridge.y) * 0.5;
+      mid.y = opts.skipFacialMatrix ? bridge.y * 0.84 + mid.y * 0.16 : (mid.y + bridge.y) * 0.5;
+    } else if (opts.skipFacialMatrix) {
+      mid.y -= dist * 0.06;
     }
-    mid.y += dist * (opts.offsetY ?? 0.02);
+    mid.y -= dist * (opts.offsetY ?? -0.1);
 
     const upHint = new THREE.Vector3(0, 1, 0);
     let zAxis = new THREE.Vector3().crossVectors(xAxis, upHint);
@@ -479,7 +488,7 @@ export function createFaceOverlay3D(canvas) {
   function place(left, right, scale, offsetY, pose, width, height, item) {
     const opts = {
       scale: typeof scale === "number" ? scale : 1.02,
-      offsetY: offsetY ?? 0.02,
+      offsetY: offsetY ?? -0.1,
       frameWidthMm: item?.frame_width_mm || item?.frameWidthMm || 140,
       meshScale: item?.mesh_scale ?? 1,
       mirror: item?.mirror !== false,

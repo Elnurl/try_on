@@ -4,7 +4,7 @@
  * Video/photos stay on-device; only anonymous usage counters hit the server.
  */
 import { createTryonEngine } from "./tryon-adapter.js?v=2";
-import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=13";
+import { buildGlasses3D, createFaceOverlay3D } from "./digitize3d.js?v=14";
 
 const body = document.body;
 const slug = body.dataset.slug || "demo";
@@ -119,6 +119,7 @@ async function buildStudioMesh(item) {
     frameWidthMm: mm,
     leftCanvas,
     rightCanvas,
+    compactTemples: !(leftCanvas && rightCanvas),
   });
 }
 
@@ -443,7 +444,7 @@ function drawGlasses(left, right, pose) {
       left,
       right,
       selected.mesh_scale ?? selected.scale,
-      selected.offset_y || 0,
+      selected.offset_y ?? -0.1,
       pose || lastFacePose,
       canvas.width,
       canvas.height,
