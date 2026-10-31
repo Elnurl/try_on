@@ -3,8 +3,8 @@ const az = {
   loadingProduct: "Eynək hazırlanır",
   loadingFace: "Üz modeli yüklənir",
   loadingDone: "Hazırdır",
-  termsCaption: "Məxfiliyə hörmət edən virtual sınaq xidmətindən istifadə etmək üzrəsiniz.",
-  termsTitle: "Yalnız üzünüzdəki ümumi nöqtələri təyin edirik — vəssalam.",
+  termsCaption: "Virtual sınaq yüklənir",
+  termsTitle: "Yalnız üzünüzdəki ümumi nöqtələri təyin edirik.",
   termsPoints: [
     "Üz tanıma və ya şəxsiyyətin müəyyənləşdirilməsi yoxdur",
     "Görüntünüz saxlanılmır və heç kimlə paylaşılmır",
@@ -57,8 +57,8 @@ const ru = {
   loadingProduct: "Готовим очки",
   loadingFace: "Загружаем модель лица",
   loadingDone: "Готово",
-  termsCaption: "Вы собираетесь воспользоваться сервисом виртуальной примерки, который уважает вашу приватность.",
-  termsTitle: "Мы определяем только общие точки лица — и всё.",
+  termsCaption: "Виртуальная примерка загружается",
+  termsTitle: "Мы определяем только общие точки лица.",
   termsPoints: [
     "Без распознавания и идентификации лица",
     "Изображение не сохраняется и никому не передаётся",
@@ -111,8 +111,8 @@ const en = {
   loadingProduct: "Preparing the glasses",
   loadingFace: "Loading the face model",
   loadingDone: "Ready",
-  termsCaption: "You are about to use a privacy-friendly virtual try-on service.",
-  termsTitle: "We detect generic points on your face, and that’s it.",
+  termsCaption: "Virtual try-on is loading",
+  termsTitle: "We detect generic points on your face.",
   termsPoints: [
     "No facial recognition or identification",
     "No storage or sharing of your image",

@@ -1,4 +1,4 @@
-import { strings, pickLang } from "./embed-i18n.js?v=3";
+import { strings, pickLang } from "./embed-i18n.js?v=4";
 import { createFaceTracker } from "./sdk/face-tracker.js?v=1";
 import { createTryOn } from "./sdk/vto-core.js?v=1";
 
@@ -58,17 +58,18 @@ function icon(path, size = 28) {
 }
 const ICON_INFO = "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01";
 
-const ART_FACE = `<svg viewBox="0 0 240 200" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <rect x="52" y="18" width="88" height="164" rx="18"/>
-  <path d="M88 28h16" opacity=".45"/>
-  <circle cx="96" cy="92" r="28" opacity=".35"/>
-  <path d="M72 88h10M110 88h10M82 88a14 8 0 0 0 28 0" />
-  <g opacity=".55">
-    <path d="M168 58h28M168 100h28M168 142h28"/>
-    <circle cx="174" cy="58" r="6"/><circle cx="196" cy="58" r="6"/>
-    <circle cx="174" cy="100" r="6"/><circle cx="196" cy="100" r="6"/>
-    <circle cx="174" cy="142" r="6"/><circle cx="196" cy="142" r="6"/>
-  </g>
+const ART_FACE = `<svg viewBox="0 0 120 230" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect x="18" y="8" width="84" height="214" rx="18"/>
+  <path d="M50 18h20" opacity=".4"/>
+  <rect x="34" y="56" width="20" height="13" rx="3"/>
+  <rect x="66" y="56" width="20" height="13" rx="3"/>
+  <path d="M54 62h12"/>
+  <circle cx="44" cy="110" r="10"/>
+  <circle cx="76" cy="110" r="10"/>
+  <path d="M54 110h12"/>
+  <rect x="34" y="152" width="20" height="13" rx="6"/>
+  <rect x="66" y="152" width="20" height="13" rx="6"/>
+  <path d="M54 158h12"/>
 </svg>`;
 const ART_CAMERA = `<svg viewBox="0 0 240 200" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <rect x="44" y="58" width="152" height="104" rx="18"/><path d="M92 58l10-18h36l10 18"/>
@@ -97,8 +98,8 @@ function svg(markup) {
   return wrap.firstElementChild;
 }
 
-function showSplit({ art, caption, title, lead, body = [], actions = [] }) {
-  const artPane = h("aside", { class: "split-art" }, h("div", { class: "brand-tag" }, "EYNƏK", h("i", {}, ".")), svg(art), caption);
+function showSplit({ art, caption, title, lead, body = [], actions = [], artClass = "" }) {
+  const artPane = h("aside", { class: "split-art" + (artClass ? " " + artClass : "") }, h("div", { class: "brand-tag" }, "EYNƏK", h("i", {}, ".")), svg(art), caption);
   const main = h(
     "section",
     { class: "split-main" },
@@ -206,6 +207,7 @@ function askTerms() {
     };
     showSplit({
       art: ART_FACE,
+      artClass: "split-art--phone",
       caption: h("p", {}, T.termsCaption),
       title: T.termsTitle,
       body: [pointList(host.termsPoints || T.termsPoints), termsNotice()],
