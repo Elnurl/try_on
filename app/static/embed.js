@@ -1,4 +1,4 @@
-import { strings, pickLang } from "./embed-i18n.js?v=8";
+import { strings, pickLang } from "./embed-i18n.js?v=9";
 import { createFaceTracker } from "./sdk/face-tracker.js?v=1";
 import { createTryOn } from "./sdk/vto-core.js?v=1";
 
@@ -406,11 +406,14 @@ function renderHead() {
   $("productName").textContent = i.name || (current && (current.name || current.sku)) || T.title;
   $("productPrice").textContent = priceText(i);
   const cart = $("cartBtn");
+  const heart = $("heartBtn");
   const unavailable = i.available === false;
   cart.disabled = unavailable;
+  heart.disabled = unavailable;
   const label = unavailable ? T.outOfStock : T.addToCart;
   $("cartLabel").textContent = label;
   cart.setAttribute("aria-label", label);
+  heart.setAttribute("aria-label", label);
 }
 
 function renderStrip() {
@@ -459,10 +462,14 @@ let cartWait = null;
 function addToCart() {
   if (!current) return;
   const btn = $("cartBtn");
+  const heart = $("heartBtn");
   btn.disabled = true;
+  heart.disabled = true;
   const done = (result) => {
     cartWait = null;
-    btn.disabled = (info.get(current.sku) || {}).available === false;
+    const locked = (info.get(current.sku) || {}).available === false;
+    btn.disabled = locked;
+    heart.disabled = locked;
     showToast(result && result.ok === false ? result.message || T.failed : T.added, !(result && result.ok === false));
   };
   const timer = setTimeout(() => done({ ok: true }), CART_WAIT_MS);
@@ -515,12 +522,15 @@ function applyStatic() {
   $("viewCartBtn").textContent = T.viewCart;
   $("closeBtn").hidden = !embedded;
   const cartOff = params.get("cart") === "0" || host.cart === false;
-  $("cartBtn").hidden = !embedded || cartOff;
+  const hideCart = !embedded || cartOff;
+  $("cartBtn").hidden = hideCart;
+  $("heartBtn").hidden = hideCart;
 }
 
 function bind() {
   $("closeBtn").addEventListener("click", closeWidget);
   $("cartBtn").addEventListener("click", addToCart);
+  $("heartBtn").addEventListener("click", addToCart);
   $("viewCartBtn").addEventListener("click", () => {
     stopCamera();
     post("view-cart");

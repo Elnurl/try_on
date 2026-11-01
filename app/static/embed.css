@@ -70,6 +70,12 @@ button, input, label { font: inherit; }
 .product .price:empty, .product .eyebrow:empty { display: none; }
 .product .btn { margin-top: 10px; width: 100%; min-height: 48px; }
 .btn-cart svg { flex: 0 0 auto; }
+.heart-fab {
+  display: none; position: absolute; top: 12px; right: 12px; z-index: 3;
+  width: 44px; height: 44px; place-items: center; border: 0; border-radius: 50%;
+  background: #fff; color: #161614; box-shadow: 0 6px 18px rgba(17, 18, 20, .16); cursor: pointer;
+}
+.heart-fab:disabled { opacity: .5; cursor: not-allowed; }
 
 .strip-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .strip { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: auto; padding: 1px; scrollbar-width: thin; }
@@ -156,6 +162,8 @@ button, input, label { font: inherit; }
   .workspace { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
   .dock { flex-direction: column; padding: 12px; border-radius: 16px; gap: 12px; }
   .product h1 { font-size: 16px; }
+  .heart-fab { display: grid; }
+  .btn-cart svg { display: none; }
   .strip-wrap { flex: none; }
   .strip { flex-direction: row; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
   .strip::-webkit-scrollbar { display: none; }
