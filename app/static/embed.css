@@ -68,22 +68,8 @@ button, input, label { font: inherit; }
 .product h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.03em; line-height: 1.2; }
 .product .price { margin: 0; font-size: 14px; font-weight: 700; }
 .product .price:empty, .product .eyebrow:empty { display: none; }
-.cam-cart {
-  position: absolute; top: 14px; right: 14px; z-index: 3;
-  display: inline-flex; align-items: center; gap: 8px;
-  border: 0; padding: 0; background: transparent; color: var(--ink); cursor: pointer;
-}
-.cam-cart #cartLabel {
-  padding: 8px 12px; border-radius: 999px; background: #fff;
-  font-size: 12px; font-weight: 700; line-height: 1;
-  box-shadow: 0 6px 18px rgba(17, 18, 20, .14);
-}
-.cam-heart {
-  width: 46px; height: 46px; display: grid; place-items: center; flex: 0 0 auto;
-  border-radius: 50%; background: #fff; color: #161614;
-  box-shadow: 0 6px 18px rgba(17, 18, 20, .14);
-}
-.cam-cart:disabled { opacity: .5; cursor: not-allowed; }
+.product .btn { margin-top: 10px; width: 100%; min-height: 48px; }
+.btn-cart svg { flex: 0 0 auto; }
 
 .strip-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .strip { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: auto; padding: 1px; scrollbar-width: thin; }

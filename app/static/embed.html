@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/embed.css?v=7" />
+    <link rel="stylesheet" href="/static/embed.css?v=8" />
     <script type="importmap">
       { "imports": { "three": "/static/vendor/three/build/three.module.js" } }
     </script>
@@ -30,12 +30,6 @@
               <canvas id="canvas"></canvas>
               <div class="hint" id="hint" hidden></div>
               <div class="busy" id="busy" hidden><span class="spinner"></span><span id="busyText"></span></div>
-              <button type="button" class="cam-cart" id="cartBtn" hidden>
-                <span id="cartLabel"></span>
-                <span class="cam-heart" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 20.2s-6.4-4-8.5-7.6C1.7 9.6 3.2 6.4 6.5 6.4c1.8 0 3 1.1 3.5 2 .5-.9 1.7-2 3.5-2 3.3 0 4.8 3.2 3 6.2-2.1 3.6-8.5 7.6-8.5 7.6z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
-                </span>
-              </button>
             </div>
             <div class="tools">
               <label class="tool" id="selfieBtn">
@@ -59,6 +53,10 @@
               <div class="eyebrow" id="vendor"></div>
               <h1 id="productName"></h1>
               <p class="price" id="productPrice"></p>
+              <button type="button" class="btn btn-cart" id="cartBtn" hidden>
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 20.2s-6.4-4-8.5-7.6C1.7 9.6 3.2 6.4 6.5 6.4c1.8 0 3 1.1 3.5 2 .5-.9 1.7-2 3.5-2 3.3 0 4.8 3.2 3 6.2-2.1 3.6-8.5 7.6-8.5 7.6z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+                <span id="cartLabel"></span>
+              </button>
             </div>
             <div class="strip-wrap" id="stripWrap" hidden>
               <div class="eyebrow" id="stripLabel"></div>
@@ -75,6 +73,6 @@
       </div>
       <div class="screen" id="screen" hidden></div>
     </main>
-    <script type="module" src="/static/embed.js?v=7"></script>
+    <script type="module" src="/static/embed.js?v=8"></script>
   </body>
 </html>

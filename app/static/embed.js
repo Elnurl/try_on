@@ -1,4 +1,4 @@
-import { strings, pickLang } from "./embed-i18n.js?v=7";
+import { strings, pickLang } from "./embed-i18n.js?v=8";
 import { createFaceTracker } from "./sdk/face-tracker.js?v=1";
 import { createTryOn } from "./sdk/vto-core.js?v=1";
 
