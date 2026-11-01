@@ -1,4 +1,4 @@
-import { strings, pickLang } from "./embed-i18n.js?v=5";
+import { strings, pickLang } from "./embed-i18n.js?v=7";
 import { createFaceTracker } from "./sdk/face-tracker.js?v=1";
 import { createTryOn } from "./sdk/vto-core.js?v=1";
 
@@ -408,7 +408,9 @@ function renderHead() {
   const cart = $("cartBtn");
   const unavailable = i.available === false;
   cart.disabled = unavailable;
-  $("cartLabel").textContent = unavailable ? T.outOfStock : T.addToCart;
+  const label = unavailable ? T.outOfStock : T.addToCart;
+  $("cartLabel").textContent = label;
+  cart.setAttribute("aria-label", label);
 }
 
 function renderStrip() {

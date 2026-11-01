@@ -68,8 +68,22 @@ button, input, label { font: inherit; }
 .product h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.03em; line-height: 1.2; }
 .product .price { margin: 0; font-size: 14px; font-weight: 700; }
 .product .price:empty, .product .eyebrow:empty { display: none; }
-.product .btn { margin-top: 8px; width: 100%; }
-.btn-like svg { flex: 0 0 auto; }
+.cam-cart {
+  position: absolute; top: 14px; right: 14px; z-index: 3;
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 0; padding: 0; background: transparent; color: var(--ink); cursor: pointer;
+}
+.cam-cart #cartLabel {
+  padding: 8px 12px; border-radius: 999px; background: #fff;
+  font-size: 12px; font-weight: 700; line-height: 1;
+  box-shadow: 0 6px 18px rgba(17, 18, 20, .14);
+}
+.cam-heart {
+  width: 46px; height: 46px; display: grid; place-items: center; flex: 0 0 auto;
+  border-radius: 50%; background: #fff; color: #161614;
+  box-shadow: 0 6px 18px rgba(17, 18, 20, .14);
+}
+.cam-cart:disabled { opacity: .5; cursor: not-allowed; }
 
 .strip-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .strip { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: auto; padding: 1px; scrollbar-width: thin; }
@@ -155,9 +169,7 @@ button, input, label { font: inherit; }
 @media (max-width: 860px) {
   .workspace { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
   .dock { flex-direction: column; padding: 12px; border-radius: 16px; gap: 12px; }
-  .product { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; }
   .product h1 { font-size: 16px; }
-  .product .btn { grid-column: 2; grid-row: 1 / span 3; width: auto; margin: 0; padding: 0 16px; }
   .strip-wrap { flex: none; }
   .strip { flex-direction: row; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
   .strip::-webkit-scrollbar { display: none; }
@@ -184,7 +196,3 @@ button, input, label { font: inherit; }
   .split-actions { position: sticky; bottom: 0; background: var(--paper); }
 }
 
-@media (max-width: 400px) {
-  .product { grid-template-columns: 1fr; }
-  .product .btn { grid-column: auto; grid-row: auto; width: 100%; }
-}
