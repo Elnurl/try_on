@@ -19,7 +19,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-PIPELINE_VERSION = 14
+PIPELINE_VERSION = 15
 log = logging.getLogger("vto.pipeline")
 MAX_SIDE = 1600
 DEFAULT_WIDTH_MM = 138.0

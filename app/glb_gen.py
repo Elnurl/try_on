@@ -660,12 +660,12 @@ def _build_temple_mesh(
     Runs in pivot-local coordinates from (0, 0, 0) backward into -Z.
     `side` = +1 for wearer-left (+X), -1 for wearer-right (-X).
     """
-    straight = length_mm * 0.72
-    bend_len = length_mm - straight
+    straight = length_mm * 0.62
+    bend_len = min(28.0, max(18.0, (length_mm - straight) * 0.55))
     n_s = 12
     n_b = 14
-    drop_mm = min(15.5, max(11.5, bend_len * 0.36))
-    inward_mm = 6.2 if metal else 6.8
+    drop_mm = min(18.0, max(12.5, bend_len * 0.52))
+    inward_mm = 4.6 if metal else 5.2
 
     # Build ergonomic 3D spine: straight section with gentle tilt -> smooth behind-ear hook.
     spine: list[np.ndarray] = []
@@ -676,9 +676,9 @@ def _build_temple_mesh(
     for i in range(n_s + 1):
         t = i / n_s
         z = -straight * t
-        y = -straight * t * 0.022
+        y = -straight * t * 0.015
         # Slight organic inward tuck near the ear so temple sits cleanly behind the ear.
-        x = -side * (1.2 * (t**2))
+        x = -side * (0.45 * (t**2))
         h_cur = h0_mm + (h1_mm - h0_mm) * t
         w_cur = thick_mm * (1.0 - 0.14 * t)
         spine.append(np.array([x, y, z], dtype=np.float64))

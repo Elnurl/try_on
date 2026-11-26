@@ -27,7 +27,7 @@ const DEFAULT_PD_MM = 63;
 const IRIS_MM = 11.7;
 const CALIB_SAMPLES = 90;
 const PANTO_TILT = THREE.MathUtils.degToRad(7);
-const TEMPLE_DROP = THREE.MathUtils.degToRad(4.2);
+const TEMPLE_DROP = THREE.MathUtils.degToRad(2.0);
 const LOST_FACE_MS = 400;
 const USER_OFFSET_MM = 12;
 const LM = {
@@ -203,8 +203,8 @@ function lensGlare(lens, w, h, bend, material) {
 
 /** Smooth ergonomic 3D temple sized from the seller's side photo (mm). */
 function templeGeometry(length, h0, h1, thick, side, metal) {
-  const straight = length * 0.74;
-  const hook = Math.min(16, Math.max(12, length - straight));
+  const straight = length * 0.62;
+  const hook = Math.min(26, Math.max(18, (length - straight) * 0.55));
   const drop = straight * 0.015;
   const line = [];
   const n = 20;
@@ -311,7 +311,7 @@ async function buildGlbGlasses(manifest) {
   const pivots = [];
   let modelHeightMm = manifest.heightMm || W / (manifest.aspect || 2.8);
   let bendMm = W * 0.055;
-  let straightMm = ((manifest.temple && manifest.temple.lengthMm) || 145) * 0.72;
+  let straightMm = ((manifest.temple && manifest.temple.lengthMm) || 145) * 0.62;
 
   model.updateMatrixWorld(true);
   if (isAuto) {
@@ -658,7 +658,7 @@ export async function buildGlasses(manifest) {
     widthMm: W,
     heightMm: H,
     bend,
-    straightMm: armLength * 0.72,
+    straightMm: armLength * 0.62,
     bridge,
     face,
     pivots,
@@ -722,7 +722,7 @@ export function createTryOn(canvas) {
   head.add(occluder);
   const ears = [-1, 1].map((side) => {
     const ear = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), hiddenMat);
-    ear.scale.set(9, 28, 15);
+    ear.scale.set(7, 24, 12);
     ear.userData.side = side;
     ear.renderOrder = -2;
     head.add(ear);
@@ -986,11 +986,12 @@ export function createTryOn(canvas) {
   /** Update the live MediaPipe face-contour depth occluder in scene space. */
   function updateFaceOccluder(lm, origin, xAxis, zAxis, pxPerMm) {
     const pos = faceGeo.attributes.position;
-    // Keep the nose bridge and inner brow close to the skin so far temples hide cleanly behind
-    // the eye/nose, while recessing outer cheek/temple edges so the near temple never gets notched.
-    const corePush = 3.2 * pxPerMm;
-    const sidePush = 9.0 * pxPerMm;
-    const sideInset = 10.0 * pxPerMm;
+    // Keep the face occluder tightly aligned to the real cheeks, brow and forehead so temples
+    // running behind the face hide naturally when pitching up/down or turning, while staying
+    // recessed enough in Z so the near temple outside the cheek never gets clipped.
+    const corePush = 3.5 * pxPerMm;
+    const sidePush = 6.5 * pxPerMm;
+    const sideInset = 2.0 * pxPerMm;
     const p = tmp.pt;
     point(lm, LM.bridge, p).addScaledVector(zAxis, -corePush);
     pos.setXYZ(0, p.x, p.y, p.z);
@@ -1157,22 +1158,21 @@ export function createTryOn(canvas) {
     const bx = mirror && mode === "live" ? -u.bridge.x : u.bridge.x;
     glasses.scale.setScalar(s);
     glasses.position.set(-bx * s, -u.bridge.y * s + (fit.offsetY || 0) + userOffsetY, zFront + (fit.offsetZ || 0));
-    const sideHalf = faceHalf + 4;
+    const sideHalf = faceHalf + 2;
     const reach = Math.max(48, u.straightMm * s);
     const zHinge = zFront + (fit.offsetZ || 0) - (u.bend || 0) * s;
-    const cz = 84;
-    const zc = -92;
-    let occA = sideHalf - 3;
+    const cz = 82;
+    const zc = -90;
+    let occA = sideHalf - 2;
     if (u.pivots.length) {
-      // In live mode the orthographic camera has no perspective foreshortening, while real ears
-      // in the webcam image sit further back and therefore appear narrower than the front rim.
-      // Gently tuck temples inward toward the foreshortened ear instead of splaying them into air.
+      // Temples run straight back (0° to +2° max) toward the real ear width:
+      // never inward across the cheeks/forehead and never splayed outward into empty air.
       const hx = u.pivots[0].userData.hingeX * s;
-      const targetX = mode === "preview" ? Math.max(sideHalf, hx + 1) : Math.min(sideHalf - 4, hx - 2.5);
+      const targetX = Math.max(hx, faceHalf);
       const splay =
         mode === "preview"
-          ? THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), -0.02, 0.04)
-          : THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), -0.085, 0.008);
+          ? 0.015
+          : THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), 0, 0.035);
       const tanS = Math.tan(splay);
       for (const pivot of u.pivots) {
         pivot.rotation.y = -pivot.userData.side * splay;
@@ -1182,13 +1182,13 @@ export function createTryOn(canvas) {
         const d = Math.max(0, zHinge - z);
         const templeX = hx + d * tanS;
         const ellipseW = Math.sqrt(Math.max(0.05, 1 - frac * frac));
-        occA = Math.min(occA, (templeX - 3.5) / ellipseW);
+        occA = Math.min(occA, (templeX - 2.5) / ellipseW);
       }
     } else if (u.isGlb) {
-      occA = Math.min(occA, (u.widthMm / 2) * s - 3);
+      occA = Math.min(occA, (u.widthMm / 2) * s - 2.5);
     }
-    occluder.scale.set(Math.max(42, occA), 114, cz);
-    for (const ear of ears) ear.position.set(ear.userData.side * (sideHalf + 1), -15, -90);
+    occluder.scale.set(Math.max(faceHalf - 6, occA), 114, cz);
+    for (const ear of ears) ear.position.set(ear.userData.side * (sideHalf + 3), -18, -104);
   }
 
   function posePreview(angle) {
