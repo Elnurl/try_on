@@ -5,9 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Eynek VTO Studio</title>
     <link rel="icon" href="/static/favicon.svg" />
-    <link rel="stylesheet" href="/static/app.css?v=1" />
+    <link rel="stylesheet" href="/static/app.css?v=2" />
     <script type="importmap">
-      { "imports": { "three": "/static/vendor/three/build/three.module.js" } }
+      {
+        "imports": {
+          "three": "/static/vendor/three/build/three.module.js",
+          "three/addons/": "/static/vendor/three/examples/jsm/"
+        }
+      }
     </script>
   </head>
   <body>
@@ -35,16 +40,24 @@
         </p>
 
         <form class="card" id="uploadForm">
+          <div class="mode-tabs" role="tablist" aria-label="Yükləmə üsulu">
+            <button type="button" class="mode-tab active" data-mode="photos">Şəkillərdən (2.5D)</button>
+            <button type="button" class="mode-tab" data-mode="glb">3D Model (.glb)</button>
+          </div>
           <div class="row">
             <label class="field">SKU (məhsul kodu)<input type="text" id="sku" required placeholder="RB3447-001" /></label>
             <label class="field">Ad<input type="text" id="name" placeholder="Ray-Ban Round Metal" /></label>
             <label class="field">Ölçülər (linza-körpü-qol)<input type="text" id="sizes" placeholder="49-18-142" /></label>
             <label class="field">Çərçivə eni, mm (istəyə görə)<input type="number" id="widthMm" min="100" max="175" step="0.5" /></label>
           </div>
-          <div class="drops">
+          <div class="drops" id="photoDrops">
             <label class="drop" data-slot="front"><span><b>Ön şəkil *</b>Düz öndən, eynək tam görünsün</span><input type="file" accept="image/*" /></label>
             <label class="drop" data-slot="left"><span><b>Sol tərəf (qol)</b>Sol qol görünsün — qalınlıq və rəng bura görə</span><input type="file" accept="image/*" /></label>
             <label class="drop" data-slot="right"><span><b>Sağ tərəf (qol)</b>Sağ qol; mümkünsə hər iki tərəf yükləyin</span><input type="file" accept="image/*" /></label>
+          </div>
+          <div class="drops drops-2" id="glbDrops" hidden>
+            <label class="drop drop-file" data-slot="model"><span><b>3D Model (.glb) *</b>Blender, Meshy, Tripo və ya 3D skanerdən eksport olunmuş .glb faylı (maks. 25 MB)</span><input type="file" accept=".glb,model/gltf-binary" /></label>
+            <label class="drop" data-slot="cover"><span><b>Örtük şəkli (istəyə görə)</b>Məhsul siyahısı üçün kiçik şəkil</span><input type="file" accept="image/*" /></label>
           </div>
           <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
             <button class="btn" type="submit" id="submitBtn">VTO hazırla</button>
@@ -58,10 +71,10 @@
           <div class="grid2">
             <div>
               <canvas id="preview3d"></canvas>
-              <p class="muted">Ön çərçivə ön şəkildən; hər qol yan şəkildən (qalınlıq, rəng, uzunluq) götürülür.</p>
+              <p class="muted" id="previewNote">Ön çərçivə ön şəkildən; hər qol yan şəkildən (qalınlıq, rəng, uzunluq) götürülür.</p>
             </div>
             <div>
-              <div class="checker"><img id="texture" alt="Emal olunmuş ön görünüş" /></div>
+              <div class="checker" id="textureWrap"><img id="texture" alt="Emal olunmuş ön görünüş" /></div>
               <div class="stats" id="stats"></div>
               <div style="display: flex; gap: 8px; flex-wrap: wrap">
                 <button class="btn" type="button" id="tryBtn">Kamerada yoxla</button>
@@ -80,6 +93,6 @@
       </div>
     </div>
     <script src="/sdk/eynek-vto.js" data-store="demo" defer></script>
-    <script type="module" src="/static/studio.js?v=7"></script>
+    <script type="module" src="/static/studio.js?v=8"></script>
   </body>
 </html>

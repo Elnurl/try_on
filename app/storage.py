@@ -20,7 +20,7 @@ import threading
 import time
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from app.pipeline import Asset
 
@@ -179,6 +179,59 @@ def save_product(store_id: str, sku: str, meta: dict, asset: Asset, photos: dict
         **meta,
         **asset.manifest,
         "photos": sorted(photos),
+        "updatedAt": int(time.time()),
+    }
+    (tmp / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    with _lock:
+        shutil.rmtree(folder, ignore_errors=True)
+        tmp.replace(folder)
+    return manifest
+
+
+def _glb_placeholder_thumb() -> Image.Image:
+    """Clean minimalist eyewear icon when a GLB is uploaded without a separate cover photo."""
+    img = Image.new("RGBA", (480, 240), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    ink = (30, 28, 25, 235)
+    glass = (30, 28, 25, 32)
+    d.rounded_rectangle((46, 66, 212, 174), radius=34, fill=glass, outline=ink, width=8)
+    d.rounded_rectangle((268, 66, 434, 174), radius=34, fill=glass, outline=ink, width=8)
+    d.arc((206, 94, 274, 146), start=200, end=340, fill=ink, width=8)
+    d.line((22, 92, 48, 92), fill=ink, width=8)
+    d.line((432, 92, 458, 92), fill=ink, width=8)
+    return img
+
+
+def save_glb_product(
+    store_id: str,
+    sku: str,
+    meta: dict,
+    glb_bytes: bytes,
+    width_mm: float,
+    width_source: str,
+    sizes: dict,
+    thumb_image: Image.Image | None = None,
+) -> dict:
+    if len(glb_bytes) < 20 or glb_bytes[:4] != b"glTF":
+        raise ValueError("Fayl etibarlı 3D .glb modeli deyil.")
+    folder = product_dir(store_id, sku)
+    tmp = folder.with_name(f".{sku}.tmp")
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir(parents=True)
+    (tmp / "model.glb").write_bytes(glb_bytes)
+    thumb = thumb_image.copy() if thumb_image is not None else _glb_placeholder_thumb()
+    thumb.thumbnail((480, 240), Image.LANCZOS)
+    thumb.save(tmp / "thumb.png", "PNG", optimize=True)
+    manifest = {
+        "version": 2,
+        "store": store_id,
+        "sku": sku,
+        **meta,
+        "type": "glb",
+        "widthMm": round(float(width_mm), 2),
+        "widthSource": width_source,
+        "sizes": sizes,
+        "fit": {"offsetY": 0, "offsetZ": 0, "scale": 1},
         "updatedAt": int(time.time()),
     }
     (tmp / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")

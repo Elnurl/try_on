@@ -1,10 +1,11 @@
-import { createTryOn } from "./sdk/vto-core.js?v=12";
+import { createTryOn } from "./sdk/vto-core.js?v=13";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const token = params.get("token") || "";
 const KEY_STORAGE = "eynek-vto-key";
-const files = { front: null, left: null, right: null };
+const files = { front: null, left: null, right: null, model: null, cover: null };
+let uploadMode = "photos";
 let me = null;
 let preview = null;
 let previewLoop = 0;
@@ -58,7 +59,19 @@ async function login() {
 function setDrop(slot, file) {
   files[slot] = file;
   const el = document.querySelector(`.drop[data-slot="${slot}"]`);
+  if (!el) return;
   if (el.dataset.url) URL.revokeObjectURL(el.dataset.url);
+  if (slot === "model") {
+    const label = el.querySelector("span");
+    if (file) {
+      el.classList.add("filled");
+      label.innerHTML = `<b>${escapeHtml(file.name)}</b>${(file.size / (1024 * 1024)).toFixed(2)} MB · 3D GLB hazırdır`;
+    } else {
+      el.classList.remove("filled");
+      label.innerHTML = "<b>3D Model (.glb) *</b>Blender, Meshy, Tripo və ya 3D skanerdən eksport olunmuş .glb faylı (maks. 25 MB)";
+    }
+    return;
+  }
   if (file) {
     el.dataset.url = URL.createObjectURL(file);
     el.style.backgroundImage = `url("${el.dataset.url}")`;
@@ -70,6 +83,15 @@ function setDrop(slot, file) {
 }
 
 function bindDrops() {
+  document.querySelectorAll(".mode-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      uploadMode = btn.dataset.mode;
+      document.querySelectorAll(".mode-tab").forEach((b) => b.classList.toggle("active", b === btn));
+      $("photoDrops").hidden = uploadMode !== "photos";
+      $("glbDrops").hidden = uploadMode !== "glb";
+      $("uploadError").textContent = "";
+    });
+  });
   document.querySelectorAll(".drop").forEach((el) => {
     const slot = el.dataset.slot;
     const input = el.querySelector("input");
@@ -95,42 +117,54 @@ function stat(label, value) {
 async function showResult(m) {
   $("resultCard").hidden = false;
   $("resultTitle").textContent = `${m.name || m.sku} — hazırdır`;
-  $("texture").src = m.texture;
-  const lenses = m.lenses || [];
+  const isGlb = m.type === "glb";
+  $("textureWrap").hidden = isGlb;
+  $("previewNote").textContent = isGlb
+    ? "Tam 3D GLB model — real millimetr ölçüsü və PBR işıqlandırma ilə göstərilir."
+    : "Ön çərçivə ön şəkildən; hər qol yan şəkildən (qalınlıq, rəng, uzunluq) götürülür.";
+  if (!isGlb) $("texture").src = m.texture;
   const widthNote = { lens: "linzadan ölçüldü", given: "daxil edildi", sizes: "ölçülərdən", default: "standart" }[m.widthSource] || "";
-  $("stats").innerHTML = [
-    stat(`Çərçivə eni (${widthNote})`, `${Math.round(m.widthMm)} mm`),
-    stat(
-      "Linzalar",
-      lenses.length === 2
-        ? lenses.every((l) => l.clear)
-          ? "2 · şəffaf"
-          : lenses.every((l) => l.sunglass || (l.opacity || 0) >= 0.8)
-            ? "2 · gün eynəyi (tünd)"
-            : "2 · rəngli"
-        : `${lenses.length} tapıldı`,
-    ),
-    stat("Qol uzunluğu", `${Math.round((m.temple && m.temple.lengthMm) || 145)} mm`),
-    stat("Qol rəngi", (m.temple && m.temple.color) || "—"),
-  ].join("");
-  const sides = m.templeSides || {};
-  if (sides.left || sides.right) {
-    const bits = [];
-    if (sides.left) bits.push(`Sol: ${sides.left.thickMm} mm qalınlıq`);
-    if (sides.right) bits.push(`Sağ: ${sides.right.thickMm} mm qalınlıq`);
-    $("stats").insertAdjacentHTML("beforeend", stat("Qollar (şəkildən)", bits.join(" · ")));
-  }
-  if ((m.warnings || []).includes("temple_one_side")) {
-    $("stats").insertAdjacentHTML(
-      "beforeend",
-      '<div class="stat" style="grid-column:1/-1"><span>Tək tərəf şəkli: digər qol təxmini eyni ölçü ilə göstərilir. Mümkünsə sol və sağ yan şəkil yükləyin.</span></div>',
-    );
-  }
-  if (lenses.length !== 2) {
-    $("stats").insertAdjacentHTML(
-      "beforeend",
-      '<div class="stat" style="grid-column:1/-1"><span>Linzalar tam tapılmadı. Daha təmiz, düz öndən ağ fonda şəkil yükləsəniz nəticə yaxşılaşar.</span></div>',
-    );
+  if (isGlb) {
+    $("stats").innerHTML = [
+      stat("Format", "3D Model (GLB)"),
+      stat(`Çərçivə eni (${widthNote})`, `${Math.round(m.widthMm)} mm`),
+    ].join("");
+  } else {
+    const lenses = m.lenses || [];
+    $("stats").innerHTML = [
+      stat(`Çərçivə eni (${widthNote})`, `${Math.round(m.widthMm)} mm`),
+      stat(
+        "Linzalar",
+        lenses.length === 2
+          ? lenses.every((l) => l.clear)
+            ? "2 · şəffaf"
+            : lenses.every((l) => l.sunglass || (l.opacity || 0) >= 0.8)
+              ? "2 · gün eynəyi (tünd)"
+              : "2 · rəngli"
+          : `${lenses.length} tapıldı`,
+      ),
+      stat("Qol uzunluğu", `${Math.round((m.temple && m.temple.lengthMm) || 145)} mm`),
+      stat("Qol rəngi", (m.temple && m.temple.color) || "—"),
+    ].join("");
+    const sides = m.templeSides || {};
+    if (sides.left || sides.right) {
+      const bits = [];
+      if (sides.left) bits.push(`Sol: ${sides.left.thickMm} mm qalınlıq`);
+      if (sides.right) bits.push(`Sağ: ${sides.right.thickMm} mm qalınlıq`);
+      $("stats").insertAdjacentHTML("beforeend", stat("Qollar (şəkildən)", bits.join(" · ")));
+    }
+    if ((m.warnings || []).includes("temple_one_side")) {
+      $("stats").insertAdjacentHTML(
+        "beforeend",
+        '<div class="stat" style="grid-column:1/-1"><span>Tək tərəf şəkli: digər qol təxmini eyni ölçü ilə göstərilir. Mümkünsə sol və sağ yan şəkil yükləyin.</span></div>',
+      );
+    }
+    if (lenses.length !== 2) {
+      $("stats").insertAdjacentHTML(
+        "beforeend",
+        '<div class="stat" style="grid-column:1/-1"><span>Linzalar tam tapılmadı. Daha təmiz, düz öndən ağ fonda şəkil yükləsəniz nəticə yaxşılaşar.</span></div>',
+      );
+    }
   }
   $("code").hidden = true;
   $("tryBtn").onclick = () => window.EynekVTO && window.EynekVTO.open({ store: m.store, sku: m.sku, cart: false });
@@ -163,18 +197,28 @@ async function showResult(m) {
 async function submit(e) {
   e.preventDefault();
   $("uploadError").textContent = "";
-  if (!files.front) {
-    $("uploadError").textContent = "Ön şəkil mütləqdir.";
-    return;
-  }
   const body = new FormData();
   body.append("sku", $("sku").value.trim());
   body.append("name", $("name").value.trim());
   body.append("sizes", $("sizes").value.trim());
   if ($("widthMm").value) body.append("width_mm", $("widthMm").value);
-  for (const [slot, f] of Object.entries(files)) if (f) body.append(slot, f);
+  if (uploadMode === "glb") {
+    if (!files.model) {
+      $("uploadError").textContent = "3D .glb model faylı mütləqdir.";
+      return;
+    }
+    body.append("model", files.model);
+    if (files.cover) body.append("front", files.cover);
+    $("progress").textContent = "3D GLB model yüklənir…";
+  } else {
+    if (!files.front) {
+      $("uploadError").textContent = "Ön şəkil mütləqdir.";
+      return;
+    }
+    for (const slot of ["front", "left", "right"]) if (files[slot]) body.append(slot, files[slot]);
+    $("progress").textContent = "Şəkillər emal olunur: fon silinir, linzalar tapılır… (10-40 san)";
+  }
   $("submitBtn").disabled = true;
-  $("progress").textContent = "Şəkillər emal olunur: fon silinir, linzalar tapılır… (10-40 san)";
   try {
     const m = await api("/v1/products", { method: "POST", body });
     $("progress").textContent = "";
@@ -196,8 +240,9 @@ async function loadList() {
   for (const m of data.products) {
     const el = document.createElement("div");
     el.className = "item";
+    const badge = m.type === "glb" ? " · 3D GLB" : "";
     el.innerHTML = `<img src="${escapeHtml(m.thumb)}" alt="" loading="lazy" />
-      <div><b>${escapeHtml(m.name || m.sku)}</b><div class="muted">${escapeHtml(m.sku)} · ${Math.round(m.widthMm)} mm</div></div>
+      <div><b>${escapeHtml(m.name || m.sku)}</b><div class="muted">${escapeHtml(m.sku)} · ${Math.round(m.widthMm)} mm${badge}</div></div>
       <div class="actions">
         <button class="btn small" data-act="try">Yoxla</button>
         <button class="btn small ghost" data-act="view">Bax</button>

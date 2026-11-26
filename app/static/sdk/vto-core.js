@@ -6,6 +6,21 @@
  * Head-local axes: x → wearer's left (screen right), y → up, z → out of the face.
  */
 import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+const DRACO_PATH = "/static/vendor/three/examples/jsm/libs/draco/gltf/";
+let _gltfLoader = null;
+function getGltfLoader() {
+  if (!_gltfLoader) {
+    const draco = new DRACOLoader();
+    draco.setDecoderPath(DRACO_PATH);
+    _gltfLoader = new GLTFLoader();
+    _gltfLoader.setDRACOLoader(draco);
+  }
+  return _gltfLoader;
+}
 
 const DEFAULT_EYE_SPAN_MM = 88;
 const DEFAULT_PD_MM = 63;
@@ -33,7 +48,7 @@ const FACE_OVAL = [
   397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
   172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
 ];
-const SIDE_OVAL = new Set([389, 356, 454, 323, 361, 288, 127, 162, 234, 93, 132, 58]);
+const SIDE_OVAL = new Set([284, 251, 389, 356, 454, 323, 361, 288, 21, 54, 127, 162, 234, 93, 132, 58]);
 
 export class OneEuro {
   constructor(minCutoff = 1, beta = 0, dCutoff = 1) {
@@ -278,7 +293,84 @@ function blobTexture() {
   return new THREE.CanvasTexture(canvas);
 }
 
+/** Load and normalise a real 3D .glb eyewear model into head-local millimetres. */
+async function buildGlbGlasses(manifest) {
+  const gltf = await getGltfLoader().loadAsync(manifest.model);
+  const model = gltf.scene;
+  const W = manifest.widthMm || 138;
+
+  // Compute initial bounds; if the model was exported sideways (depth > width), rotate 90°.
+  model.updateMatrixWorld(true);
+  let box = new THREE.Box3().setFromObject(model);
+  let size = box.getSize(new THREE.Vector3());
+  if (size.z > size.x * 1.15) {
+    model.rotation.y = Math.PI / 2;
+    model.updateMatrixWorld(true);
+    box = new THREE.Box3().setFromObject(model);
+    size = box.getSize(new THREE.Vector3());
+  }
+  const scale = size.x > 1e-4 ? W / size.x : 1;
+  model.scale.multiplyScalar(scale);
+  model.updateMatrixWorld(true);
+  box = new THREE.Box3().setFromObject(model);
+  size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+
+  // Place nose bridge at origin (0, 0, 0) and front plane at z = 0 so temples run into -z.
+  const bridgeY = box.max.y - size.y * 0.42;
+  model.position.set(-center.x, -bridgeY, -box.max.z);
+
+  model.traverse((node) => {
+    if (!node.isMesh) return;
+    const mats = Array.isArray(node.material) ? node.material : [node.material];
+    let hasGlass = false;
+    for (const mat of mats) {
+      if (!mat) continue;
+      if ("envMapIntensity" in mat) mat.envMapIntensity = 1.1;
+      const isTransparent = mat.transparent || (mat.opacity !== undefined && mat.opacity < 0.98) || (mat.transmission && mat.transmission > 0.05);
+      if (isTransparent) {
+        hasGlass = true;
+        mat.transparent = true;
+        mat.depthWrite = false;
+      }
+    }
+    node.renderOrder = hasGlass ? 4 : 3;
+  });
+
+  const root = new THREE.Group();
+  const face = new THREE.Group();
+  face.add(model);
+  root.add(face);
+
+  // Subtle nose-pad contact shadows ground the 3D frame onto the skin.
+  const blob = blobTexture();
+  const noseMat = new THREE.MeshBasicMaterial({ map: blob, transparent: true, opacity: 0.24, depthWrite: false, depthTest: false });
+  for (const side of [-1, 1]) {
+    const pad = new THREE.Mesh(new THREE.PlaneGeometry(9, 15), noseMat);
+    pad.position.set(side * 7.5, -9, -5);
+    pad.rotation.z = side * 0.35;
+    pad.renderOrder = 1;
+    face.add(pad);
+  }
+
+  root.userData = {
+    isGlb: true,
+    widthMm: W,
+    heightMm: size.y || W / 2.8,
+    bend: W * 0.055,
+    straightMm: Math.max(70, (size.z || 140) * 0.72),
+    bridge: new THREE.Vector3(0, 0, 0),
+    face,
+    pivots: [],
+    noseMat,
+  };
+  return root;
+}
+
 export async function buildGlasses(manifest) {
+  if (manifest.type === "glb" && manifest.model) {
+    return buildGlbGlasses(manifest);
+  }
   const templeSides = manifest.templeSides || {};
   const templeUrls = manifest.templeTextures || {};
   const [tex, ...sideTex] = await Promise.all([
@@ -459,12 +551,17 @@ export function createTryOn(canvas) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
   const scene = new THREE.Scene();
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8178, 1.55);
+  // Studio PBR IBL environment gives realistic specular reflections on metal, acetate and GLB lenses.
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  if ("environmentIntensity" in scene) scene.environmentIntensity = 0.65;
+  pmrem.dispose();
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8178, 1.35);
   scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xffffff, 1.45);
+  const key = new THREE.DirectionalLight(0xffffff, 1.3);
   key.position.set(0.35, 0.7, 1);
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0xeef4ff, 0.75);
+  const rim = new THREE.DirectionalLight(0xeef4ff, 0.65);
   rim.position.set(-0.85, 0.35, 0.25);
   scene.add(rim);
 
@@ -739,8 +836,8 @@ export function createTryOn(canvas) {
   /** Update the live MediaPipe face-contour depth occluder in scene space. */
   function updateFaceOccluder(lm, origin, xAxis, zAxis, pxPerMm) {
     const pos = faceGeo.attributes.position;
-    const pushBack = 4.5 * pxPerMm;
-    const sideInset = 5.5 * pxPerMm;
+    const pushBack = 8.5 * pxPerMm;
+    const sideInset = 9 * pxPerMm;
     const p = tmp.pt;
     point(lm, LM.bridge, p).addScaledVector(zAxis, -pushBack);
     pos.setXYZ(0, p.x, p.y, p.z);
@@ -912,20 +1009,24 @@ export function createTryOn(canvas) {
     const cz = 84;
     const zc = -92;
     let occA = sideHalf - 3;
-    for (const pivot of u.pivots) {
-      const hx = pivot.userData.hingeX * s;
-      const targetX = Math.max(sideHalf + 1.5, hx + 1);
-      // Real glasses hinges only flex ~5–6° outward; larger angles make temples flare out.
-      const splay = THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), -0.04, 0.11);
-      pivot.rotation.y = -pivot.userData.side * splay;
-      // Guarantee the smooth head ellipsoid never clips the near temple from hinge to ear.
-      const tanS = Math.tan(splay);
-      for (const frac of [0.15, 0.42, 0.68, 0.9]) {
-        const z = zc + cz * frac;
-        const d = Math.max(0, zHinge - z);
-        const templeX = hx + d * tanS;
-        const ellipseW = Math.sqrt(Math.max(0.05, 1 - frac * frac));
-        occA = Math.min(occA, (templeX - 3.5) / ellipseW);
+    if (u.isGlb) {
+      occA = Math.min(occA, (u.widthMm / 2) * s - 4.5);
+    } else {
+      for (const pivot of u.pivots) {
+        const hx = pivot.userData.hingeX * s;
+        const targetX = Math.max(sideHalf + 1.5, hx + 1);
+        // Real glasses hinges only flex ~5–6° outward; larger angles make temples flare out.
+        const splay = THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), -0.04, 0.11);
+        pivot.rotation.y = -pivot.userData.side * splay;
+        // Guarantee the smooth head ellipsoid never clips the near temple from hinge to ear.
+        const tanS = Math.tan(splay);
+        for (const frac of [0.15, 0.42, 0.68, 0.9]) {
+          const z = zc + cz * frac;
+          const d = Math.max(0, zHinge - z);
+          const templeX = hx + d * tanS;
+          const ellipseW = Math.sqrt(Math.max(0.05, 1 - frac * frac));
+          occA = Math.min(occA, (templeX - 3.5) / ellipseW);
+        }
       }
     }
     occluder.scale.set(Math.max(42, occA), 114, cz);

@@ -10,6 +10,7 @@ Sizes        → "49-18-142" style numbers; lens width calibrates real frame wid
 from __future__ import annotations
 
 import colorsys
+import os
 from dataclasses import dataclass, field
 from io import BytesIO
 
@@ -105,7 +106,11 @@ def _rembg(img: Image.Image) -> np.ndarray:
     from rembg import new_session, remove
 
     if _REMBG_SESSION is None:
-        _REMBG_SESSION = new_session("u2net")
+        model = os.environ.get("VTO_REMBG_MODEL", "isnet-general-use").strip() or "isnet-general-use"
+        try:
+            _REMBG_SESSION = new_session(model)
+        except Exception:  # noqa: BLE001
+            _REMBG_SESSION = new_session("u2net")
     return np.array(remove(img, session=_REMBG_SESSION).convert("RGBA"))
 
 

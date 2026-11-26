@@ -1,5 +1,7 @@
 /**
  * MediaPipe Face Landmarker, self-hosted (CDNs are often blocked in AZ).
+ * Runs in a dedicated ES module Web Worker when supported (keeping WebGL & UI smooth),
+ * with automatic main-thread fallback on browsers without module workers.
  * detect*() → { landmarks: [{x,y,z}] (normalised), matrix: number[16] | null }
  */
 const MODULE = "/static/vendor/mediapipe/vision_bundle.mjs";
@@ -20,7 +22,69 @@ function toFace(result) {
   return { landmarks, matrix: m && m.data ? Array.from(m.data) : null };
 }
 
-export async function createFaceTracker() {
+async function createWorkerTracker() {
+  if (typeof Worker === "undefined" || typeof createImageBitmap === "undefined") {
+    throw new Error("no-worker");
+  }
+  const worker = new Worker(new URL("./face-worker.js?v=1", import.meta.url), { type: "module" });
+  const pending = new Map();
+  let seq = 1;
+  let videoBusy = false;
+  let lastFace = null;
+
+  const call = (payload, transfer = []) =>
+    new Promise((resolve, reject) => {
+      const id = seq++;
+      pending.set(id, { resolve, reject });
+      worker.postMessage({ ...payload, id }, transfer);
+    });
+
+  worker.onmessage = (e) => {
+    const { id, error, ...rest } = e.data || {};
+    const slot = pending.get(id);
+    if (!slot) return;
+    pending.delete(id);
+    if (error) slot.reject(new Error(error));
+    else slot.resolve(rest);
+  };
+  worker.onerror = (e) => {
+    const err = new Error(e.message || "worker-error");
+    pending.forEach((s) => s.reject(err));
+    pending.clear();
+  };
+
+  try {
+    await withTimeout(call({ type: "init" }), 10000);
+  } catch (err) {
+    worker.terminate();
+    throw err;
+  }
+
+  return {
+    offThread: true,
+    async detectVideo(video, timestampMs) {
+      if (videoBusy) return lastFace;
+      videoBusy = true;
+      try {
+        const bitmap = await createImageBitmap(video);
+        const { face } = await call({ type: "video", bitmap, timestampMs }, [bitmap]);
+        lastFace = face;
+        return face;
+      } catch {
+        return lastFace;
+      } finally {
+        videoBusy = false;
+      }
+    },
+    async detectImage(image) {
+      const bitmap = await createImageBitmap(image);
+      const { face } = await call({ type: "image", bitmap }, [bitmap]);
+      return face;
+    },
+  };
+}
+
+async function createMainThreadTracker() {
   let mp;
   try {
     mp = await import(MODULE);
@@ -51,6 +115,7 @@ export async function createFaceTracker() {
     mode = next;
   }
   return {
+    offThread: false,
     async detectVideo(video, timestampMs) {
       await setMode("VIDEO");
       return toFace(landmarker.detectForVideo(video, timestampMs));
@@ -60,4 +125,12 @@ export async function createFaceTracker() {
       return toFace(landmarker.detect(image));
     },
   };
+}
+
+export async function createFaceTracker() {
+  try {
+    return await createWorkerTracker();
+  } catch {
+    return createMainThreadTracker();
+  }
 }

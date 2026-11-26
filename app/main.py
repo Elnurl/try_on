@@ -23,7 +23,18 @@ from pydantic import BaseModel  # noqa: E402
 from starlette.concurrency import run_in_threadpool  # noqa: E402
 
 from app.auth import caller, require_admin  # noqa: E402
-from app.pipeline import PIPELINE_VERSION, PipelineError, Sizes, build_asset, load_image, parse_sizes  # noqa: E402
+from app.pipeline import (  # noqa: E402
+    DEFAULT_WIDTH_MM,
+    MAX_WIDTH_MM,
+    MIN_WIDTH_MM,
+    PIPELINE_VERSION,
+    PipelineError,
+    Sizes,
+    build_asset,
+    load_image,
+    parse_sizes,
+    resolve_width,
+)
 from app.storage import (  # noqa: E402
     create_store,
     delete_product,
@@ -35,6 +46,7 @@ from app.storage import (  # noqa: E402
     list_stores,
     product_dir,
     rotate_key,
+    save_glb_product,
     save_product,
     valid_sku,
     valid_store_id,
@@ -45,12 +57,14 @@ ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
 DEMO = ROOT / "demo"
 MAX_UPLOAD = 15 * 1024 * 1024
+MAX_GLB = 25 * 1024 * 1024
 ASSET_FILE_RE = re.compile(
-    r"^(front|thumb)\.png$|^photo-(front|left|right)\.jpg$|^temple-(left|right)\.png$"
+    r"^(front|thumb)\.png$|^model\.glb$|^photo-(front|left|right)\.jpg$|^temple-(left|right)\.png$"
 )
 
 mimetypes.add_type("application/javascript", ".mjs")
 mimetypes.add_type("application/wasm", ".wasm")
+mimetypes.add_type("model/gltf-binary", ".glb")
 
 log = logging.getLogger("vto")
 app = FastAPI(title="Eynek VTO", version="2.0.0")
@@ -87,7 +101,7 @@ def rebuild_outdated() -> None:
     """Re-run the current pipeline on products built by an older one, from their saved photos."""
     for store in list_stores():
         for m in list_products(store["id"]):
-            if m.get("pipeline") == PIPELINE_VERSION or "front" not in m.get("photos", []):
+            if m.get("type") == "glb" or m.get("pipeline") == PIPELINE_VERSION or "front" not in m.get("photos", []):
                 continue
             folder = product_dir(m["store"], m["sku"])
             try:
@@ -141,8 +155,11 @@ def public_manifest(m: dict, base: str) -> dict:
     root = f"{base}/assets/{m['store']}/{m['sku']}"
     v = m.get("updatedAt", 0)
     out = {k: v2 for k, v2 in m.items() if k not in ("photos", "background", "seller")}
-    out["texture"] = f"{root}/front.png?v={v}"
     out["thumb"] = f"{root}/thumb.png?v={v}"
+    if m.get("type") == "glb":
+        out["model"] = f"{root}/model.glb?v={v}"
+        return out
+    out["texture"] = f"{root}/front.png?v={v}"
     out["photos"] = {name: f"{root}/photo-{name}.jpg?v={v}" for name in m.get("photos", [])}
     textures = {}
     for side, info in (m.get("templeSides") or {}).items():
@@ -237,12 +254,12 @@ def me(who: Caller):
     return {**who, "name": (get_store(who["store"]) or {}).get("name")}
 
 
-async def _read_upload(file: UploadFile | None, label: str) -> bytes | None:
+async def _read_upload(file: UploadFile | None, label: str, limit: int = MAX_UPLOAD) -> bytes | None:
     if file is None or not file.filename:
         return None
     data = await file.read()
-    if len(data) > MAX_UPLOAD:
-        raise HTTPException(status_code=413, detail=f"{label} şəkli 15 MB-dan böyükdür.")
+    if len(data) > limit:
+        raise HTTPException(status_code=413, detail=f"{label} faylı {limit // (1024 * 1024)} MB-dan böyükdür.")
     return data or None
 
 
@@ -251,13 +268,14 @@ async def create_product(
     who: Caller,
     request: Request,
     sku: Annotated[str, Form()],
-    front: Annotated[UploadFile, File()],
+    front: Annotated[UploadFile | None, File()] = None,
     name: Annotated[str, Form()] = "",
     sizes: Annotated[str, Form()] = "",
     width_mm: Annotated[float | None, Form()] = None,
     product_url: Annotated[str, Form()] = "",
     left: Annotated[UploadFile | None, File()] = None,
     right: Annotated[UploadFile | None, File()] = None,
+    model: Annotated[UploadFile | None, File()] = None,
 ):
     sku = sku.strip()
     if not valid_sku(sku):
@@ -265,17 +283,34 @@ async def create_product(
     existing = get_product(who["store"], sku)
     if existing and who["seller"] is not None and existing.get("seller") != who["seller"]:
         raise HTTPException(status_code=403, detail="Bu SKU başqa satıcıya aiddir.")
+    glb_bytes = await _read_upload(model, "3D model (.glb)", MAX_GLB)
     raw = {"front": await _read_upload(front, "Ön"), "left": await _read_upload(left, "Sol"), "right": await _read_upload(right, "Sağ")}
-    if not raw["front"]:
-        raise HTTPException(status_code=400, detail="Ön şəkil mütləqdir.")
     parsed = parse_sizes(sizes)
     parsed = Sizes(parsed.lens_mm, parsed.bridge_mm, parsed.temple_mm, width_mm)
+    meta = {"name": name.strip() or sku, "seller": who["seller"] or "", "productUrl": product_url.strip()}
+
+    if glb_bytes:
+        w_mm, w_src = resolve_width([], parsed)
+        w_mm = max(MIN_WIDTH_MM, min(MAX_WIDTH_MM, w_mm or DEFAULT_WIDTH_MM))
+        size_dict = {"lens": parsed.lens_mm, "bridge": parsed.bridge_mm, "temple": parsed.temple_mm}
+
+        def work_glb():
+            thumb_img = load_image(raw["front"]) if raw["front"] else None
+            return save_glb_product(who["store"], sku, meta, glb_bytes, w_mm, w_src, size_dict, thumb_img)
+
+        try:
+            manifest = await run_in_threadpool(work_glb)
+        except (ValueError, PipelineError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return public_manifest(manifest, base_url(request))
+
+    if not raw["front"]:
+        raise HTTPException(status_code=400, detail="Ön şəkil və ya 3D .glb model mütləqdir.")
 
     def work():
         images = {k: load_image(v) for k, v in raw.items() if v}
         asset = build_asset(images.pop("front"), images, parsed)
         photos = {k: _jpeg(v) for k, v in raw.items() if v}
-        meta = {"name": name.strip() or sku, "seller": who["seller"] or "", "productUrl": product_url.strip()}
         return save_product(who["store"], sku, meta, asset, photos)
 
     try:

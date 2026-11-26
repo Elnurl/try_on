@@ -30,13 +30,19 @@ input[type="text"], input[type="number"], input[type="password"], input[type="ur
 .error { color: var(--danger); font-size: 14px; min-height: 1.2em; }
 .ok { color: #2f7a3d; }
 .drops { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0; }
-@media (max-width: 640px) { .drops { grid-template-columns: 1fr; } }
+.drops.drops-2 { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 640px) { .drops, .drops.drops-2 { grid-template-columns: 1fr; } }
+.mode-tabs { display: inline-flex; gap: 6px; padding: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; margin-bottom: 14px; }
+.mode-tab { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 999px; cursor: pointer; }
+.mode-tab.active { background: var(--ink); color: #fff; }
 .drop {
   position: relative; display: grid; place-items: center; text-align: center; aspect-ratio: 4 / 3; padding: 10px;
   border: 1.5px dashed #cfc6b8; border-radius: 12px; background: #fbf9f6 center/contain no-repeat; cursor: pointer; font-size: 13px; color: var(--muted);
 }
 .drop.filled { border-style: solid; color: transparent; }
 .drop.filled span { display: none; }
+.drop.drop-file.filled { color: var(--ink); background: #f2f7f2; border-color: #2f7a3d; }
+.drop.drop-file.filled span { display: block; }
 .drop b { display: block; color: var(--ink); font-size: 14px; }
 .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .drop.dragover { border-color: var(--accent); background-color: #fff6e3; }
