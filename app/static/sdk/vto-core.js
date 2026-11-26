@@ -27,7 +27,7 @@ const DEFAULT_PD_MM = 63;
 const IRIS_MM = 11.7;
 const CALIB_SAMPLES = 90;
 const PANTO_TILT = THREE.MathUtils.degToRad(7);
-const TEMPLE_DROP = THREE.MathUtils.degToRad(5);
+const TEMPLE_DROP = THREE.MathUtils.degToRad(1.5);
 const LOST_FACE_MS = 400;
 const LM = {
   eyeA: 33,
@@ -136,9 +136,9 @@ function rimTexture(image) {
     if (d[i + 3] < 210) {
       d[i + 3] = 0;
     } else {
-      d[i] = Math.round(d[i] * 0.65);
-      d[i + 1] = Math.round(d[i + 1] * 0.65);
-      d[i + 2] = Math.round(d[i + 2] * 0.65);
+      d[i] = Math.round(d[i] * 0.55);
+      d[i + 1] = Math.round(d[i + 1] * 0.55);
+      d[i + 2] = Math.round(d[i + 2] * 0.55);
       d[i + 3] = 255;
     }
   }
@@ -202,9 +202,9 @@ function lensGlare(lens, w, h, bend, material) {
 
 /** Smooth ergonomic 3D temple sized from the seller's side photo (mm). */
 function templeGeometry(length, h0, h1, thick, side, metal) {
-  const straight = length * 0.72;
-  const hook = Math.min(24, Math.max(14, length - straight));
-  const drop = straight * 0.025;
+  const straight = length * 0.74;
+  const hook = Math.min(16, Math.max(12, length - straight));
+  const drop = straight * 0.015;
   const line = [];
   const n = 20;
   for (let i = 0; i <= n; i += 1) {
@@ -215,7 +215,7 @@ function templeGeometry(length, h0, h1, thick, side, metal) {
   const m = 10;
   for (let j = 1; j <= m; j += 1) {
     const f = j / m;
-    const a = 0.08 + f * f * 0.92;
+    const a = 0.05 + f * f * 0.78;
     const prev = line[line.length - 1];
     line.push(new THREE.Vector2(prev.x + Math.cos(a) * (hook / m), prev.y - Math.sin(a) * (hook / m)));
   }
@@ -417,14 +417,17 @@ export async function buildGlasses(manifest) {
     map: rimTex,
     transparent: true,
     alphaTest: 0.45,
-    roughness: frontMetal ? 0.28 : 0.42,
-    metalness: frontMetal ? 0.65 : 0.08,
+    roughness: frontMetal ? 0.38 : 0.55,
+    metalness: frontMetal ? 0.45 : 0.04,
+    envMapIntensity: 0.22,
     side: THREE.DoubleSide,
   });
   const rimLayers = Math.max(2, Math.min(7, Math.round(frontThick / 0.65)));
   for (let i = 1; i <= rimLayers; i += 1) {
     const zDepth = (i / rimLayers) * frontThick;
     const layer = new THREE.Mesh(bentPlane(W, H, bend, -zDepth), rimMat);
+    // Slightly inset so back rim layers never peek above the top rim edge in frontal view.
+    layer.scale.set(0.992, 0.985, 1);
     layer.renderOrder = 3;
     face.add(layer);
   }
@@ -479,20 +482,27 @@ export async function buildGlasses(manifest) {
 
   const pivots = [];
 
+  // Average measured temple dimensions across sides so left and right arms are always symmetric.
+  const measuredSides = ["left", "right"].map((k) => templeSides[k]).filter((s) => s && s.rimMm != null);
+  const avg = (key, fallback) => {
+    const vals = measuredSides.map((s) => s[key]).filter((v) => v != null);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : fallback;
+  };
+  const symRim = avg("rimMm", templeBase.rimMm ?? 4);
+  const symFinish = (measuredSides[0] && measuredSides[0].finish) || templeBase.finish || "acetate";
+  const symMetal = symFinish === "metal";
+  const symH0 = THREE.MathUtils.clamp(symRim, 1.4, 18);
+  const symH1 = THREE.MathUtils.clamp(avg("tipMm", symH0 * (symMetal ? 0.68 : 0.72)), 1.2, symH0 * 1.05);
+  const symThick = THREE.MathUtils.clamp(avg("thickMm", templeBase.thickMm ?? symH0 * (symMetal ? 0.5 : 0.42)), 0.9, 4.2);
+  const symLength = templeBase.lengthMm || avg("lengthMm", 145);
+
   function sideConfig(sideKey) {
     const other = sideKey === "left" ? "right" : "left";
     const own = templeSides[sideKey] || {};
     const cfg = own.rimMm != null ? own : { ...(templeSides[other] || {}), ...own };
     const source = photoTemples[sideKey] ? sideKey : photoTemples[other] ? other : null;
-    const finish = cfg.finish || templeBase.finish || "acetate";
-    const metal = finish === "metal";
-    const rimMm = cfg.rimMm ?? templeBase.rimMm ?? 4;
-    const h0 = THREE.MathUtils.clamp(rimMm, 1.4, 18);
-    const h1 = THREE.MathUtils.clamp(cfg.tipMm ?? h0 * (metal ? 0.68 : 0.72), 1.2, h0 * 1.05);
-    const thick = THREE.MathUtils.clamp(cfg.thickMm ?? templeBase.thickMm ?? h0 * (metal ? 0.5 : 0.42), 0.9, 4.2);
-    const length = templeBase.lengthMm || cfg.lengthMm || 145;
     const color = cfg.color || templeBase.color || manifest.frameColor || "#222222";
-    return { metal, h0, h1, thick, length, color, source };
+    return { metal: symMetal, h0: symH0, h1: symH1, thick: symThick, length: symLength, color, source };
   }
 
   // Head-local +x is the wearer's left, so side +1 carries the "left" temple.
@@ -836,15 +846,19 @@ export function createTryOn(canvas) {
   /** Update the live MediaPipe face-contour depth occluder in scene space. */
   function updateFaceOccluder(lm, origin, xAxis, zAxis, pxPerMm) {
     const pos = faceGeo.attributes.position;
-    const pushBack = 8.5 * pxPerMm;
-    const sideInset = 9 * pxPerMm;
+    // Keep the nose bridge and inner brow close to the skin so far temples hide cleanly behind
+    // the eye/nose, while recessing outer cheek/temple edges so the near temple never gets notched.
+    const corePush = 3.2 * pxPerMm;
+    const sidePush = 9.0 * pxPerMm;
+    const sideInset = 10.0 * pxPerMm;
     const p = tmp.pt;
-    point(lm, LM.bridge, p).addScaledVector(zAxis, -pushBack);
+    point(lm, LM.bridge, p).addScaledVector(zAxis, -corePush);
     pos.setXYZ(0, p.x, p.y, p.z);
     for (let i = 0; i < FACE_OVAL.length; i += 1) {
       const idx = FACE_OVAL[i];
-      point(lm, idx, p).addScaledVector(zAxis, -pushBack);
-      if (SIDE_OVAL.has(idx)) {
+      const isSide = SIDE_OVAL.has(idx);
+      point(lm, idx, p).addScaledVector(zAxis, -(isSide ? sidePush : corePush));
+      if (isSide) {
         const dx = (p.x - origin.x) * xAxis.x + (p.y - origin.y) * xAxis.y + (p.z - origin.z) * xAxis.z;
         p.addScaledVector(xAxis, -Math.sign(dx) * sideInset);
       }
@@ -1010,23 +1024,22 @@ export function createTryOn(canvas) {
     const zc = -92;
     let occA = sideHalf - 3;
     if (u.isGlb) {
-      occA = Math.min(occA, (u.widthMm / 2) * s - 4.5);
-    } else {
+      occA = Math.min(occA, (u.widthMm / 2) * s - 3);
+    } else if (u.pivots.length) {
+      // Apply the exact same symmetric splay angle to both temples.
+      const hx = u.pivots[0].userData.hingeX * s;
+      const targetX = Math.max(sideHalf + 1.5, hx + 1);
+      const splay = THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), -0.04, 0.11);
+      const tanS = Math.tan(splay);
       for (const pivot of u.pivots) {
-        const hx = pivot.userData.hingeX * s;
-        const targetX = Math.max(sideHalf + 1.5, hx + 1);
-        // Real glasses hinges only flex ~5–6° outward; larger angles make temples flare out.
-        const splay = THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), -0.04, 0.11);
         pivot.rotation.y = -pivot.userData.side * splay;
-        // Guarantee the smooth head ellipsoid never clips the near temple from hinge to ear.
-        const tanS = Math.tan(splay);
-        for (const frac of [0.15, 0.42, 0.68, 0.9]) {
-          const z = zc + cz * frac;
-          const d = Math.max(0, zHinge - z);
-          const templeX = hx + d * tanS;
-          const ellipseW = Math.sqrt(Math.max(0.05, 1 - frac * frac));
-          occA = Math.min(occA, (templeX - 3.5) / ellipseW);
-        }
+      }
+      for (const frac of [0.15, 0.42, 0.68, 0.9]) {
+        const z = zc + cz * frac;
+        const d = Math.max(0, zHinge - z);
+        const templeX = hx + d * tanS;
+        const ellipseW = Math.sqrt(Math.max(0.05, 1 - frac * frac));
+        occA = Math.min(occA, (templeX - 3.5) / ellipseW);
       }
     }
     occluder.scale.set(Math.max(42, occA), 114, cz);
