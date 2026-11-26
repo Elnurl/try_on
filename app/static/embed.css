@@ -71,6 +71,18 @@ button, input, label { font: inherit; }
   backdrop-filter: blur(8px);
 }
 .fit-chip.warn { background: rgba(160, 98, 18, .78); }
+.render-toggle {
+  position: absolute; right: 14px; bottom: 14px; z-index: 3;
+  display: inline-flex; padding: 3px; border-radius: 999px;
+  background: rgba(17,18,20,.62); backdrop-filter: blur(8px);
+}
+.render-toggle[hidden] { display: none; }
+.render-toggle button {
+  border: 0; border-radius: 999px; padding: 6px 11px; cursor: pointer;
+  background: transparent; color: rgba(255,255,255,.78);
+  font: 700 11px/1 inherit; font-family: inherit; transition: background .15s, color .15s;
+}
+.render-toggle button.active { background: #fff; color: var(--ink); }
 .fit-panel {
   position: absolute; left: 14px; bottom: 56px; z-index: 4; width: min(300px, calc(100% - 28px));
   padding: 14px; border-radius: 16px; background: #fff; color: var(--ink);

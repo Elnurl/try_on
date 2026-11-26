@@ -263,6 +263,27 @@ def list_products(store_id: str) -> list[dict]:
     return items
 
 
+def set_render_mode(store_id: str, sku: str, render_mode: str) -> dict | None:
+    if render_mode not in ("2.5d", "auto3d"):
+        raise ValueError("Yanlış render rejimi (2.5d və ya auto3d olmalıdır).")
+    folder = product_dir(store_id, sku)
+    path = folder / "manifest.json"
+    if not path.exists():
+        return None
+    with _lock:
+        m = json.loads(path.read_text(encoding="utf-8"))
+        if m.get("type") == "glb":
+            return m
+        if render_mode == "auto3d" and not m.get("autoGlb"):
+            raise ValueError("Bu məhsul üçün Avto 3D modeli mövcud deyil.")
+        m["renderMode"] = render_mode
+        m["updatedAt"] = int(time.time())
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(m, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+    return m
+
+
 def delete_product(store_id: str, sku: str) -> bool:
     folder = product_dir(store_id, sku)
     if not folder.exists():

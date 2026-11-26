@@ -67,7 +67,13 @@
         </form>
 
         <section class="card" id="resultCard" hidden>
-          <h2 id="resultTitle">Nəticə</h2>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px">
+            <h2 id="resultTitle" style="margin: 0">Nəticə</h2>
+            <div class="mode-tabs" id="renderModeTabs" style="margin: 0" hidden>
+              <button type="button" class="mode-tab active" data-render="2.5d">2.5D (Şəkil)</button>
+              <button type="button" class="mode-tab" data-render="auto3d">Avto 3D (GLB)</button>
+            </div>
+          </div>
           <div class="grid2">
             <div>
               <canvas id="preview3d"></canvas>
@@ -93,6 +99,6 @@
       </div>
     </div>
     <script src="/sdk/eynek-vto.js" data-store="demo" defer></script>
-    <script type="module" src="/static/studio.js?v=10"></script>
+    <script type="module" src="/static/studio.js?v=11"></script>
   </body>
 </html>

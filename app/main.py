@@ -48,6 +48,7 @@ from app.storage import (  # noqa: E402
     rotate_key,
     save_glb_product,
     save_product,
+    set_render_mode,
     valid_sku,
     valid_store_id,
 )
@@ -111,6 +112,8 @@ def rebuild_outdated() -> None:
                 width = m.get("widthMm") if m.get("widthSource") == "given" else None
                 sizes = Sizes(given.get("lens"), given.get("bridge"), given.get("temple"), width)
                 asset = build_asset(images.pop("front"), images, sizes)
+                if m.get("renderMode") in ("2.5d", "auto3d") and asset.manifest.get("autoGlb"):
+                    asset.manifest["renderMode"] = m["renderMode"]
                 meta = {k: m[k] for k in ("name", "seller", "productUrl") if k in m}
                 save_product(m["store"], m["sku"], meta, asset, photos)
                 log.info("Rebuilt %s/%s with pipeline %s", m["store"], m["sku"], PIPELINE_VERSION)
@@ -329,6 +332,24 @@ def my_products(who: Caller, request: Request):
     if who["seller"] is not None:
         items = [m for m in items if m.get("seller") == who["seller"]]
     return {"store": who["store"], "products": [public_manifest(m, base) for m in items]}
+
+
+class RenderModeRequest(BaseModel):
+    renderMode: str
+
+
+@app.post("/v1/products/{sku}/render-mode")
+def update_render_mode(sku: str, body: RenderModeRequest, who: Caller, request: Request):
+    existing = get_product(who["store"], sku) if valid_sku(sku) else None
+    if not existing:
+        raise HTTPException(status_code=404, detail="Məhsul tapılmadı.")
+    if who["seller"] is not None and existing.get("seller") != who["seller"]:
+        raise HTTPException(status_code=403, detail="Bu SKU başqa satıcıya aiddir.")
+    try:
+        updated = set_render_mode(who["store"], sku, body.renderMode.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return public_manifest(updated, base_url(request))
 
 
 @app.delete("/v1/products/{sku}")

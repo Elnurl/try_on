@@ -1,6 +1,6 @@
 import { strings, pickLang } from "./embed-i18n.js?v=11";
 import { createFaceTracker } from "./sdk/face-tracker.js?v=2";
-import { createTryOn } from "./sdk/vto-core.js?v=15";
+import { createTryOn } from "./sdk/vto-core.js?v=16";
 
 const TERMS_VERSION = "1";
 const TERMS_KEY = "eynek-vto:terms";
@@ -526,6 +526,33 @@ function renderStrip() {
   }
 }
 
+function syncRenderToggle() {
+  const el = $("renderToggle");
+  if (!el) return;
+  const dual = Boolean(current && current.type !== "glb" && current.autoGlb && current.model && current.texture);
+  el.hidden = !dual;
+  if (!dual) return;
+  const active = current.renderMode === "auto3d" ? "auto3d" : "2.5d";
+  el.querySelectorAll("[data-render]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.render === active);
+  });
+}
+
+async function setLiveRenderMode(nextMode) {
+  if (!current || current.type === "glb" || !current.autoGlb || !current.model) return;
+  if ((current.renderMode || "2.5d") === nextMode) return;
+  current = { ...current, renderMode: nextMode };
+  manifests.set(current.sku, current);
+  syncRenderToggle();
+  try {
+    await vto.setProduct(current);
+    if (mode === "photo") redrawPhoto();
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || T.failed, false);
+  }
+}
+
 async function selectProduct(sku) {
   const m = await manifestFor(sku);
   try {
@@ -538,6 +565,7 @@ async function selectProduct(sku) {
   current = m;
   rememberInfo({ sku: m.sku, name: (info.get(m.sku) || {}).name || m.name });
   $("toast").hidden = true;
+  syncRenderToggle();
   renderHead();
   renderStrip();
   post("product-change");
@@ -641,6 +669,9 @@ function bind() {
   });
   $("camBtn").addEventListener("click", startCamera);
   $("fitChip").addEventListener("click", toggleFitPanel);
+  $("renderToggle")?.querySelectorAll("[data-render]").forEach((btn) => {
+    btn.addEventListener("click", () => setLiveRenderMode(btn.dataset.render));
+  });
   $("photoInput").addEventListener("change", (e) => usePhoto(e.target.files && e.target.files[0]));
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && embedded) closeWidget();

@@ -19,7 +19,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-PIPELINE_VERSION = 12
+PIPELINE_VERSION = 13
 log = logging.getLogger("vto.pipeline")
 MAX_SIDE = 1600
 DEFAULT_WIDTH_MM = 138.0
@@ -746,6 +746,7 @@ def build_asset(front: Image.Image, sides: dict[str, Image.Image], sizes: Sizes)
         glb_bytes = generate_eyewear_glb(px, lens_interiors, manifest, temple_strips)
         if glb_bytes:
             manifest["autoGlb"] = True
+            manifest["renderMode"] = "2.5d"
     except Exception as exc:  # noqa: BLE001
         log.warning("Auto 3D GLB generation skipped: %s", exc)
     return Asset(

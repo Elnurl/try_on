@@ -1,4 +1,4 @@
-import { createTryOn } from "./sdk/vto-core.js?v=15";
+import { createTryOn } from "./sdk/vto-core.js?v=16";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -119,12 +119,40 @@ async function showResult(m) {
   $("resultTitle").textContent = `${m.name || m.sku} — hazırdır`;
   const isGlb = m.type === "glb";
   const hasAutoGlb = Boolean(m.autoGlb && m.model);
+  const activeMode = m.renderMode === "auto3d" && hasAutoGlb ? "auto3d" : "2.5d";
   $("textureWrap").hidden = isGlb;
+  const rTabs = $("renderModeTabs");
+  if (rTabs) {
+    rTabs.hidden = isGlb || !hasAutoGlb;
+    rTabs.querySelectorAll("[data-render]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.render === activeMode);
+      btn.onclick = async () => {
+        const nextMode = btn.dataset.render;
+        if (nextMode === (m.renderMode || "2.5d")) return;
+        btn.disabled = true;
+        try {
+          const updated = await api(`/v1/products/${encodeURIComponent(m.sku)}/render-mode`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ renderMode: nextMode }),
+          });
+          await showResult(updated);
+          loadList();
+        } catch (err) {
+          alert(err.message);
+        } finally {
+          btn.disabled = false;
+        }
+      };
+    });
+  }
   $("previewNote").textContent = isGlb
     ? "Tam 3D GLB model — real millimetr ölçüsü və PBR işıqlandırma ilə göstərilir."
-    : hasAutoGlb
-      ? "Stok şəklindən avtomatik real 3D (.glb) model yaradıldı — bərk çərçivə, əyri PBR şüşə və simmetrik qollar."
-      : "Ön çərçivə ön şəkildən; hər qol yan şəkildən (qalınlıq, rəng, uzunluq) götürülür.";
+    : hasAutoGlb && activeMode === "auto3d"
+      ? "Avto 3D (.glb) rejimi aktivdir — istəsəniz yuxarıdan 2.5D (Şəkil) rejiminə qayıda bilərsiniz."
+      : hasAutoGlb
+        ? "Kəskin 2.5D (Şəkil) rejimi aktivdir — yuxarıdan Avto 3D (.glb) ilə müqayisə edib seçə bilərsiniz."
+        : "Ön çərçivə ön şəkildən; hər qol yan şəkildən (qalınlıq, rəng, uzunluq) götürülür.";
   if (!isGlb) $("texture").src = m.texture;
   const widthNote = { lens: "linzadan ölçüldü", given: "daxil edildi", sizes: "ölçülərdən", default: "standart" }[m.widthSource] || "";
   if (isGlb) {
@@ -135,7 +163,7 @@ async function showResult(m) {
   } else {
     const lenses = m.lenses || [];
     $("stats").innerHTML = [
-      ...(hasAutoGlb ? [stat("Format", "Avto 3D (GLB)")] : []),
+      ...(hasAutoGlb ? [stat("Aktiv rejim", activeMode === "auto3d" ? "Avto 3D (GLB)" : "2.5D (Şəkil) + GLB")] : []),
       stat(`Çərçivə eni (${widthNote})`, `${Math.round(m.widthMm)} mm`),
       stat(
         "Linzalar",
@@ -244,7 +272,11 @@ async function loadList() {
   for (const m of data.products) {
     const el = document.createElement("div");
     el.className = "item";
-    const badge = m.type === "glb" ? " · 3D GLB" : m.autoGlb ? " · Avto 3D" : "";
+    const badge = m.type === "glb"
+      ? " · 3D GLB"
+      : m.autoGlb
+        ? (m.renderMode === "auto3d" ? " · Avto 3D" : " · 2.5D + 3D")
+        : "";
     const dlBtn = m.model
       ? `<a class="btn small ghost" href="${escapeHtml(m.model)}" download="${escapeHtml(m.sku)}.glb">GLB</a>`
       : "";

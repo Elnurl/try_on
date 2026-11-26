@@ -449,7 +449,8 @@ async function buildGlbGlasses(manifest) {
 }
 
 export async function buildGlasses(manifest) {
-  if ((manifest.type === "glb" || manifest.autoGlb) && manifest.model) {
+  const useGlb = manifest.type === "glb" || (manifest.autoGlb && manifest.renderMode === "auto3d");
+  if (useGlb && manifest.model) {
     try {
       return await buildGlbGlasses(manifest);
     } catch (err) {
@@ -522,6 +523,7 @@ export async function buildGlasses(manifest) {
   const bridge = new THREE.Vector3((ax - 0.5) * W, (0.5 - ay) * H, 0);
 
   // Shadows sit on the skin, so they skip the depth test against the head occluder.
+  const skinShadows = new THREE.Group();
   const shadow = shadowTexture(tex.image);
   const shadowMat = new THREE.MeshBasicMaterial({
     map: shadow.tex,
@@ -533,7 +535,7 @@ export async function buildGlasses(manifest) {
   const shadowMesh = new THREE.Mesh(bentPlane(W * shadow.scaleX, H * shadow.scaleY, bend, -4), shadowMat);
   shadowMesh.position.y = -2.2;
   shadowMesh.renderOrder = 1;
-  face.add(shadowMesh);
+  skinShadows.add(shadowMesh);
 
   const blob = blobTexture();
   const noseMat = new THREE.MeshBasicMaterial({ map: blob, transparent: true, opacity: 0.28, depthWrite: false, depthTest: false });
@@ -542,8 +544,9 @@ export async function buildGlasses(manifest) {
     pad.position.set(bridge.x + side * 7.5, bridge.y - 9, -5);
     pad.rotation.z = side * 0.35;
     pad.renderOrder = 1;
-    face.add(pad);
+    skinShadows.add(pad);
   }
+  face.add(skinShadows);
 
   const glareTex = glareTexture();
   const glareMats = [];
@@ -630,6 +633,7 @@ export async function buildGlasses(manifest) {
     frontMat,
     shadowMat,
     noseMat,
+    skinShadows,
     glare: { tex: glareTex, mats: glareMats },
   };
   return root;

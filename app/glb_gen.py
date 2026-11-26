@@ -101,7 +101,7 @@ def _signed_area(pts: np.ndarray) -> float:
     return 0.5 * float(np.sum(x * np.roll(y, -1) - np.roll(x, -1) * y))
 
 
-def _smooth_loop(pts: np.ndarray, weight: float = 0.20, passes: int = 2) -> np.ndarray:
+def _smooth_loop(pts: np.ndarray, weight: float = 0.22, passes: int = 2) -> np.ndarray:
     out = pts.astype(np.float64).copy()
     if len(out) < 5:
         return out
@@ -109,6 +109,21 @@ def _smooth_loop(pts: np.ndarray, weight: float = 0.20, passes: int = 2) -> np.n
         prev_p = np.roll(out, 1, axis=0)
         next_p = np.roll(out, -1, axis=0)
         out = (1.0 - weight) * out + (weight * 0.5) * (prev_p + next_p)
+    return out
+
+
+def _chaikin_loop(pts: np.ndarray, passes: int = 1) -> np.ndarray:
+    """Quadratic B-spline corner cutting: turns polygonal rim contours into silky smooth curves."""
+    out = pts.astype(np.float64)
+    for _ in range(passes):
+        if len(out) < 4 or len(out) > 220:
+            break
+        nxt = np.roll(out, -1, axis=0)
+        q = 0.75 * out + 0.25 * nxt
+        r = 0.25 * out + 0.75 * nxt
+        out = np.empty((len(out) * 2, 2), dtype=np.float64)
+        out[0::2] = q
+        out[1::2] = r
     return out
 
 
@@ -236,14 +251,16 @@ def _build_front_frame_mesh(
         perim = cv2.arcLength(cnt, True)
         if perim < 16:
             return None
-        eps = max(0.7, 0.0011 * perim)
+        # Fixed sub-pixel tolerance (1.5 px on 2x mask = 0.75 original px) avoids octagonal facets on round rims.
+        eps = min(2.2, max(1.1, 0.00035 * perim))
         approx = cv2.approxPolyDP(cnt, eps, True)
         if len(approx) < 3:
             return None
         pts = px2x_to_mm(approx)
-        pts = _smooth_loop(pts, weight=0.18, passes=2)
-        pts = _subdivide_loop(pts, max_seg_mm=3.5)
-        pts = _dedup_loop(pts, tol=0.08)
+        pts = _chaikin_loop(pts, passes=1)
+        pts = _smooth_loop(pts, weight=0.22, passes=2)
+        pts = _subdivide_loop(pts, max_seg_mm=3.0)
+        pts = _dedup_loop(pts, tol=0.14)
         if len(pts) < 3:
             return None
         area = _signed_area(pts)
@@ -961,14 +978,16 @@ def generate_eyewear_glb(
     bx_mm = (bridge_xy[0] - 0.5) * w_mm
     by_mm = (0.5 - bridge_xy[1]) * h_mm
 
-    # Frame silhouette mask: opaque pixels minus detected lens interiors.
+    # Frame silhouette mask: keep thin rims 100% continuous (erode lens holes slightly so
+    # inner nasal rims near nose pads never get notched or broken).
     lens_union = np.zeros((h, w), dtype=bool)
     for interior in lens_interiors:
         if interior is not None and interior.shape == (h, w):
-            lens_union |= interior
-    frame_mask = (px[..., 3] > 185) & (~lens_union)
-    # Close 1px pinholes on thin metal rims while keeping lens openings crisp.
-    frame_mask = cv2.morphologyEx(frame_mask.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8)) > 0
+            eroded_lens = cv2.erode(interior.astype(np.uint8), np.ones((3, 3), np.uint8), iterations=1) > 0
+            lens_union |= eroded_lens
+    frame_mask = (px[..., 3] > 125) & (~lens_union)
+    # Close tiny gaps on razor-thin rims while keeping lens openings crisp.
+    frame_mask = cv2.morphologyEx(frame_mask.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8)) > 0
     frame_mask &= ~lens_union
     if frame_mask.sum() < 120:
         return None
