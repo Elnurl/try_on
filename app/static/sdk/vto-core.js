@@ -27,7 +27,7 @@ const DEFAULT_PD_MM = 63;
 const IRIS_MM = 11.7;
 const CALIB_SAMPLES = 90;
 const PANTO_TILT = THREE.MathUtils.degToRad(7);
-const TEMPLE_DROP = THREE.MathUtils.degToRad(1.5);
+const TEMPLE_DROP = THREE.MathUtils.degToRad(4.2);
 const LOST_FACE_MS = 400;
 const USER_OFFSET_MM = 12;
 const LM = {
@@ -376,12 +376,12 @@ async function buildGlbGlasses(manifest) {
           map: mat.map || null,
           transparent: true,
           opacity: mat.opacity !== undefined ? mat.opacity : 0.25,
-          roughness: Math.min(mat.roughness ?? 0.08, 0.1),
-          metalness: mat.metalness ?? 0.1,
+          roughness: Math.min(mat.roughness ?? 0.05, 0.05),
+          metalness: mat.metalness ?? 0.14,
           clearcoat: 1.0,
-          clearcoatRoughness: 0.05,
-          reflectivity: 0.92,
-          envMapIntensity: 1.45,
+          clearcoatRoughness: 0.04,
+          reflectivity: 0.96,
+          envMapIntensity: 2.1,
           depthWrite: false,
           side: THREE.DoubleSide,
         });
@@ -433,6 +433,36 @@ async function buildGlbGlasses(manifest) {
   }
   face.add(skinShadows);
 
+  // Add subtle moving lens glare on auto-3D GLB lenses so tinted glass has realistic depth & shine.
+  const glareTex = isAuto && (manifest.lenses || []).length ? glareTexture() : null;
+  const glareMats = [];
+  if (glareTex) {
+    const [ax, ay] = manifest.bridgeAnchor || [0.5, 0.45];
+    const bxOff = -(ax - 0.5) * W;
+    const byOff = -(0.5 - ay) * modelHeightMm;
+    for (const lens of manifest.lenses || []) {
+      const dark = lens.sunglass || (!lens.clear && (lens.opacity || 0) >= 0.55);
+      const baseOpacity = dark ? 0.24 : 0.34;
+      const glareMat = new THREE.MeshBasicMaterial({
+        map: glareTex,
+        transparent: true,
+        opacity: baseOpacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      glareMat.userData.baseOpacity = baseOpacity;
+      const mesh = lensGlare(lens, W, modelHeightMm, bendMm, glareMat);
+      if (mesh) {
+        mesh.position.x += bxOff;
+        mesh.position.y += byOff;
+        mesh.position.z += 0.35;
+        mesh.renderOrder = 5;
+        face.add(mesh);
+        glareMats.push(glareMat);
+      }
+    }
+  }
+
   root.userData = {
     isGlb: true,
     widthMm: W,
@@ -445,6 +475,7 @@ async function buildGlbGlasses(manifest) {
     shadowMat,
     noseMat,
     skinShadows,
+    glare: glareTex ? { tex: glareTex, mats: glareMats } : null,
   };
   return root;
 }
@@ -691,7 +722,7 @@ export function createTryOn(canvas) {
   head.add(occluder);
   const ears = [-1, 1].map((side) => {
     const ear = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), hiddenMat);
-    ear.scale.set(6, 22, 11);
+    ear.scale.set(9, 28, 15);
     ear.userData.side = side;
     ear.renderOrder = -2;
     head.add(ear);
@@ -1133,10 +1164,15 @@ export function createTryOn(canvas) {
     const zc = -92;
     let occA = sideHalf - 3;
     if (u.pivots.length) {
-      // Apply the exact same symmetric splay angle to both temples (both 2.5D and auto-3D GLB).
+      // In live mode the orthographic camera has no perspective foreshortening, while real ears
+      // in the webcam image sit further back and therefore appear narrower than the front rim.
+      // Gently tuck temples inward toward the foreshortened ear instead of splaying them into air.
       const hx = u.pivots[0].userData.hingeX * s;
-      const targetX = Math.max(sideHalf + 1.5, hx + 1);
-      const splay = THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), -0.04, 0.11);
+      const targetX = mode === "preview" ? Math.max(sideHalf, hx + 1) : Math.min(sideHalf - 4, hx - 2.5);
+      const splay =
+        mode === "preview"
+          ? THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), -0.02, 0.04)
+          : THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), -0.085, 0.008);
       const tanS = Math.tan(splay);
       for (const pivot of u.pivots) {
         pivot.rotation.y = -pivot.userData.side * splay;
@@ -1152,7 +1188,7 @@ export function createTryOn(canvas) {
       occA = Math.min(occA, (u.widthMm / 2) * s - 3);
     }
     occluder.scale.set(Math.max(42, occA), 114, cz);
-    for (const ear of ears) ear.position.set(ear.userData.side * (sideHalf + 5), -36, -104);
+    for (const ear of ears) ear.position.set(ear.userData.side * (sideHalf + 1), -15, -90);
   }
 
   function posePreview(angle) {

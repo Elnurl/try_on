@@ -413,7 +413,7 @@ def _build_lens_mesh(
     by_mm = (0.5 - bridge_xy[1]) * h_mm
 
     # Tuck lens perimeter slightly into the 3D rim so there is zero hairline gap.
-    pad_px = max(2, round(w * 0.0045))
+    pad_px = max(3, round(w * 0.0055))
     k = pad_px * 2 + 1
     grown = cv2.dilate(lens_mask.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
     contours, _ = cv2.findContours(grown, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
@@ -421,15 +421,17 @@ def _build_lens_mesh(
         return None
     cnt = max(contours, key=cv2.contourArea)
     perim = cv2.arcLength(cnt, True)
-    approx = cv2.approxPolyDP(cnt, max(1.0, 0.0045 * perim), True).reshape(-1, 2).astype(np.float64)
+    # Tight epsilon + subdivide BEFORE light smoothing so rectangular lens corners are never sliced off.
+    approx = cv2.approxPolyDP(cnt, min(1.8, max(0.8, 0.0014 * perim)), True).reshape(-1, 2).astype(np.float64)
     if len(approx) < 6:
         return None
 
     u = approx[:, 0] / max(w - 1, 1)
     v = approx[:, 1] / max(h - 1, 1)
     boundary = np.stack([(u - 0.5) * w_mm - bx_mm, (0.5 - v) * h_mm - by_mm], axis=1)
-    boundary = _smooth_loop(boundary, weight=0.22, passes=2)
-    boundary = _dedup_loop(boundary, tol=0.25)
+    boundary = _subdivide_loop(boundary, max_seg_mm=3.0)
+    boundary = _smooth_loop(boundary, weight=0.14, passes=1)
+    boundary = _dedup_loop(boundary, tol=0.22)
     if len(boundary) < 6:
         return None
 
@@ -625,7 +627,7 @@ def _build_nose_pads(
         pads.append(
             _ellipsoid_mesh(
                 (px, py, pz),
-                (1.15, 4.2, 2.3),
+                (0.75, 2.8, 1.4),
                 rot_y=side * 0.42,
                 rot_z=side * 0.16,
             )
@@ -663,9 +665,9 @@ def _build_temple_mesh(
     n_s = 12
     n_b = 14
     drop_mm = min(15.5, max(11.5, bend_len * 0.36))
-    inward_mm = 4.6 if metal else 5.2
+    inward_mm = 6.2 if metal else 6.8
 
-    # Build ergonomic 3D spine: straight section with gentle 1.5° tilt -> smooth behind-ear hook.
+    # Build ergonomic 3D spine: straight section with gentle tilt -> smooth behind-ear hook.
     spine: list[np.ndarray] = []
     heights: list[float] = []
     widths: list[float] = []
@@ -674,9 +676,9 @@ def _build_temple_mesh(
     for i in range(n_s + 1):
         t = i / n_s
         z = -straight * t
-        y = -straight * t * 0.014
+        y = -straight * t * 0.022
         # Slight organic inward tuck near the ear so temple sits cleanly behind the ear.
-        x = -side * (0.45 * (t**2))
+        x = -side * (1.2 * (t**2))
         h_cur = h0_mm + (h1_mm - h0_mm) * t
         w_cur = thick_mm * (1.0 - 0.14 * t)
         spine.append(np.array([x, y, z], dtype=np.float64))
@@ -986,8 +988,8 @@ def generate_eyewear_glb(
             eroded_lens = cv2.erode(interior.astype(np.uint8), np.ones((3, 3), np.uint8), iterations=1) > 0
             lens_union |= eroded_lens
     frame_mask = (px[..., 3] > 125) & (~lens_union)
-    # Close tiny gaps on razor-thin rims while keeping lens openings crisp.
-    frame_mask = cv2.morphologyEx(frame_mask.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8)) > 0
+    # Close 1px pinholes on razor-thin rims without inflating corners into blobs.
+    frame_mask = cv2.morphologyEx(frame_mask.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8)) > 0
     frame_mask &= ~lens_union
     if frame_mask.sum() < 120:
         return None
@@ -1091,7 +1093,7 @@ def generate_eyewear_glb(
                 {
                     "name": "nose_pad_silicone",
                     "pbrMetallicRoughness": {
-                        "baseColorFactor": [*_rgb_to_linear((0.92, 0.91, 0.89)), 0.52],
+                        "baseColorFactor": [*_rgb_to_linear((0.92, 0.91, 0.89)), 0.26],
                         "metallicFactor": 0.0,
                         "roughnessFactor": 0.36,
                     },
