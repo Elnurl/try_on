@@ -17,17 +17,15 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-PIPELINE_VERSION = 8
+PIPELINE_VERSION = 10
 MAX_SIDE = 1600
 DEFAULT_WIDTH_MM = 138.0
 DEFAULT_TEMPLE_MM = 145.0
 MIN_WIDTH_MM, MAX_WIDTH_MM = 100.0, 175.0
 CLEAR_SHEEN_ALPHA = 10
-LENS_ALPHA_MIN, LENS_ALPHA_MAX = 0.10, 0.74
-LENS_ALPHA_MAX_DARK = 0.94
+LENS_ALPHA_MIN, LENS_ALPHA_MAX = 0.10, 0.68
 LENS_GAMMA = 1.0
-LENS_COLOR_KEEP = 0.45
-LENS_COLOR_KEEP_DARK = 0.92
+LENS_COLOR_KEEP = 0.42
 LENS_WIDTH_FACTOR = 1.04
 
 _REMBG_SESSION = None
@@ -165,7 +163,7 @@ def _crop_temple_tips(px: np.ndarray) -> np.ndarray:
 def _crop_temple_stubs(px: np.ndarray) -> np.ndarray:
     """Temples seen in perspective stick up above the end pieces; trim to the frame's top line."""
     h, w = px.shape[:2]
-    solid = px[..., 3] > 128
+    solid = px[..., 3] > 90
     cols = solid.any(axis=0)
     top = np.where(cols, solid.argmax(axis=0), h).astype(np.float32)
     out = px.copy()
@@ -179,8 +177,8 @@ def _crop_temple_stubs(px: np.ndarray) -> np.ndarray:
         if ok.sum() < 5:
             continue
         slope, icept = np.polyfit(ref_cols[ok], ref[ok], 1)
-        line = slope * zone_cols + icept - h * 0.015
-        if (top[zone_cols] < line - h * 0.04).sum() < w * 0.02:
+        line = slope * zone_cols + icept - h * 0.01
+        if (top[zone_cols] < line - h * 0.02).sum() < max(4, w * 0.01):
             continue
         rows = np.arange(h, dtype=np.float32)[:, None]
         keep = np.clip(rows - line[None, :] + 1.5, 0, 1)
@@ -326,23 +324,16 @@ def _apply_lenses(px: np.ndarray) -> tuple[np.ndarray, list[dict], int]:
             tint = "#f0f4f8"
             opacity = CLEAR_SHEEN_ALPHA / 255
         else:
+            # A tinted lens filters light (face × transmission); capping opacity keeps eyes
+            # subtly visible even on dark sunglasses so they look like glass, not solid paint.
             rgb = _smooth_tint(rgb, interior)
             sunglass = _lens_is_sunglass(rgb, interior)
-            if sunglass:
-                # Gün eynəyi / tünd linza: teksturada qara qalsın (optik rəngi üçün azaldılmasın).
-                transmission = np.power(rgb / 255, 1.35)
-                lens_a = np.clip(1 - transmission.mean(axis=2, keepdims=True) * 0.55, 0.82, LENS_ALPHA_MAX_DARK)
-                target_rgb = rgb * LENS_COLOR_KEEP_DARK
-                target_a = lens_a * 255
-                tint = _hex(np.median(rgb[interior], axis=0))
-                opacity = round(float(np.median(target_a[interior])) / 255, 3)
-            else:
-                transmission = np.power(rgb / 255, LENS_GAMMA)
-                lens_a = np.clip(1 - transmission.mean(axis=2, keepdims=True), LENS_ALPHA_MIN, LENS_ALPHA_MAX)
-                target_rgb = rgb * LENS_COLOR_KEEP
-                target_a = lens_a * 255
-                tint = _hex(np.median(px[..., :3][interior], axis=0))
-                opacity = round(float(np.median(target_a[interior])) / 255, 3)
+            transmission = np.power(rgb / 255, LENS_GAMMA)
+            lens_a = np.clip(1 - transmission.mean(axis=2, keepdims=True), LENS_ALPHA_MIN, LENS_ALPHA_MAX)
+            target_rgb = rgb * LENS_COLOR_KEEP
+            target_a = lens_a * 255
+            tint = _hex(np.median(rgb[interior], axis=0))
+            opacity = round(float(np.median(target_a[interior])) / 255, 3)
         out[..., :3] = rgb * (1 - weight) + target_rgb * weight
         out[..., 3:4] = alpha * (1 - weight) + target_a * weight
         ys, xs = np.nonzero(interior)
@@ -507,10 +498,12 @@ def _smooth(values: np.ndarray, k: int = 5) -> np.ndarray:
 
 
 def _temple_profile(px: np.ndarray, frame_h_mm: float, temple_mm: float) -> dict | None:
-    """Temple silhouette (mm) and texture from a side / 3-4 photo.
+    """Measure real temple dimensions (mm) and optional straight-section texture from a side/3-4 photo.
 
-    Height is scaled by the frame height seen in the same photo (vertical lengths are not
-    foreshortened in a 3/4 view); length is scaled to the "…-142" temple size.
+    Vertical height is immune to horizontal foreshortening in 3/4 shots, so scaling by the
+    frame height seen in the same photo gives accurate thin-vs-thick temple proportions.
+    We build smooth 3D geometry on the client from these measurements instead of extruding
+    raw foreshortened pixel silhouettes (which distort the hinge and ear hook).
     """
     raw = px[..., 3] > 120
     alpha = raw | _fill_holes(raw)
@@ -536,58 +529,64 @@ def _temple_profile(px: np.ndarray, frame_h_mm: float, temple_mm: float) -> dict
         return None
 
     sy = frame_h_mm / frame_px
-    sx = temple_mm * 0.94 / arm_len
-    straight = heights[arm_len * 15 // 100 : max(arm_len * 15 // 100 + 3, arm_len * 65 // 100)]
-    hinge_mm = float(np.median(straight)) * sy
+    i0 = arm_len * 12 // 100
+    i1 = max(i0 + 3, arm_len * 36 // 100)
+    i2 = arm_len * 45 // 100
+    i3 = max(i2 + 3, arm_len * 72 // 100)
+    hinge_mm = float(np.median(heights[i0:i1])) * sy
+    mid_mm = float(np.median(heights[i2:i3])) * sy
     if not 0.8 <= hinge_mm <= 20:
         return None
+    hinge_mm = float(np.clip(hinge_mm, 1.4, 18.0))
+    mid_mm = float(np.clip(mid_mm, 1.2, hinge_mm * 1.05))
 
-    # Perspective tilts the arm in a 3/4 shot; shear it level (heights stay untouched).
-    idx = np.arange(arm_len)
-    centers = np.array([(t + b) / 2 for _, t, b in runs], np.float32)
-    head = max(5, arm_len * 65 // 100)
-    slope = float(np.polyfit(idx[:head], centers[:head], 1)[0])
-    shift = np.round(slope * idx).astype(int)
+    # Core mask along the straight run avoids anti-aliased border halos when sampling colour.
+    core_mask = np.zeros((h, w), bool)
+    for x, top, bot in runs[i0:i3]:
+        pad = max(1, (bot - top) // 4)
+        t_in, b_in = min(top + pad, bot), max(bot - pad, top)
+        core_mask[t_in : b_in + 1, x] = True
 
-    xs = idx.astype(np.float32)
-    tops_px = np.array([t for _, t, _ in runs]) - shift
-    bots_px = np.array([b for _, _, b in runs]) - shift
-    tops = _smooth(tops_px)
-    bots = _smooth(bots_px)
-    lead = max(3, arm_len // 20)
-    y0 = float(np.mean((tops[:lead] + bots[:lead]) / 2))
-    pick = np.unique(np.linspace(0, arm_len - 1, min(arm_len, 48)).round().astype(int))
-    top_pts = [[round(float((xs[i] + 0.5) * sx), 2), round(float((y0 - tops[i] - 0.6) * sy), 2)] for i in pick]
-    bot_pts = [[round(float((xs[i] + 0.5) * sx), 2), round(float((y0 - bots[i] - 0.4) * sy), 2)] for i in pick]
-
-    r0 = int(tops_px.min())
-    r1 = int(bots_px.max())
-    rows = np.arange(r0, r1 + 1)
-    tex = np.zeros((r1 - r0 + 1, arm_len, 4), np.uint8)
-    arm_mask = np.zeros((h, w), bool)
-    for i, (x, top, bot) in enumerate(runs):
-        inner_t, inner_b = min(top + 1, bot), max(bot - 1, top)
-        tex[:, i] = px[np.clip(rows + shift[i], inner_t, inner_b), x]
-        arm_mask[top : bot + 1, x] = True
-    tex[..., 3] = 255
+    # Only attach a straight-section texture when the temple is wide enough to show a visible
+    # logo or pattern (e.g. thick acetate / tortoise); solid thin temples render cleaner in 3D.
+    texture = None
+    core_rgb = px[..., :3][core_mask & (px[..., 3] > 200)]
+    if hinge_mm >= 5.5 and len(core_rgb) >= 60:
+        luma = core_rgb.mean(axis=1)
+        contrast = float(np.percentile(luma, 98) - np.percentile(luma, 8))
+        if contrast > 55:
+            seg = runs[i0:i3]
+            seg_len = len(seg)
+            seg_idx = np.arange(seg_len)
+            centers = np.array([(t + b) / 2 for _, t, b in seg], np.float32)
+            slope = float(np.polyfit(seg_idx, centers, 1)[0])
+            shift = np.round(slope * seg_idx).astype(int)
+            tops = np.array([t for _, t, _ in seg]) - shift
+            bots = np.array([b for _, _, b in seg]) - shift
+            r0 = int(np.percentile(tops, 15))
+            r1 = int(np.percentile(bots, 85))
+            if r1 - r0 >= 8:
+                rows = np.arange(r0, r1 + 1)
+                tex = np.zeros((r1 - r0 + 1, seg_len, 4), np.uint8)
+                for i, (x, top, bot) in enumerate(seg):
+                    inner_t, inner_b = min(top + 1, bot), max(bot - 1, top)
+                    tex[:, i] = px[np.clip(rows + shift[i], inner_t, inner_b), x]
+                tex[..., 3] = 255
+                texture = Image.fromarray(tex, "RGBA")
 
     return {
         "side": "left" if tip_right else "right",
-        "texture": Image.fromarray(tex, "RGBA"),
-        "mask": arm_mask,
+        "texture": texture,
+        "mask": core_mask,
         "hingeMm": hinge_mm,
-        "profile": {
-            "points": top_pts + bot_pts[::-1],
-            "uv": [0.0, round((y0 - r1 - 1) * sy, 3), round(arm_len * sx, 3), round((r1 + 1 - r0) * sy, 3)],
-            "lengthMm": round(arm_len * sx, 1),
-        },
+        "midMm": mid_mm,
     }
 
 
 def _temple_thick(hinge_mm: float, finish: str) -> float:
     if finish == "metal":
-        return float(np.clip(hinge_mm * 0.55, 0.8, 1.8))
-    return float(np.clip(hinge_mm * 0.42, 1.2, 4.5))
+        return float(np.clip(hinge_mm * 0.55, 0.9, 1.8))
+    return float(np.clip(hinge_mm * 0.42, 1.2, 4.2))
 
 
 def analyze_side(img: Image.Image, frame_h_mm: float, temple_mm: float) -> tuple[Image.Image, dict]:
@@ -601,11 +600,12 @@ def analyze_side(img: Image.Image, frame_h_mm: float, temple_mm: float) -> tuple
         info.update(
             side=found["side"],
             rimMm=round(found["hingeMm"], 2),
+            tipMm=round(found["midMm"], 2),
             thickMm=round(_temple_thick(found["hingeMm"], finish), 2),
-            profile=found["profile"],
-            texture=found["texture"],
             source="photo",
         )
+        if found["texture"] is not None:
+            info["texture"] = found["texture"]
     else:
         info["source"] = "photo-color"
     return Image.fromarray(px, "RGBA"), info
@@ -638,8 +638,8 @@ def build_asset(front: Image.Image, sides: dict[str, Image.Image], sizes: Sizes)
     h, w = px.shape[:2]
     if w < 120 or w / max(h, 1) < 1.2:
         raise PipelineError("Ön şəkil düz öndən olmalıdır: eynək tam görünsün, yan bucaqdan yox.")
-    px, lenses, split = _apply_lenses(px)
     px = _refine_alpha_edges(px)
+    px, lenses, split = _apply_lenses(px)
     if len(lenses) == 2:
         (wa, wb) = (lenses[0]["box"][2], lenses[1]["box"][2])
         mid = (lenses[0]["center"][0] + lenses[1]["center"][0]) / 2
@@ -697,7 +697,7 @@ def build_asset(front: Image.Image, sides: dict[str, Image.Image], sizes: Sizes)
 
     temple_sides = {}
     for name, info in side_info.items():
-        keys = ("color", "finish", "rimMm", "thickMm", "lengthMm", "source", "profile", "texture")
+        keys = ("color", "finish", "rimMm", "tipMm", "thickMm", "lengthMm", "source", "texture")
         temple_sides[name] = {k: info[k] for k in keys if k in info}
     if len(temple_sides) == 1:
         warnings.append("temple_one_side")
