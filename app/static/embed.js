@@ -1,6 +1,6 @@
 import { strings, pickLang } from "./embed-i18n.js?v=13";
 import { createFaceTracker } from "./sdk/face-tracker.js?v=2";
-import { createTryOn } from "./sdk/vto-core.js?v=19";
+import { createTryOn } from "./sdk/vto-core.js?v=20";
 
 const TERMS_VERSION = "1";
 const TERMS_KEY = "eynek-vto:terms";

@@ -294,6 +294,61 @@ function blobTexture() {
   return new THREE.CanvasTexture(canvas);
 }
 
+/** Softly fade temple tips behind the ear in live mode (stays 100% solid in 3D preview). */
+function attachTempleFade(mat, fadeStartZ, fadeEndZ, liveUniform) {
+  mat.transparent = true;
+  mat.depthWrite = true;
+  mat.customProgramCacheKey = () => "eynek-temple-fade";
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uLiveFade = liveUniform;
+    shader.uniforms.uFadeStart = { value: fadeStartZ };
+    shader.uniforms.uFadeEnd = { value: fadeEndZ };
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying float vTempleZ;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvTempleZ = position.z;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nuniform float uLiveFade;\nuniform float uFadeStart;\nuniform float uFadeEnd;\nvarying float vTempleZ;",
+      )
+      .replace(
+        "#include <color_fragment>",
+        "#include <color_fragment>\nif (uLiveFade > 0.5) { float tf = smoothstep(uFadeEnd, uFadeStart, vTempleZ); if (tf < 0.02) discard; diffuseColor.a *= tf; }",
+      );
+  };
+}
+
+/** Single continuous 3D head+ear occluder in head-local mm (replaces disconnected spheres & 2D fan). */
+function buildHeadOccluder() {
+  const geo = new THREE.SphereGeometry(1, 48, 32);
+  const pos = geo.attributes.position;
+  const ss = (e0, e1, x) => {
+    const t = THREE.MathUtils.clamp((x - e0) / (e1 - e0), 0, 1);
+    return t * t * (3 - 2 * t);
+  };
+  for (let i = 0; i < pos.count; i += 1) {
+    const ux = pos.getX(i);
+    const uy = pos.getY(i);
+    const uz = pos.getZ(i);
+    const y = -10 + uy * 108;
+    const z = -90 + uz * 88;
+    let xFactor = 1.0;
+    // Natural cheek/jaw taper below eye level.
+    xFactor -= 0.12 * ss(-22, -98, y);
+    // Subtle temple-channel recess along the visible straight temple path so 3/4 turns never notch the near arm.
+    const inTempleZ = ss(-86, -68, z) * (1 - ss(-22, -6, z));
+    const inTempleY = ss(-20, -6, y) * (1 - ss(10, 24, y));
+    xFactor -= 0.065 * inTempleZ * inTempleY * ss(0.4, 0.85, Math.abs(ux));
+    // Seamless behind-ear flare: widens smoothly behind z = -82mm so the temple tip stays buried behind the ear.
+    const behindEar = 1 - ss(-94, -76, z);
+    const earBandY = ss(-58, -32, y) * (1 - ss(8, 28, y));
+    xFactor += 0.24 * behindEar * earBandY * ss(0.3, 0.75, Math.abs(ux));
+    pos.setXYZ(i, ux * xFactor, y, z);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
 /** Load and normalise a real 3D .glb eyewear model into head-local millimetres. */
 async function buildGlbGlasses(manifest) {
   const [gltf, frontTex] = await Promise.all([
@@ -355,10 +410,13 @@ async function buildGlbGlasses(manifest) {
     straightMm = Math.max(70, (size.z || 140) * 0.72);
   }
 
+  const templeFadeUniform = { value: 1.0 };
+  const liftMats = [];
   model.traverse((node) => {
     if (!node.isMesh) return;
     const isPad = /nose_pad/i.test(node.name);
     const isLensNode = /lens|glass/i.test(node.name);
+    const isTempleNode = /temple_(left|right)/i.test(node.name);
     const mats = Array.isArray(node.material) ? node.material : [node.material];
     let hasGlass = false;
     const nextMats = mats.map((mat) => {
@@ -392,6 +450,11 @@ async function buildGlbGlasses(manifest) {
       if (isPad) {
         mat.transparent = true;
         mat.depthWrite = false;
+      } else {
+        if ("emissive" in mat) liftMats.push(mat);
+        if (isAuto && isTempleNode) {
+          attachTempleFade(mat, -straightMm * 0.84 * 0.001, -straightMm * 1.16 * 0.001, templeFadeUniform);
+        }
       }
       return mat;
     });
@@ -472,9 +535,12 @@ async function buildGlbGlasses(manifest) {
     bridge: new THREE.Vector3(0, 0, 0),
     face,
     pivots,
+    liftMats,
+    templeFadeUniform,
     shadowMat,
     noseMat,
     skinShadows,
+    templeShadows: [],
     glare: glareTex ? { tex: glareTex, mats: glareMats } : null,
   };
   return root;
@@ -518,12 +584,15 @@ export async function buildGlasses(manifest) {
     ? THREE.MathUtils.clamp(frontRimHint * 0.55, 1.3, 2.2)
     : THREE.MathUtils.clamp(frontRimHint * 0.65, 1.8, 4.4);
 
-  const frontMat = new THREE.MeshBasicMaterial({
+  const frontMat = new THREE.MeshStandardMaterial({
     map: tex,
     transparent: true,
     depthWrite: true,
     depthTest: true,
-    alphaTest: 0.06,
+    alphaTest: 0.05,
+    roughness: frontMetal ? 0.30 : 0.44,
+    metalness: frontMetal ? 0.22 : 0.04,
+    envMapIntensity: frontMetal ? 0.85 : 0.45,
     side: THREE.DoubleSide,
   });
   const front = new THREE.Mesh(bentPlane(W, H, bend), frontMat);
@@ -626,17 +695,31 @@ export async function buildGlasses(manifest) {
     return { metal: symMetal, h0: symH0, h1: symH1, thick: symThick, length: symLength, color, source };
   }
 
+  const templeFadeUniform = { value: 1.0 };
+  const liftMats = [frontMat, rimMat];
+  const templeShadows = [];
+  const templeShadowMat = new THREE.MeshBasicMaterial({
+    map: blob,
+    transparent: true,
+    opacity: 0.16,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+
   // Head-local +x is the wearer's left, so side +1 carries the "left" temple.
   for (const side of [-1, 1]) {
     const sideKey = side > 0 ? "left" : "right";
     const cfg = sideConfig(sideKey);
-    const map = cfg.source ? templeTexture(photoTemples[cfg.source], cfg.length * 0.72, (cfg.h0 + cfg.h1) / 2) : null;
+    const straightLen = cfg.length * 0.62;
+    const map = cfg.source ? templeTexture(photoTemples[cfg.source], straightLen, (cfg.h0 + cfg.h1) / 2) : null;
     const armMat = new THREE.MeshStandardMaterial({
-      color: map ? new THREE.Color(0.82, 0.82, 0.82) : new THREE.Color(cfg.color),
+      color: map ? new THREE.Color(0.84, 0.84, 0.84) : new THREE.Color(cfg.color),
       map,
-      roughness: cfg.metal ? 0.24 : 0.34,
-      metalness: cfg.metal ? 0.72 : 0.08,
+      roughness: cfg.metal ? 0.26 : 0.36,
+      metalness: cfg.metal ? 0.68 : 0.08,
     });
+    attachTempleFade(armMat, -straightLen * 0.84, -straightLen * 1.16, templeFadeUniform);
+    liftMats.push(armMat);
     const geo = templeGeometry(cfg.length, cfg.h0, cfg.h1, cfg.thick, side, cfg.metal);
     const pivot = new THREE.Group();
     const hingeX = W / 2 - Math.max(3.2, cfg.thick * 1.2);
@@ -647,6 +730,13 @@ export async function buildGlasses(manifest) {
     const arm = new THREE.Mesh(geo, armMat);
     arm.renderOrder = 3;
     pivot.add(arm);
+    // Soft contact shadow cast by the temple onto the side of the face in live view.
+    const tShad = new THREE.Mesh(new THREE.PlaneGeometry(straightLen * 0.82, Math.max(4.5, cfg.h0 * 1.6)), templeShadowMat);
+    tShad.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2;
+    tShad.position.set(-side * 1.8, -cfg.h0 * 0.55 - 1.6, -straightLen * 0.44);
+    tShad.renderOrder = 1;
+    pivot.add(tShad);
+    templeShadows.push(tShad);
     pivot.userData.side = side;
     pivot.userData.hingeX = hingeX;
     face.add(pivot);
@@ -663,9 +753,13 @@ export async function buildGlasses(manifest) {
     face,
     pivots,
     frontMat,
+    liftMats,
+    templeFadeUniform,
     shadowMat,
     noseMat,
+    templeShadowMat,
     skinShadows,
+    templeShadows,
     glare: { tex: glareTex, mats: glareMats },
   };
   return root;
@@ -697,8 +791,9 @@ export function createTryOn(canvas) {
   rim.position.set(-0.85, 0.35, 0.25);
   scene.add(rim);
 
-  const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 8000);
-  ortho.position.z = 4000;
+  // Real perspective camera for live/photo try-on so temples naturally foreshorten toward the
+  // user's ears at every head pitch/yaw and distance, matching real webcam/phone optics.
+  const liveCam = new THREE.PerspectiveCamera(46, 1, 10, 12000);
   const persp = new THREE.PerspectiveCamera(28, 1, 10, 4000);
   persp.position.set(0, 34, 330);
   persp.lookAt(0, 0, 0);
@@ -709,47 +804,22 @@ export function createTryOn(canvas) {
   bg.renderOrder = -10;
   scene.add(bg);
 
-  // Depth-only head: cranium ellipsoid + ear spheres + live MediaPipe face-contour mesh.
-  // Together they occlude the far temple right at the user's real brow/cheek silhouette
-  // without ever clipping the front lenses or the near temple.
+  // Unified continuous depth-only 3D head+ear occluder attached to `head`.
+  // Replaces disconnected spheres and 2D fans so temples never get notched mid-way or pop out behind the ear.
   const head = new THREE.Group();
   head.visible = false;
   scene.add(head);
   const hiddenMat = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide });
-  const occluder = new THREE.Mesh(new THREE.SphereGeometry(1, 36, 24), hiddenMat);
+  const occluder = new THREE.Mesh(buildHeadOccluder(), hiddenMat);
   occluder.renderOrder = -2;
-  occluder.position.set(0, -12, -92);
   head.add(occluder);
-  const ears = [-1, 1].map((side) => {
-    const ear = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), hiddenMat);
-    ear.scale.set(7, 24, 12);
-    ear.userData.side = side;
-    ear.renderOrder = -2;
-    head.add(ear);
-    return ear;
-  });
 
-  // Live MediaPipe face-contour depth mesh in scene space (1 center + 36 oval vertices).
-  const faceGeo = new THREE.BufferGeometry();
-  const facePos = new Float32Array((1 + FACE_OVAL.length) * 3);
-  const faceIdx = [];
-  for (let i = 0; i < FACE_OVAL.length; i += 1) {
-    faceIdx.push(0, 1 + i, 1 + ((i + 1) % FACE_OVAL.length));
-  }
-  faceGeo.setAttribute("position", new THREE.BufferAttribute(facePos, 3));
-  faceGeo.setIndex(faceIdx);
-  const faceOccluder = new THREE.Mesh(faceGeo, hiddenMat);
-  faceOccluder.renderOrder = -2;
-  faceOccluder.visible = false;
-  faceOccluder.frustumCulled = false;
-  scene.add(faceOccluder);
-
-  // Lightweight 24×18 offscreen sampler for real-time room light & colour-temperature estimation.
+  // Lightweight 24×18 offscreen sampler for real-time room light, colour-temp & camera black-level estimation.
   const lightCanvas = document.createElement("canvas");
   lightCanvas.width = 24;
   lightCanvas.height = 18;
   const lightCtx = lightCanvas.getContext("2d", { willReadFrequently: true });
-  const lightState = { lastT: 0, luma: 0.6, r: 1, g: 1, b: 1, dirX: 0.35 };
+  const lightState = { lastT: 0, luma: 0.6, black: 0.08, r: 1, g: 1, b: 1, dirX: 0.35 };
   let lightSource = null;
 
   let glasses = null;
@@ -792,16 +862,26 @@ export function createTryOn(canvas) {
     qInv: new THREE.Quaternion(),
   };
 
+  function liveFocalPx() {
+    // Matches standard phone/webcam optics (~57° long-axis FOV) in both portrait and landscape.
+    return 0.92 * Math.max(viewW, viewH);
+  }
+
   function resize(width, height) {
     viewW = Math.max(2, Math.round(width));
     viewH = Math.max(2, Math.round(height));
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(viewW, viewH, false);
-    Object.assign(ortho, { left: -viewW / 2, right: viewW / 2, top: viewH / 2, bottom: -viewH / 2 });
-    ortho.updateProjectionMatrix();
+    const f = liveFocalPx();
+    liveCam.fov = THREE.MathUtils.radToDeg(2 * Math.atan(viewH / (2 * f)));
+    liveCam.aspect = viewW / viewH;
+    liveCam.position.set(0, 0, f);
+    liveCam.lookAt(0, 0, 0);
+    liveCam.updateProjectionMatrix();
+    const bgScale = (f + 3000) / f;
+    bg.scale.set(viewW * bgScale, viewH * bgScale, 1);
     persp.aspect = viewW / viewH;
     persp.updateProjectionMatrix();
-    bg.scale.set(viewW, viewH, 1);
   }
 
   function setSource(source, opts = {}) {
@@ -828,6 +908,12 @@ export function createTryOn(canvas) {
     glasses = next;
     glasses.userData.face.scale.x = mirror && mode === "live" ? -1 : 1;
     if (glasses.userData.skinShadows) glasses.userData.skinShadows.visible = mode !== "preview";
+    if (glasses.userData.templeShadows) {
+      glasses.userData.templeShadows.forEach((s) => (s.visible = mode !== "preview"));
+    }
+    if (glasses.userData.templeFadeUniform) {
+      glasses.userData.templeFadeUniform.value = mode === "preview" ? 0.0 : 1.0;
+    }
     head.add(glasses);
     fit = { offsetY: 0, offsetZ: 0, scale: 1, ...(manifest.fit || {}) };
     applyLighting();
@@ -864,7 +950,6 @@ export function createTryOn(canvas) {
     have = false;
     lastT = 0;
     head.visible = mode === "preview";
-    faceOccluder.visible = false;
   }
 
   /** Shift lens specular reflection dynamically with head yaw/pitch and room key-light side. */
@@ -933,6 +1018,15 @@ export function createTryOn(canvas) {
       }
     }
     if (count < 4) return;
+    // Measure camera sensor's real shadow floor (6th-percentile luma across frame) so black
+    // frames match the camera's true dark level instead of looking like pasted #000000 CGI.
+    const lumas = [];
+    for (let i = 0; i < data.length; i += 4) {
+      lumas.push((0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255);
+    }
+    lumas.sort((p, q) => p - q);
+    const blackFloor = THREE.MathUtils.clamp(lumas[Math.floor(lumas.length * 0.06)] || 0.06, 0.02, 0.18);
+
     const avgR = rSum / count;
     const avgG = gSum / count;
     const avgB = bSum / count;
@@ -945,6 +1039,7 @@ export function createTryOn(canvas) {
     const targetDirX = THREE.MathUtils.clamp(lDiff, -0.85, 0.85);
     const a = lightState.lastT ? 0.22 : 1;
     lightState.luma += (avgLuma - lightState.luma) * a;
+    lightState.black += (blackFloor - lightState.black) * a;
     lightState.r += (tintR - lightState.r) * a;
     lightState.g += (tintG - lightState.g) * a;
     lightState.b += (tintB - lightState.b) * a;
@@ -962,51 +1057,40 @@ export function createTryOn(canvas) {
       key.color.setRGB(1, 1, 1);
       key.position.set(0.35, 0.7, 1);
       if (glasses && glasses.userData.frontMat) glasses.userData.frontMat.color.setRGB(1, 1, 1);
+      if (glasses && glasses.userData.liftMats) {
+        glasses.userData.liftMats.forEach((m) => m.emissive && m.emissive.setRGB(0, 0, 0));
+      }
       return;
     }
-    const { luma, r, g, b, dirX } = lightState;
-    hemi.intensity = 1.1 + luma * 0.8;
+    const { luma, black, r, g, b, dirX } = lightState;
+    hemi.intensity = 1.15 + luma * 0.75;
     hemi.color.setRGB(0.55 + 0.45 * r, 0.55 + 0.45 * g, 0.55 + 0.45 * b);
-    key.intensity = 0.95 + luma * 0.9;
+    key.intensity = 0.95 + luma * 0.85;
     key.color.setRGB(r, g, b);
     key.position.set(dirX, 0.65, 1);
+    // Convert sRGB shadow floor into linear emissive lift (Three.js emissive is linear!) so
+    // black frames match the camera's real shadow depth without ever turning milky gray.
+    const liftSrgb = THREE.MathUtils.clamp(black * 0.45, 0.04, 0.13);
+    const lift = Math.pow(liftSrgb, 2.2);
+    if (glasses && glasses.userData.liftMats) {
+      glasses.userData.liftMats.forEach((m) => {
+        if (m.emissive) m.emissive.setRGB(lift * r, lift * g, lift * b);
+      });
+    }
     if (glasses && glasses.userData.frontMat) {
-      const bright = THREE.MathUtils.clamp(0.84 + luma * 0.24, 0.85, 1.05);
+      const bright = THREE.MathUtils.clamp(0.86 + luma * 0.22, 0.86, 1.06);
       glasses.userData.frontMat.color.setRGB(
-        bright * (0.78 + 0.22 * r),
-        bright * (0.78 + 0.22 * g),
-        bright * (0.78 + 0.22 * b),
+        bright * (0.80 + 0.20 * r),
+        bright * (0.80 + 0.20 * g),
+        bright * (0.80 + 0.20 * b),
       );
     }
     if (glasses && glasses.userData.shadowMat) {
       glasses.userData.shadowMat.opacity = THREE.MathUtils.clamp(0.14 + luma * 0.14, 0.14, 0.27);
     }
-  }
-
-  /** Update the live MediaPipe face-contour depth occluder in scene space. */
-  function updateFaceOccluder(lm, origin, xAxis, zAxis, pxPerMm) {
-    const pos = faceGeo.attributes.position;
-    // Keep the face occluder tightly aligned to the real cheeks, brow and forehead so temples
-    // running behind the face hide naturally when pitching up/down or turning, while staying
-    // recessed enough in Z so the near temple outside the cheek never gets clipped.
-    const corePush = 3.5 * pxPerMm;
-    const sidePush = 6.5 * pxPerMm;
-    const sideInset = 2.0 * pxPerMm;
-    const p = tmp.pt;
-    point(lm, LM.bridge, p).addScaledVector(zAxis, -corePush);
-    pos.setXYZ(0, p.x, p.y, p.z);
-    for (let i = 0; i < FACE_OVAL.length; i += 1) {
-      const idx = FACE_OVAL[i];
-      const isSide = SIDE_OVAL.has(idx);
-      point(lm, idx, p).addScaledVector(zAxis, -(isSide ? sidePush : corePush));
-      if (isSide) {
-        const dx = (p.x - origin.x) * xAxis.x + (p.y - origin.y) * xAxis.y + (p.z - origin.z) * xAxis.z;
-        p.addScaledVector(xAxis, -Math.sign(dx) * sideInset);
-      }
-      pos.setXYZ(1 + i, p.x, p.y, p.z);
+    if (glasses && glasses.userData.templeShadowMat) {
+      glasses.userData.templeShadowMat.opacity = THREE.MathUtils.clamp(0.10 + luma * 0.12, 0.10, 0.22);
     }
-    pos.needsUpdate = true;
-    faceOccluder.visible = true;
   }
 
   function resetCalibration() {
@@ -1087,7 +1171,6 @@ export function createTryOn(canvas) {
     if (!face) {
       if (now - lastSeen > LOST_FACE_MS) {
         head.visible = false;
-        faceOccluder.visible = false;
         have = false;
       }
       return false;
@@ -1135,13 +1218,14 @@ export function createTryOn(canvas) {
     have = true;
 
     head.visible = true;
-    head.position.set(filters.x.filter(o.x, dt), filters.y.filter(o.y, dt), filters.z.filter(o.z, dt));
+    // Keep head origin on z = 0 so 1 world unit == 1 video pixel at the nose bridge, while
+    // everything behind the bridge (temples, ears, occluder) gets exact perspective foreshortening.
+    head.position.set(filters.x.filter(o.x, dt), filters.y.filter(o.y, dt), 0);
     head.quaternion.copy(smoothQ);
     head.scale.setScalar(filters.s.filter(pxPerMm, dt));
 
     const zFront = THREE.MathUtils.clamp(filters.zf.filter(bridgeZ, dt) * 0.5 + 2, 7, 13);
     layout(zFront, THREE.MathUtils.clamp(filters.ear.filter(faceHalf, dt), 60, 74));
-    updateFaceOccluder(lm, head.position, x, z, head.scale.x);
     estimateLight(lm, now);
     updateGlare(head.quaternion);
     return true;
@@ -1149,7 +1233,7 @@ export function createTryOn(canvas) {
 
   const lastLayout = { zFront: 10, faceHalf: 68 };
 
-  /** Temples run cleanly outside the head wall; the occluder stays strictly inside them. */
+  /** Natural eyewear temple alignment + continuous 3D head/ear occluder sizing. */
   function layout(zFront, faceHalf) {
     lastLayout.zFront = zFront;
     lastLayout.faceHalf = faceHalf;
@@ -1158,42 +1242,27 @@ export function createTryOn(canvas) {
     const bx = mirror && mode === "live" ? -u.bridge.x : u.bridge.x;
     glasses.scale.setScalar(s);
     glasses.position.set(-bx * s, -u.bridge.y * s + (fit.offsetY || 0) + userOffsetY, zFront + (fit.offsetZ || 0));
-    const sideHalf = faceHalf + 2;
     const reach = Math.max(48, u.straightMm * s);
-    const zHinge = zFront + (fit.offsetZ || 0) - (u.bend || 0) * s;
-    const cz = 82;
-    const zc = -90;
-    let occA = sideHalf - 2;
+    let occX = faceHalf - 1;
     if (u.pivots.length) {
-      // Temples run straight back (0° to +2° max) toward the real ear width:
-      // never inward across the cheeks/forehead and never splayed outward into empty air.
+      // With a real PerspectiveCamera, physical straight/slightly-splayed temples automatically
+      // foreshorten toward the real ears in screen space — zero splay hacks needed.
       const hx = u.pivots[0].userData.hingeX * s;
-      const targetX = Math.max(hx, faceHalf);
-      const splay =
-        mode === "preview"
-          ? 0.015
-          : THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), 0, 0.035);
-      const tanS = Math.tan(splay);
+      const targetX = Math.max(hx, faceHalf + 1);
+      const splay = mode === "preview" ? 0.015 : THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), 0, 0.045);
       for (const pivot of u.pivots) {
         pivot.rotation.y = -pivot.userData.side * splay;
       }
-      for (const frac of [0.15, 0.42, 0.68, 0.9]) {
-        const z = zc + cz * frac;
-        const d = Math.max(0, zHinge - z);
-        const templeX = hx + d * tanS;
-        const ellipseW = Math.sqrt(Math.max(0.05, 1 - frac * frac));
-        occA = Math.min(occA, (templeX - 2.5) / ellipseW);
-      }
+      // Keep the sculpted head occluder snug against the temple channel (channel recess is -6.5%).
+      occX = Math.max(54, Math.min(faceHalf, hx + 2.5));
     } else if (u.isGlb) {
-      occA = Math.min(occA, (u.widthMm / 2) * s - 2.5);
+      occX = Math.max(52, Math.min(faceHalf - 1, (u.widthMm / 2) * s));
     }
-    occluder.scale.set(Math.max(faceHalf - 6, occA), 114, cz);
-    for (const ear of ears) ear.position.set(ear.userData.side * (sideHalf + 3), -18, -104);
+    occluder.scale.set(occX, 1, 1);
   }
 
   function posePreview(angle) {
     head.visible = true;
-    faceOccluder.visible = false;
     head.position.set(0, 0, 0);
     head.scale.setScalar(1);
     head.quaternion.setFromEuler(new THREE.Euler(0.12, angle, 0));
@@ -1207,12 +1276,12 @@ export function createTryOn(canvas) {
     mode = "preview";
     bg.visible = false;
     occluder.visible = false;
-    faceOccluder.visible = false;
-    ears.forEach((ear) => (ear.visible = false));
     renderer.setClearColor(clear, 1);
     if (glasses) {
       glasses.userData.face.scale.x = 1;
       if (glasses.userData.skinShadows) glasses.userData.skinShadows.visible = false;
+      if (glasses.userData.templeShadows) glasses.userData.templeShadows.forEach((s) => (s.visible = false));
+      if (glasses.userData.templeFadeUniform) glasses.userData.templeFadeUniform.value = 0.0;
     }
     applyLighting();
     posePreview(0);
@@ -1222,11 +1291,11 @@ export function createTryOn(canvas) {
     mode = "live";
     bg.visible = true;
     occluder.visible = true;
-    faceOccluder.visible = false;
-    ears.forEach((ear) => (ear.visible = true));
     if (glasses) {
       glasses.userData.face.scale.x = mirror ? -1 : 1;
       if (glasses.userData.skinShadows) glasses.userData.skinShadows.visible = true;
+      if (glasses.userData.templeShadows) glasses.userData.templeShadows.forEach((s) => (s.visible = true));
+      if (glasses.userData.templeFadeUniform) glasses.userData.templeFadeUniform.value = 1.0;
     }
     applyLighting();
     resetTracking();
@@ -1234,7 +1303,7 @@ export function createTryOn(canvas) {
 
   function render(t = performance.now()) {
     if (mode === "preview") posePreview(Math.sin(t / 1600) * 0.95);
-    renderer.render(scene, mode === "preview" ? persp : ortho);
+    renderer.render(scene, mode === "preview" ? persp : liveCam);
   }
 
   function snapshot(type = "image/jpeg", quality = 0.92) {

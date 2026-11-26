@@ -19,7 +19,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-PIPELINE_VERSION = 15
+PIPELINE_VERSION = 16
 log = logging.getLogger("vto.pipeline")
 MAX_SIDE = 1600
 DEFAULT_WIDTH_MM = 138.0
@@ -169,24 +169,29 @@ def _crop_temple_tips(px: np.ndarray) -> np.ndarray:
 
 
 def _crop_temple_stubs(px: np.ndarray) -> np.ndarray:
-    """Temples seen in perspective stick up above the end pieces; trim to the frame's top line."""
+    """Temples seen in perspective or folded behind the rim stick up above the outer top line; trim them."""
     h, w = px.shape[:2]
     solid = px[..., 3] > 90
     cols = solid.any(axis=0)
     top = np.where(cols, solid.argmax(axis=0), h).astype(np.float32)
     out = px.copy()
-    zone = int(w * 0.16)
-    for ref_cols, zone_cols in (
-        (np.arange(int(w * 0.16), int(w * 0.30)), np.arange(0, zone)),
-        (np.arange(int(w * 0.70), int(w * 0.84)), np.arange(w - zone, w)),
+    zone = int(w * 0.22)
+    for ref_cols, zone_cols, is_left in (
+        (np.arange(int(w * 0.22), int(w * 0.36)), np.arange(0, zone), True),
+        (np.arange(int(w * 0.64), int(w * 0.78)), np.arange(w - zone, w), False),
     ):
         ref = top[ref_cols]
         ok = ref < h
         if ok.sum() < 5:
             continue
         slope, icept = np.polyfit(ref_cols[ok], ref[ok], 1)
-        line = slope * zone_cols + icept - h * 0.01
-        if (top[zone_cols] < line - h * 0.02).sum() < max(4, w * 0.01):
+        # Preserve genuine upward-sweeping cat-eye frames (steep outward rise along ref_cols).
+        outward_rise = -slope if is_left else slope
+        if outward_rise < -0.18:
+            continue
+        line = slope * zone_cols + icept - h * 0.008
+        protruding = top[zone_cols] < line - h * 0.012
+        if protruding.sum() < max(3, int(w * 0.005)):
             continue
         rows = np.arange(h, dtype=np.float32)[:, None]
         keep = np.clip(rows - line[None, :] + 1.5, 0, 1)
