@@ -29,6 +29,7 @@ const CALIB_SAMPLES = 90;
 const PANTO_TILT = THREE.MathUtils.degToRad(7);
 const TEMPLE_DROP = THREE.MathUtils.degToRad(1.5);
 const LOST_FACE_MS = 400;
+const USER_OFFSET_MM = 12;
 const LM = {
   eyeA: 33,
   eyeB: 263,
@@ -726,6 +727,7 @@ export function createTryOn(canvas) {
   let viewH = 480;
   let mode = "live";
   let fit = { offsetY: 0, offsetZ: 0, scale: 1 };
+  let userOffsetY = 0;
   let lastSeen = 0;
   let lastT = 0;
   let have = false;
@@ -808,6 +810,22 @@ export function createTryOn(canvas) {
 
   function setFit(next) {
     fit = { ...fit, ...next };
+  }
+
+  /** Shopper's own height tweak in mm; kept across product switches, unlike the seller's fit. */
+  function setUserOffsetY(mm) {
+    userOffsetY = THREE.MathUtils.clamp(Number(mm) || 0, -USER_OFFSET_MM, USER_OFFSET_MM);
+    if (glasses && have) layout(lastLayout.zFront, lastLayout.faceHalf);
+    return userOffsetY;
+  }
+
+  function getUserOffsetY() {
+    return userOffsetY;
+  }
+
+  /** Rendered pixels per millimetre at the head, for turning a drag into mm. */
+  function pxPerMm() {
+    return have ? head.scale.x : 0;
   }
 
   function resetTracking() {
@@ -1107,7 +1125,7 @@ export function createTryOn(canvas) {
     const s = fit.scale || 1;
     const bx = mirror && mode === "live" ? -u.bridge.x : u.bridge.x;
     glasses.scale.setScalar(s);
-    glasses.position.set(-bx * s, -u.bridge.y * s + (fit.offsetY || 0), zFront + (fit.offsetZ || 0));
+    glasses.position.set(-bx * s, -u.bridge.y * s + (fit.offsetY || 0) + userOffsetY, zFront + (fit.offsetZ || 0));
     const sideHalf = faceHalf + 4;
     const reach = Math.max(48, u.straightMm * s);
     const zHinge = zFront + (fit.offsetZ || 0) - (u.bend || 0) * s;
@@ -1201,6 +1219,9 @@ export function createTryOn(canvas) {
     startLive,
     measurements,
     setManualPd,
+    setUserOffsetY,
+    getUserOffsetY,
+    pxPerMm,
     renderer,
   };
 }

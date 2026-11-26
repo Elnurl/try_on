@@ -63,7 +63,12 @@ const az = {
   fitWide: "Bir az genişdir",
   fitNarrow: "Bir az dardır",
   auto: "Avtomatik",
-  sizeNote: "Ölçülər kamera ilə təxmini hesablanır. PD-nizi bilirsinizsə, əl ilə düzəldin.",
+  heightLabel: "Hündürlük (yuxarı / aşağı)",
+  up: "Yuxarı",
+  down: "Aşağı",
+  reset: "Sıfırla",
+  dragHint: "Eynəyi barmaqla yuxarı-aşağı sürüşdürə bilərsiniz",
+  sizeNote: "Ölçülər kamera ilə təxmini hesablanır. PD-nizi bilirsinizsə, əl ilə düzəldin. Eynəyi şəkil üzərində sürüşdürərək də yerini dəyişə bilərsiniz.",
   done: "Hazır",
 };
 
@@ -132,7 +137,12 @@ const ru = {
   fitWide: "Немного широковата",
   fitNarrow: "Немного узковата",
   auto: "Авто",
-  sizeNote: "Размеры оцениваются по камере приблизительно. Если знаете свой PD, укажите его вручную.",
+  heightLabel: "Высота (вверх / вниз)",
+  up: "Вверх",
+  down: "Вниз",
+  reset: "Сбросить",
+  dragHint: "Очки можно сдвинуть пальцем вверх или вниз",
+  sizeNote: "Размеры оцениваются по камере приблизительно. Если знаете свой PD, укажите его вручную. Очки также можно сдвинуть прямо на изображении.",
   done: "Готово",
 };
 
@@ -201,7 +211,12 @@ const en = {
   fitWide: "A bit wide",
   fitNarrow: "A bit narrow",
   auto: "Auto",
-  sizeNote: "Measurements are estimated from the camera. If you know your PD, set it manually.",
+  heightLabel: "Height (up / down)",
+  up: "Up",
+  down: "Down",
+  reset: "Reset",
+  dragHint: "Drag the glasses up or down with your finger",
+  sizeNote: "Measurements are estimated from the camera. If you know your PD, set it manually. You can also drag the glasses on the image.",
   done: "Done",
 };
 

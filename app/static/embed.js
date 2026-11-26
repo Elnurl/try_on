@@ -1,6 +1,6 @@
-import { strings, pickLang } from "./embed-i18n.js?v=12";
+import { strings, pickLang } from "./embed-i18n.js?v=13";
 import { createFaceTracker } from "./sdk/face-tracker.js?v=2";
-import { createTryOn } from "./sdk/vto-core.js?v=16";
+import { createTryOn } from "./sdk/vto-core.js?v=17";
 
 const TERMS_VERSION = "1";
 const TERMS_KEY = "eynek-vto:terms";
@@ -375,6 +375,27 @@ function fillFitPanel(m) {
   const values = { pd: mmText(m.pdMm), face: mmText(m.faceWidthMm), frame: mmText(m.frameWidthMm), fit: fitText(m) || "—" };
   rows.forEach((el) => (el.textContent = values[el.dataset.v]));
   panel.querySelector(".fit-auto").classList.toggle("active", m.auto);
+  syncHeightControls();
+}
+
+function heightText(mm) {
+  const v = Math.round(mm * 2) / 2;
+  return v === 0 ? "0 mm" : `${v > 0 ? "+" : ""}${v} mm`;
+}
+
+function syncHeightControls() {
+  const panel = $("fitPanel");
+  const slider = panel.querySelector(".fit-height input");
+  const value = vto.getUserOffsetY();
+  if (slider && document.activeElement !== slider) slider.value = String(value);
+  const out = panel.querySelector("[data-v='height']");
+  if (out) out.textContent = heightText(value);
+}
+
+function setHeight(mm) {
+  vto.setUserOffsetY(mm);
+  if (mode === "photo") redrawPhoto();
+  syncHeightControls();
 }
 
 function toggleFitPanel() {
@@ -396,12 +417,26 @@ function toggleFitPanel() {
     if (mode === "photo") redrawPhoto();
     renderFit(performance.now(), true);
   });
+  const heightSlider = h("input", { type: "range", min: "-12", max: "12", step: "0.5", "aria-label": T.heightLabel });
+  heightSlider.addEventListener("input", () => setHeight(Number(heightSlider.value)));
+  const step = (delta) => setHeight(vto.getUserOffsetY() + delta);
+  const arrow = (label, delta, path) =>
+    h("button", { type: "button", class: "fit-step", "aria-label": label, title: label, onclick: () => step(delta) }, icon(path, 16));
   panel.replaceChildren(
     h("div", { class: "fit-head" }, h("b", {}, T.sizeTitle), h("button", { type: "button", class: "fit-close", onclick: toggleFitPanel }, T.done)),
     row(T.faceLabel, "face"),
     row(T.frameLabel, "frame"),
     row(T.pdLabel, "pd"),
     h("div", { class: "fit-slider" }, slider, autoBtn),
+    h("div", { class: "fit-row" }, h("span", {}, T.heightLabel), h("b", { "data-v": "height" })),
+    h(
+      "div",
+      { class: "fit-slider fit-height" },
+      arrow(T.down, -0.5, "M12 5v14M6 13l6 6 6-6"),
+      heightSlider,
+      arrow(T.up, 0.5, "M12 19V5M6 11l6-6 6 6"),
+      h("button", { type: "button", class: "fit-auto", onclick: () => setHeight(0) }, T.reset),
+    ),
     h("div", { class: "fit-row fit-verdict" }, h("b", { "data-v": "fit" })),
     h("p", { class: "fit-note" }, T.sizeNote),
   );
@@ -436,6 +471,7 @@ async function usePhoto(file) {
     redrawPhoto();
     $("camBtn").hidden = false;
     busy("");
+    showToast(T.dragHint, true, false);
   } catch (err) {
     busy("");
     showMessage(err.message || T.failed, { retry: mode === "idle" ? startCamera : null });
@@ -655,6 +691,33 @@ function applyStatic() {
   syncLikeBtn();
 }
 
+/** Vertical drag on the picture moves the glasses up/down (handy on a static selfie). */
+function bindDrag() {
+  let drag = null;
+  canvas.addEventListener("pointerdown", (e) => {
+    if (mode === "idle" || !current) return;
+    const ppm = vto.pxPerMm();
+    if (!ppm) return;
+    const rect = canvas.getBoundingClientRect();
+    const fitFn = stage.classList.contains("contain") ? Math.min : Math.max;
+    const cssPerPx = fitFn(rect.width / canvas.width, rect.height / canvas.height) * vto.renderer.getPixelRatio();
+    drag = { id: e.pointerId, y: e.clientY, start: vto.getUserOffsetY(), cssPerMm: ppm * cssPerPx };
+    canvas.setPointerCapture(e.pointerId);
+    stage.classList.add("dragging");
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id || !drag.cssPerMm) return;
+    setHeight(drag.start - (e.clientY - drag.y) / drag.cssPerMm);
+  });
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null;
+    stage.classList.remove("dragging");
+  };
+  canvas.addEventListener("pointerup", end);
+  canvas.addEventListener("pointercancel", end);
+}
+
 function bind() {
   $("closeBtn").addEventListener("click", closeWidget);
   $("cartBtn").addEventListener("click", addToCart);
@@ -678,6 +741,7 @@ function bind() {
     btn.addEventListener("click", () => setLiveRenderMode(btn.dataset.render));
   });
   $("photoInput").addEventListener("change", (e) => usePhoto(e.target.files && e.target.files[0]));
+  bindDrag();
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && embedded) closeWidget();
   });
