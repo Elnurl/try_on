@@ -868,8 +868,10 @@ export function createTryOn(canvas) {
   };
 
   function liveFocalPx() {
-    // Matches standard phone/webcam optics (~57° long-axis FOV) in both portrait and landscape.
-    return 0.92 * Math.max(viewW, viewH);
+    // Mild, stable perspective: strong enough to foreshorten temples slightly toward the ears,
+    // but far weaker than raw webcam optics so the temples never converge inward over the face
+    // (MediaPipe pose is already estimated under weak perspective).
+    return 2.6 * Math.max(viewW, viewH);
   }
 
   function resize(width, height) {
@@ -1250,11 +1252,11 @@ export function createTryOn(canvas) {
     const reach = Math.max(48, u.straightMm * s);
     let occX = faceHalf - 1;
     if (u.pivots.length) {
-      // With a real PerspectiveCamera, physical straight/slightly-splayed temples automatically
-      // foreshorten toward the real ears in screen space — zero splay hacks needed.
+      // Temples splay outward from the hinge to the real ear (just outside the cheekbone width),
+      // so they hug the side of the head and end at the ear instead of crossing the face.
       const hx = u.pivots[0].userData.hingeX * s;
-      const targetX = Math.max(hx, faceHalf + 1);
-      const splay = mode === "preview" ? 0.015 : THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), 0, 0.045);
+      const targetX = Math.max(hx + 1, faceHalf + 4);
+      const splay = mode === "preview" ? 0.015 : THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), 0.01, 0.1);
       for (const pivot of u.pivots) {
         pivot.rotation.y = -pivot.userData.side * splay;
       }
