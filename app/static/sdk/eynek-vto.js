@@ -12,7 +12,8 @@
  *     product:  { name, price, currency, vendor, image, available },   shown in the window
  *     products: [{ sku, name, price, vendor, image, available }],      "similar models" strip
  *     onAddToCart(detail) → optional { ok: false, message } to report a failure
- *     onViewCart(detail), termsUrl, termsVersion, cart: false
+ *     onLike(detail) — wishlist heart in the camera view ({ sku, product, liked })
+ *     onViewCart(detail), termsUrl, termsVersion, cart: false, likedSkus: ["1","2"]
  *   })
  *
  * The try-on runs in an iframe on the VTO origin, so camera/WASM never touch the host page.
@@ -75,6 +76,7 @@
       store: store,
       sku: sku,
       onAddToCart: opts.onAddToCart,
+      onLike: opts.onLike,
       onViewCart: opts.onViewCart,
       config: {
         lang: lang,
@@ -82,6 +84,7 @@
         products: opts.products || null,
         cart: opts.cart !== false,
         viewCart: opts.viewCart !== false,
+        likedSkus: opts.likedSkus || null,
         termsUrl: opts.termsUrl || null,
         termsVersion: opts.termsVersion || null,
         termsPoints: opts.termsPoints || null,
@@ -156,7 +159,16 @@
     if (d.type === "hello") reply({ type: "init", config: current ? current.config : {} });
     else if (d.type === "close") close();
     else if (d.type === "add-to-cart") addToCart(detail);
-    else if (d.type === "view-cart") {
+    else if (d.type === "like") {
+      if (current && current.onLike) {
+        try {
+          current.onLike(Object.assign({}, detail, { liked: d.liked }));
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      emit("like", Object.assign({}, detail, { liked: d.liked }));
+    } else if (d.type === "view-cart") {
       if (current && current.onViewCart) current.onViewCart(detail);
       emit("view-cart", detail);
       close();

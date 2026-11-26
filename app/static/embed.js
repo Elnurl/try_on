@@ -1,6 +1,6 @@
-import { strings, pickLang } from "./embed-i18n.js?v=9";
+import { strings, pickLang } from "./embed-i18n.js?v=11";
 import { createFaceTracker } from "./sdk/face-tracker.js?v=1";
-import { createTryOn } from "./sdk/vto-core.js?v=1";
+import { createTryOn } from "./sdk/vto-core.js?v=9";
 
 const TERMS_VERSION = "1";
 const TERMS_KEY = "eynek-vto:terms";
@@ -335,8 +335,78 @@ async function loop() {
     vto.update(face, now);
     if (face) lastFaceAt = now;
     hint(now - lastFaceAt > 900 ? T.faceHint : "");
+    renderFit(now);
   }
   vto.render();
+}
+
+/* ---------- measurements ---------- */
+
+let fitDrawnAt = 0;
+function fitText(m) {
+  return { good: T.fitGood, wide: T.fitWide, narrow: T.fitNarrow }[m.fit] || "";
+}
+
+function mmText(value) {
+  return value ? `${Math.round(value)} mm` : "—";
+}
+
+function renderFit(now = performance.now(), force = false) {
+  if (!force && now - fitDrawnAt < 400) return;
+  fitDrawnAt = now;
+  const chip = $("fitChip");
+  if (mode === "idle" || !current) {
+    chip.hidden = true;
+    $("fitPanel").hidden = true;
+    return;
+  }
+  const m = vto.measurements();
+  chip.hidden = false;
+  chip.classList.toggle("warn", m.fit === "wide" || m.fit === "narrow");
+  chip.textContent = m.pdMm ? `PD ${Math.round(m.pdMm)} mm${m.fit ? " · " + fitText(m) : ""}` : T.measuring;
+  if (!$("fitPanel").hidden) fillFitPanel(m);
+}
+
+function fillFitPanel(m) {
+  const panel = $("fitPanel");
+  const slider = panel.querySelector("input");
+  if (slider && document.activeElement !== slider) slider.value = String(Math.round((m.pdMm || 63) * 2) / 2);
+  const rows = panel.querySelectorAll("[data-v]");
+  const values = { pd: mmText(m.pdMm), face: mmText(m.faceWidthMm), frame: mmText(m.frameWidthMm), fit: fitText(m) || "—" };
+  rows.forEach((el) => (el.textContent = values[el.dataset.v]));
+  panel.querySelector(".fit-auto").classList.toggle("active", m.auto);
+}
+
+function toggleFitPanel() {
+  const panel = $("fitPanel");
+  if (!panel.hidden) {
+    panel.hidden = true;
+    return;
+  }
+  const row = (label, key) => h("div", { class: "fit-row" }, h("span", {}, label), h("b", { "data-v": key }));
+  const slider = h("input", { type: "range", min: "50", max: "78", step: "0.5", "aria-label": T.pdLabel });
+  slider.addEventListener("input", () => {
+    vto.setManualPd(Number(slider.value));
+    if (mode === "photo") redrawPhoto();
+    renderFit(performance.now(), true);
+  });
+  const autoBtn = h("button", { type: "button", class: "fit-auto" }, T.auto);
+  autoBtn.addEventListener("click", () => {
+    vto.setManualPd(null);
+    if (mode === "photo") redrawPhoto();
+    renderFit(performance.now(), true);
+  });
+  panel.replaceChildren(
+    h("div", { class: "fit-head" }, h("b", {}, T.sizeTitle), h("button", { type: "button", class: "fit-close", onclick: toggleFitPanel }, T.done)),
+    row(T.faceLabel, "face"),
+    row(T.frameLabel, "frame"),
+    row(T.pdLabel, "pd"),
+    h("div", { class: "fit-slider" }, slider, autoBtn),
+    h("div", { class: "fit-row fit-verdict" }, h("b", { "data-v": "fit" })),
+    h("p", { class: "fit-note" }, T.sizeNote),
+  );
+  panel.hidden = false;
+  fillFitPanel(vto.measurements());
 }
 
 let photoFace = null;
@@ -377,6 +447,7 @@ function redrawPhoto() {
   vto.startLive();
   for (let i = 0; i < 4; i += 1) vto.update(photoFace, performance.now() + i * 33);
   vto.render();
+  renderFit(performance.now(), true);
 }
 
 /* ---------- products ---------- */
@@ -400,20 +471,31 @@ function rememberInfo(p) {
   if (p && p.sku != null && p.sku !== "") info.set(String(p.sku), { ...(info.get(String(p.sku)) || {}), ...p, sku: String(p.sku) });
 }
 
+function likedSkus() {
+  const raw = host.likedSkus;
+  if (!raw) return new Set();
+  return new Set((Array.isArray(raw) ? raw : []).map(String));
+}
+
+function syncLikeBtn() {
+  const btn = $("likeBtn");
+  if (!btn || btn.hidden || !current) return;
+  const liked = likedSkus().has(String(current.sku));
+  btn.classList.toggle("active", liked);
+  btn.setAttribute("aria-pressed", liked ? "true" : "false");
+  btn.setAttribute("aria-label", liked ? T.unlike : T.like);
+}
+
 function renderHead() {
   const i = (current && info.get(current.sku)) || {};
   $("vendor").textContent = i.vendor || "";
   $("productName").textContent = i.name || (current && (current.name || current.sku)) || T.title;
   $("productPrice").textContent = priceText(i);
   const cart = $("cartBtn");
-  const heart = $("heartBtn");
   const unavailable = i.available === false;
   cart.disabled = unavailable;
-  heart.disabled = unavailable;
-  const label = unavailable ? T.outOfStock : T.addToCart;
-  $("cartLabel").textContent = label;
-  cart.setAttribute("aria-label", label);
-  heart.setAttribute("aria-label", label);
+  $("cartLabel").textContent = unavailable ? T.outOfStock : T.addToCart;
+  syncLikeBtn();
 }
 
 function renderStrip() {
@@ -446,7 +528,13 @@ function renderStrip() {
 
 async function selectProduct(sku) {
   const m = await manifestFor(sku);
-  await vto.setProduct(m);
+  try {
+    await vto.setProduct(m);
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || T.failed, false);
+    throw err;
+  }
   current = m;
   rememberInfo({ sku: m.sku, name: (info.get(m.sku) || {}).name || m.name });
   $("toast").hidden = true;
@@ -462,14 +550,10 @@ let cartWait = null;
 function addToCart() {
   if (!current) return;
   const btn = $("cartBtn");
-  const heart = $("heartBtn");
   btn.disabled = true;
-  heart.disabled = true;
   const done = (result) => {
     cartWait = null;
-    const locked = (info.get(current.sku) || {}).available === false;
-    btn.disabled = locked;
-    heart.disabled = locked;
+    btn.disabled = (info.get(current.sku) || {}).available === false;
     showToast(result && result.ok === false ? result.message || T.failed : T.added, !(result && result.ok === false));
   };
   const timer = setTimeout(() => done({ ok: true }), CART_WAIT_MS);
@@ -478,6 +562,17 @@ function addToCart() {
     done(result);
   };
   post("add-to-cart", { product: info.get(current.sku) || { sku: current.sku } });
+}
+
+function toggleLike() {
+  if (!current || !embedded) return;
+  const sku = String(current.sku);
+  const btn = $("likeBtn");
+  const next = !btn.classList.contains("active");
+  btn.classList.toggle("active", next);
+  btn.setAttribute("aria-pressed", next ? "true" : "false");
+  btn.setAttribute("aria-label", next ? T.unlike : T.like);
+  post("like", { product: info.get(sku) || { sku }, liked: next });
 }
 
 let toastTimer = 0;
@@ -522,15 +617,15 @@ function applyStatic() {
   $("viewCartBtn").textContent = T.viewCart;
   $("closeBtn").hidden = !embedded;
   const cartOff = params.get("cart") === "0" || host.cart === false;
-  const hideCart = !embedded || cartOff;
-  $("cartBtn").hidden = hideCart;
-  $("heartBtn").hidden = hideCart;
+  $("cartBtn").hidden = !embedded || cartOff;
+  $("likeBtn").hidden = !embedded;
+  syncLikeBtn();
 }
 
 function bind() {
   $("closeBtn").addEventListener("click", closeWidget);
   $("cartBtn").addEventListener("click", addToCart);
-  $("heartBtn").addEventListener("click", addToCart);
+  $("likeBtn").addEventListener("click", toggleLike);
   $("viewCartBtn").addEventListener("click", () => {
     stopCamera();
     post("view-cart");
@@ -545,6 +640,7 @@ function bind() {
     a.click();
   });
   $("camBtn").addEventListener("click", startCamera);
+  $("fitChip").addEventListener("click", toggleFitPanel);
   $("photoInput").addEventListener("change", (e) => usePhoto(e.target.files && e.target.files[0]));
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && embedded) closeWidget();
@@ -552,6 +648,10 @@ function bind() {
   window.addEventListener("message", (e) => {
     if (e.source !== window.parent || !e.data || e.data.source !== "eynek-vto-host") return;
     if (e.data.type === "cart-result" && cartWait) cartWait(e.data);
+    if (e.data.type === "set-liked" && Array.isArray(e.data.likedSkus)) {
+      host = { ...host, likedSkus: e.data.likedSkus };
+      syncLikeBtn();
+    }
     if (e.data.type === "set-product" && e.data.sku) selectProduct(String(e.data.sku)).catch(() => {});
   });
   document.addEventListener("visibilitychange", () => {

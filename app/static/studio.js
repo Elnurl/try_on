@@ -1,4 +1,4 @@
-import { createTryOn } from "./sdk/vto-core.js?v=1";
+import { createTryOn } from "./sdk/vto-core.js?v=9";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -100,10 +100,32 @@ async function showResult(m) {
   const widthNote = { lens: "linzadan ölçüldü", given: "daxil edildi", sizes: "ölçülərdən", default: "standart" }[m.widthSource] || "";
   $("stats").innerHTML = [
     stat(`Çərçivə eni (${widthNote})`, `${Math.round(m.widthMm)} mm`),
-    stat("Linzalar", lenses.length === 2 ? (lenses.every((l) => l.clear) ? "2 · şəffaf" : "2 · rəngli") : `${lenses.length} tapıldı`),
+    stat(
+      "Linzalar",
+      lenses.length === 2
+        ? lenses.every((l) => l.clear)
+          ? "2 · şəffaf"
+          : lenses.every((l) => l.sunglass || (l.opacity || 0) >= 0.8)
+            ? "2 · gün eynəyi (tünd)"
+            : "2 · rəngli"
+        : `${lenses.length} tapıldı`,
+    ),
     stat("Qol uzunluğu", `${Math.round((m.temple && m.temple.lengthMm) || 145)} mm`),
     stat("Qol rəngi", (m.temple && m.temple.color) || "—"),
   ].join("");
+  const sides = m.templeSides || {};
+  if (sides.left || sides.right) {
+    const bits = [];
+    if (sides.left) bits.push(`Sol: ${sides.left.thickMm} mm qalınlıq`);
+    if (sides.right) bits.push(`Sağ: ${sides.right.thickMm} mm qalınlıq`);
+    $("stats").insertAdjacentHTML("beforeend", stat("Qollar (şəkildən)", bits.join(" · ")));
+  }
+  if ((m.warnings || []).includes("temple_one_side")) {
+    $("stats").insertAdjacentHTML(
+      "beforeend",
+      '<div class="stat" style="grid-column:1/-1"><span>Tək tərəf şəkli: digər qol təxmini eyni ölçü ilə göstərilir. Mümkünsə sol və sağ yan şəkil yükləyin.</span></div>',
+    );
+  }
   if (lenses.length !== 2) {
     $("stats").insertAdjacentHTML(
       "beforeend",

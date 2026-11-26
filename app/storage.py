@@ -169,6 +169,9 @@ def save_product(store_id: str, sku: str, meta: dict, asset: Asset, photos: dict
     thumb.save(tmp / "thumb.png", "PNG", optimize=True)
     for name, data in photos.items():
         (tmp / f"photo-{name}.jpg").write_bytes(data)
+    for name, strip in asset.temple_strips.items():
+        if name in {"left", "right"}:
+            strip.save(tmp / f"temple-{name}.png", "PNG", optimize=True)
     manifest = {
         "version": 2,
         "store": store_id,

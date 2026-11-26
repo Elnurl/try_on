@@ -52,6 +52,43 @@ button, input, label { font: inherit; }
 .hint { top: 16px; transform: translateX(-50%); }
 .busy { top: 50%; transform: translate(-50%, -50%); }
 
+.stage-like {
+  position: absolute; top: 14px; right: 14px; z-index: 3;
+  width: 40px; height: 40px; display: grid; place-items: center;
+  border: 0; border-radius: 50%; background: #fff; color: var(--ink);
+  box-shadow: 0 4px 16px rgba(17, 18, 20, .14); cursor: pointer;
+  transition: transform .15s ease, box-shadow .18s ease;
+}
+.stage-like:hover { box-shadow: 0 6px 20px rgba(17, 18, 20, .18); }
+.stage-like:active { transform: scale(.96); }
+.stage-like.active { color: var(--ink); }
+.stage-like.active svg path { fill: currentColor; }
+
+.fit-chip {
+  position: absolute; left: 14px; bottom: 14px; z-index: 3;
+  padding: 8px 12px; border: 0; border-radius: 999px; cursor: pointer;
+  background: rgba(17,18,20,.62); color: #fff; font: 600 12px/1 inherit; font-family: inherit;
+  backdrop-filter: blur(8px);
+}
+.fit-chip.warn { background: rgba(160, 98, 18, .78); }
+.fit-panel {
+  position: absolute; left: 14px; bottom: 56px; z-index: 4; width: min(300px, calc(100% - 28px));
+  padding: 14px; border-radius: 16px; background: #fff; color: var(--ink);
+  box-shadow: 0 18px 40px rgba(17, 18, 20, .22); font-size: 13px;
+}
+.fit-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.fit-close, .fit-auto {
+  border: 1px solid rgba(17,18,20,.14); background: #fff; border-radius: 999px;
+  padding: 5px 10px; font: 600 12px inherit; font-family: inherit; cursor: pointer; color: var(--ink);
+}
+.fit-auto.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+.fit-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; }
+.fit-row span { color: rgba(17,18,20,.6); }
+.fit-slider { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.fit-slider input { flex: 1; accent-color: var(--ink); }
+.fit-verdict { justify-content: center; }
+.fit-note { margin: 6px 0 0; font-size: 11px; line-height: 1.4; color: rgba(17,18,20,.55); }
+
 .tools { display: flex; gap: 8px; flex-wrap: wrap; }
 .tool {
   min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px;
@@ -69,13 +106,6 @@ button, input, label { font: inherit; }
 .product .price { margin: 0; font-size: 14px; font-weight: 700; }
 .product .price:empty, .product .eyebrow:empty { display: none; }
 .product .btn { margin-top: 10px; width: 100%; min-height: 48px; }
-.btn-cart svg { flex: 0 0 auto; }
-.heart-fab {
-  display: none; position: absolute; top: 12px; right: 12px; z-index: 3;
-  width: 44px; height: 44px; place-items: center; border: 0; border-radius: 50%;
-  background: #fff; color: #161614; box-shadow: 0 6px 18px rgba(17, 18, 20, .16); cursor: pointer;
-}
-.heart-fab:disabled { opacity: .5; cursor: not-allowed; }
 
 .strip-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .strip { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: auto; padding: 1px; scrollbar-width: thin; }
@@ -161,9 +191,9 @@ button, input, label { font: inherit; }
 @media (max-width: 860px) {
   .workspace { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
   .dock { flex-direction: column; padding: 12px; border-radius: 16px; gap: 12px; }
+  .product { grid-template-columns: 1fr; align-items: stretch; }
   .product h1 { font-size: 16px; }
-  .heart-fab { display: grid; }
-  .btn-cart svg { display: none; }
+  .product .btn { grid-column: 1; grid-row: auto; width: 100%; margin-top: 10px; padding: 0 20px; }
   .strip-wrap { flex: none; }
   .strip { flex-direction: row; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
   .strip::-webkit-scrollbar { display: none; }
@@ -190,3 +220,7 @@ button, input, label { font: inherit; }
   .split-actions { position: sticky; bottom: 0; background: var(--paper); }
 }
 
+@media (max-width: 400px) {
+  .product { grid-template-columns: 1fr; }
+  .product .btn { grid-column: auto; grid-row: auto; width: 100%; }
+}

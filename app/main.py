@@ -45,7 +45,9 @@ ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
 DEMO = ROOT / "demo"
 MAX_UPLOAD = 15 * 1024 * 1024
-ASSET_FILE_RE = re.compile(r"^(front|thumb)\.png$|^photo-(front|left|right)\.jpg$")
+ASSET_FILE_RE = re.compile(
+    r"^(front|thumb)\.png$|^photo-(front|left|right)\.jpg$|^temple-(left|right)\.png$"
+)
 
 mimetypes.add_type("application/javascript", ".mjs")
 mimetypes.add_type("application/wasm", ".wasm")
@@ -78,6 +80,28 @@ def _bootstrap() -> None:
         seed_demo()
     except Exception as exc:  # noqa: BLE001
         log.warning("Demo seed failed: %s", exc)
+    rebuild_outdated()
+
+
+def rebuild_outdated() -> None:
+    """Re-run the current pipeline on products built by an older one, from their saved photos."""
+    for store in list_stores():
+        for m in list_products(store["id"]):
+            if m.get("pipeline") == PIPELINE_VERSION or "front" not in m.get("photos", []):
+                continue
+            folder = product_dir(m["store"], m["sku"])
+            try:
+                photos = {name: (folder / f"photo-{name}.jpg").read_bytes() for name in m["photos"]}
+                images = {name: load_image(data) for name, data in photos.items()}
+                given = m.get("sizes") or {}
+                width = m.get("widthMm") if m.get("widthSource") == "given" else None
+                sizes = Sizes(given.get("lens"), given.get("bridge"), given.get("temple"), width)
+                asset = build_asset(images.pop("front"), images, sizes)
+                meta = {k: m[k] for k in ("name", "seller", "productUrl") if k in m}
+                save_product(m["store"], m["sku"], meta, asset, photos)
+                log.info("Rebuilt %s/%s with pipeline %s", m["store"], m["sku"], PIPELINE_VERSION)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Rebuild failed for %s/%s: %s", m["store"], m["sku"], exc)
 
 
 def seed_demo() -> None:
@@ -120,6 +144,12 @@ def public_manifest(m: dict, base: str) -> dict:
     out["texture"] = f"{root}/front.png?v={v}"
     out["thumb"] = f"{root}/thumb.png?v={v}"
     out["photos"] = {name: f"{root}/photo-{name}.jpg?v={v}" for name in m.get("photos", [])}
+    textures = {}
+    for side, info in (m.get("templeSides") or {}).items():
+        if side in ("left", "right") and info.get("texture"):
+            textures[side] = f"{root}/temple-{side}.png?v={v}"
+    if textures:
+        out["templeTextures"] = textures
     return out
 
 

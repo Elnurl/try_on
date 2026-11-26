@@ -43,8 +43,8 @@
           </div>
           <div class="drops">
             <label class="drop" data-slot="front"><span><b>Ön şəkil *</b>Düz öndən, eynək tam görünsün</span><input type="file" accept="image/*" /></label>
-            <label class="drop" data-slot="left"><span><b>Sol tərəf</b>Soldan və ya 3/4 bucaqdan</span><input type="file" accept="image/*" /></label>
-            <label class="drop" data-slot="right"><span><b>Sağ tərəf</b>Sağdan və ya 3/4 bucaqdan</span><input type="file" accept="image/*" /></label>
+            <label class="drop" data-slot="left"><span><b>Sol tərəf (qol)</b>Sol qol görünsün — qalınlıq və rəng bura görə</span><input type="file" accept="image/*" /></label>
+            <label class="drop" data-slot="right"><span><b>Sağ tərəf (qol)</b>Sağ qol; mümkünsə hər iki tərəf yükləyin</span><input type="file" accept="image/*" /></label>
           </div>
           <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
             <button class="btn" type="submit" id="submitBtn">VTO hazırla</button>
@@ -58,7 +58,7 @@
           <div class="grid2">
             <div>
               <canvas id="preview3d"></canvas>
-              <p class="muted">3D önizləmə: ön hissə sizin şəklinizdən, qollar ölçülərə görə qurulub.</p>
+              <p class="muted">Ön çərçivə ön şəkildən; hər qol yan şəkildən (qalınlıq, rəng, uzunluq) götürülür.</p>
             </div>
             <div>
               <div class="checker"><img id="texture" alt="Emal olunmuş ön görünüş" /></div>
@@ -79,7 +79,7 @@
         </section>
       </div>
     </div>
-    <script src="/sdk/eynek-vto.js" defer></script>
-    <script type="module" src="/static/studio.js?v=1"></script>
+    <script src="/sdk/eynek-vto.js" data-store="demo" defer></script>
+    <script type="module" src="/static/studio.js?v=4"></script>
   </body>
 </html>
