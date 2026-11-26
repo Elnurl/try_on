@@ -392,7 +392,24 @@ function syncHeightControls() {
   if (out) out.textContent = heightText(value);
 }
 
+let peekTimer = 0;
+let peekHeld = false;
+/** Fade the size panel to just the height controls so the glasses stay visible while moving. */
+function peekPanel(on, delay = 0) {
+  clearTimeout(peekTimer);
+  const panel = $("fitPanel");
+  if (on) panel.classList.add("peek");
+  else peekTimer = setTimeout(() => panel.classList.remove("peek"), delay);
+}
+
+function holdPeek(on) {
+  peekHeld = on;
+  peekPanel(on, 900);
+}
+
 function setHeight(mm) {
+  peekPanel(true);
+  if (!peekHeld) peekPanel(false, 1200);
   vto.setUserOffsetY(mm);
   if (mode === "photo") redrawPhoto();
   syncHeightControls();
@@ -419,6 +436,8 @@ function toggleFitPanel() {
   });
   const heightSlider = h("input", { type: "range", min: "-12", max: "12", step: "0.5", "aria-label": T.heightLabel });
   heightSlider.addEventListener("input", () => setHeight(Number(heightSlider.value)));
+  heightSlider.addEventListener("pointerdown", () => holdPeek(true));
+  ["pointerup", "pointercancel", "change"].forEach((t) => heightSlider.addEventListener(t, () => holdPeek(false)));
   const step = (delta) => setHeight(vto.getUserOffsetY() + delta);
   const arrow = (label, delta, path) =>
     h("button", { type: "button", class: "fit-step", "aria-label": label, title: label, onclick: () => step(delta) }, icon(path, 16));
@@ -428,7 +447,7 @@ function toggleFitPanel() {
     row(T.frameLabel, "frame"),
     row(T.pdLabel, "pd"),
     h("div", { class: "fit-slider" }, slider, autoBtn),
-    h("div", { class: "fit-row" }, h("span", {}, T.heightLabel), h("b", { "data-v": "height" })),
+    h("div", { class: "fit-row fit-height-label" }, h("span", {}, T.heightLabel), h("b", { "data-v": "height" })),
     h(
       "div",
       { class: "fit-slider fit-height" },
@@ -704,6 +723,7 @@ function bindDrag() {
     drag = { id: e.pointerId, y: e.clientY, start: vto.getUserOffsetY(), cssPerMm: ppm * cssPerPx };
     canvas.setPointerCapture(e.pointerId);
     stage.classList.add("dragging");
+    holdPeek(true);
   });
   canvas.addEventListener("pointermove", (e) => {
     if (!drag || e.pointerId !== drag.id || !drag.cssPerMm) return;
@@ -713,6 +733,7 @@ function bindDrag() {
     if (!drag || e.pointerId !== drag.id) return;
     drag = null;
     stage.classList.remove("dragging");
+    holdPeek(false);
   };
   canvas.addEventListener("pointerup", end);
   canvas.addEventListener("pointercancel", end);
