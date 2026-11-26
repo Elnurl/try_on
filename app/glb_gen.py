@@ -660,8 +660,8 @@ def _build_temple_mesh(
     Runs in pivot-local coordinates from (0, 0, 0) backward into -Z.
     `side` = +1 for wearer-left (+X), -1 for wearer-right (-X).
     """
-    straight = length_mm * 0.62
-    bend_len = min(28.0, max(18.0, (length_mm - straight) * 0.55))
+    straight = length_mm * 0.74
+    bend_len = min(26.0, max(16.0, (length_mm - straight) * 0.65))
     n_s = 12
     n_b = 14
     drop_mm = min(18.0, max(12.5, bend_len * 0.52))

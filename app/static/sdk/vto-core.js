@@ -203,8 +203,8 @@ function lensGlare(lens, w, h, bend, material) {
 
 /** Smooth ergonomic 3D temple sized from the seller's side photo (mm). */
 function templeGeometry(length, h0, h1, thick, side, metal) {
-  const straight = length * 0.62;
-  const hook = Math.min(26, Math.max(18, (length - straight) * 0.55));
+  const straight = length * 0.74;
+  const hook = Math.min(24, Math.max(16, (length - straight) * 0.65));
   const drop = straight * 0.015;
   const line = [];
   const n = 20;
@@ -331,16 +331,21 @@ function buildHeadOccluder() {
     const uy = pos.getY(i);
     const uz = pos.getZ(i);
     const y = -10 + uy * 108;
-    const z = -90 + uz * 88;
+    // Flatter anatomical front face (forehead/eye-sockets/cheekbones) so the far temple
+    // hides right behind the outer brow/eye corner instead of crossing in front of the pupil.
+    const uzShaped = uz > 0 ? Math.pow(uz, 0.55) : uz;
+    const z = -92 + uzShaped * 91; // front apex at z = -1mm, back of cranium at z = -183mm
     let xFactor = 1.0;
     // Natural cheek/jaw taper below eye level.
     xFactor -= 0.12 * ss(-22, -98, y);
-    // Subtle temple-channel recess along the visible straight temple path so 3/4 turns never notch the near arm.
-    const inTempleZ = ss(-86, -68, z) * (1 - ss(-22, -6, z));
+    // Subtle temple-channel recess all the way to the ear (z = -100mm) so the near temple reaches
+    // the top of the ear cleanly without ever getting cut short or notched on 3/4 turns.
+    const inTempleZ = ss(-102, -88, z) * (1 - ss(-20, -4, z));
     const inTempleY = ss(-20, -6, y) * (1 - ss(10, 24, y));
-    xFactor -= 0.065 * inTempleZ * inTempleY * ss(0.4, 0.85, Math.abs(ux));
-    // Seamless behind-ear flare: widens smoothly behind z = -82mm so the temple tip stays buried behind the ear.
-    const behindEar = 1 - ss(-94, -76, z);
+    xFactor -= 0.075 * inTempleZ * inTempleY * ss(0.4, 0.85, Math.abs(ux));
+    // Seamless behind-ear flare starts AFTER the ear apex (z < -98mm) so the temple reaches the
+    // ear fully, then stays buried behind the ear with zero floating rear tips.
+    const behindEar = 1 - ss(-116, -96, z);
     const earBandY = ss(-58, -32, y) * (1 - ss(8, 28, y));
     xFactor += 0.24 * behindEar * earBandY * ss(0.3, 0.75, Math.abs(ux));
     pos.setXYZ(i, ux * xFactor, y, z);
@@ -366,7 +371,7 @@ async function buildGlbGlasses(manifest) {
   const pivots = [];
   let modelHeightMm = manifest.heightMm || W / (manifest.aspect || 2.8);
   let bendMm = W * 0.055;
-  let straightMm = ((manifest.temple && manifest.temple.lengthMm) || 145) * 0.62;
+  let straightMm = ((manifest.temple && manifest.temple.lengthMm) || 145) * 0.74;
 
   model.updateMatrixWorld(true);
   if (isAuto) {
@@ -453,7 +458,7 @@ async function buildGlbGlasses(manifest) {
       } else {
         if ("emissive" in mat) liftMats.push(mat);
         if (isAuto && isTempleNode) {
-          attachTempleFade(mat, -straightMm * 0.84 * 0.001, -straightMm * 1.16 * 0.001, templeFadeUniform);
+          attachTempleFade(mat, -straightMm * 0.94 * 0.001, -straightMm * 1.18 * 0.001, templeFadeUniform);
         }
       }
       return mat;
@@ -710,7 +715,7 @@ export async function buildGlasses(manifest) {
   for (const side of [-1, 1]) {
     const sideKey = side > 0 ? "left" : "right";
     const cfg = sideConfig(sideKey);
-    const straightLen = cfg.length * 0.62;
+    const straightLen = cfg.length * 0.74;
     const map = cfg.source ? templeTexture(photoTemples[cfg.source], straightLen, (cfg.h0 + cfg.h1) / 2) : null;
     const armMat = new THREE.MeshStandardMaterial({
       color: map ? new THREE.Color(0.84, 0.84, 0.84) : new THREE.Color(cfg.color),
@@ -718,7 +723,7 @@ export async function buildGlasses(manifest) {
       roughness: cfg.metal ? 0.26 : 0.36,
       metalness: cfg.metal ? 0.68 : 0.08,
     });
-    attachTempleFade(armMat, -straightLen * 0.84, -straightLen * 1.16, templeFadeUniform);
+    attachTempleFade(armMat, -straightLen * 0.94, -straightLen * 1.18, templeFadeUniform);
     liftMats.push(armMat);
     const geo = templeGeometry(cfg.length, cfg.h0, cfg.h1, cfg.thick, side, cfg.metal);
     const pivot = new THREE.Group();
@@ -748,7 +753,7 @@ export async function buildGlasses(manifest) {
     widthMm: W,
     heightMm: H,
     bend,
-    straightMm: armLength * 0.62,
+    straightMm: armLength * 0.74,
     bridge,
     face,
     pivots,
