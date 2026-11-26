@@ -61,7 +61,8 @@ button, input, label { font: inherit; }
 }
 .stage-like:hover { box-shadow: 0 6px 20px rgba(17, 18, 20, .18); }
 .stage-like:active { transform: scale(.96); }
-.stage-like.active { color: var(--ink); }
+.stage-like svg { display: block; }
+.stage-like.active { color: #e11d48; }
 .stage-like.active svg path { fill: currentColor; }
 
 .fit-chip {

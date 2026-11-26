@@ -1,4 +1,4 @@
-import { strings, pickLang } from "./embed-i18n.js?v=11";
+import { strings, pickLang } from "./embed-i18n.js?v=12";
 import { createFaceTracker } from "./sdk/face-tracker.js?v=2";
 import { createTryOn } from "./sdk/vto-core.js?v=16";
 
@@ -483,7 +483,9 @@ function syncLikeBtn() {
   const liked = likedSkus().has(String(current.sku));
   btn.classList.toggle("active", liked);
   btn.setAttribute("aria-pressed", liked ? "true" : "false");
-  btn.setAttribute("aria-label", liked ? T.unlike : T.like);
+  const label = liked ? T.unlike : T.like;
+  btn.setAttribute("aria-label", label);
+  btn.setAttribute("title", label);
 }
 
 function renderHead() {
@@ -597,16 +599,19 @@ function toggleLike() {
   const sku = String(current.sku);
   const btn = $("likeBtn");
   const next = !btn.classList.contains("active");
-  btn.classList.toggle("active", next);
-  btn.setAttribute("aria-pressed", next ? "true" : "false");
-  btn.setAttribute("aria-label", next ? T.unlike : T.like);
+  const set = likedSkus();
+  if (next) set.add(sku);
+  else set.delete(sku);
+  host = { ...host, likedSkus: [...set] };
+  syncLikeBtn();
   post("like", { product: info.get(sku) || { sku }, liked: next });
+  showToast(next ? T.liked : T.unliked, true, false);
 }
 
 let toastTimer = 0;
-function showToast(text, ok = true) {
+function showToast(text, ok = true, showCartLink = ok) {
   $("toastText").textContent = text;
-  $("viewCartBtn").hidden = !ok || host.viewCart === false;
+  $("viewCartBtn").hidden = !showCartLink || host.viewCart === false;
   $("toast").classList.toggle("warn", !ok);
   $("toast").hidden = false;
   clearTimeout(toastTimer);
@@ -646,7 +651,7 @@ function applyStatic() {
   $("closeBtn").hidden = !embedded;
   const cartOff = params.get("cart") === "0" || host.cart === false;
   $("cartBtn").hidden = !embedded || cartOff;
-  $("likeBtn").hidden = !embedded;
+  $("likeBtn").hidden = !embedded || host.like === false;
   syncLikeBtn();
 }
 

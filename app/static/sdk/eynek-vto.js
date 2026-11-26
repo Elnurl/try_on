@@ -83,6 +83,7 @@
         product: opts.product ? Object.assign({}, opts.product, { sku: sku }) : sku ? { sku: sku } : null,
         products: opts.products || null,
         cart: opts.cart !== false,
+        like: opts.like !== false,
         viewCart: opts.viewCart !== false,
         likedSkus: opts.likedSkus || null,
         termsUrl: opts.termsUrl || null,
