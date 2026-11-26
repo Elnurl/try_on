@@ -27,6 +27,13 @@ const LM = {
   irisA: [469, 471],
   irisB: [474, 476],
 };
+// MediaPipe 468-landmark outer face oval (clockwise from top of forehead).
+const FACE_OVAL = [
+  10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
+  397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
+  172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
+];
+const SIDE_OVAL = new Set([389, 356, 454, 323, 361, 288, 127, 162, 234, 93, 132, 58]);
 
 export class OneEuro {
   constructor(minCutoff = 1, beta = 0, dCutoff = 1) {
@@ -99,22 +106,65 @@ function shadowTexture(image) {
   return { tex, scaleX: canvas.width / cw, scaleY: canvas.height / ch };
 }
 
-function glareTexture() {
+/** Opaque rim-only texture (lenses stripped) for volumetric 3D front thickness layers. */
+function rimTexture(image) {
+  const cw = 512;
+  const ch = Math.max(64, Math.round((cw * image.height) / image.width));
   const canvas = document.createElement("canvas");
-  canvas.width = 128;
-  canvas.height = 128;
+  canvas.width = cw;
+  canvas.height = ch;
   const ctx = canvas.getContext("2d");
-  const g = ctx.createLinearGradient(0, 0, 128, 128);
-  g.addColorStop(0, "rgba(255,255,255,0.55)");
-  g.addColorStop(0.28, "rgba(255,255,255,0.08)");
-  g.addColorStop(0.42, "rgba(255,255,255,0)");
-  g.addColorStop(0.7, "rgba(255,255,255,0)");
-  g.addColorStop(0.86, "rgba(255,255,255,0.16)");
-  g.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 128, 128);
+  ctx.drawImage(image, 0, 0, cw, ch);
+  const img = ctx.getImageData(0, 0, cw, ch);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 210) {
+      d[i + 3] = 0;
+    } else {
+      d[i] = Math.round(d[i] * 0.65);
+      d[i + 1] = Math.round(d[i + 1] * 0.65);
+      d[i + 2] = Math.round(d[i + 2] * 0.65);
+      d[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  return tex;
+}
+
+/** Realistic studio window reflection map; UV offset glides dynamically with head rotation. */
+function glareTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  // Main diagonal studio softbox reflection with generous transparent margins for sliding.
+  const g1 = ctx.createLinearGradient(32, 16, 224, 240);
+  g1.addColorStop(0.0, "rgba(255,255,255,0)");
+  g1.addColorStop(0.22, "rgba(255,255,255,0)");
+  g1.addColorStop(0.32, "rgba(255,255,255,0.52)");
+  g1.addColorStop(0.41, "rgba(255,255,255,0.14)");
+  g1.addColorStop(0.49, "rgba(255,255,255,0)");
+  g1.addColorStop(0.64, "rgba(255,255,255,0)");
+  g1.addColorStop(0.71, "rgba(255,255,255,0.22)");
+  g1.addColorStop(0.78, "rgba(255,255,255,0)");
+  g1.addColorStop(1.0, "rgba(255,255,255,0)");
+  ctx.fillStyle = g1;
+  ctx.fillRect(0, 0, 256, 256);
+  // Subtle upper curved sky sheen.
+  const g2 = ctx.createRadialGradient(110, 64, 8, 110, 64, 110);
+  g2.addColorStop(0, "rgba(240,248,255,0.26)");
+  g2.addColorStop(0.6, "rgba(240,248,255,0.06)");
+  g2.addColorStop(1, "rgba(240,248,255,0)");
+  ctx.fillStyle = g2;
+  ctx.fillRect(0, 0, 256, 256);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
   return tex;
 }
 
@@ -248,35 +298,64 @@ export async function buildGlasses(manifest) {
   face.rotation.x = PANTO_TILT;
   root.add(face);
 
-  const front = new THREE.Mesh(
-    bentPlane(W, H, bend),
-    new THREE.MeshBasicMaterial({
-      map: tex,
-      transparent: true,
-      depthWrite: true,
-      depthTest: true,
-      alphaTest: 0.06,
-      side: THREE.DoubleSide,
-    }),
-  );
+  const templeBase = manifest.temple || {};
+  const hinge = manifest.hinge || { y: 0.32, heightMm: 5 };
+  const frontFinish = templeBase.finish || "acetate";
+  const frontMetal = frontFinish === "metal";
+  const frontRimHint = hinge.heightMm || templeBase.rimMm || 3;
+  const frontThick = frontMetal
+    ? THREE.MathUtils.clamp(frontRimHint * 0.55, 1.3, 2.2)
+    : THREE.MathUtils.clamp(frontRimHint * 0.65, 1.8, 4.4);
+
+  const frontMat = new THREE.MeshBasicMaterial({
+    map: tex,
+    transparent: true,
+    depthWrite: true,
+    depthTest: true,
+    alphaTest: 0.06,
+    side: THREE.DoubleSide,
+  });
+  const front = new THREE.Mesh(bentPlane(W, H, bend), frontMat);
   front.renderOrder = 4;
   face.add(front);
+
+  // Volumetric 3D rim extrusion behind the front face (lenses excluded so glass stays single-layer).
+  const rimTex = rimTexture(tex.image);
+  const rimMat = new THREE.MeshStandardMaterial({
+    map: rimTex,
+    transparent: true,
+    alphaTest: 0.45,
+    roughness: frontMetal ? 0.28 : 0.42,
+    metalness: frontMetal ? 0.65 : 0.08,
+    side: THREE.DoubleSide,
+  });
+  const rimLayers = Math.max(2, Math.min(7, Math.round(frontThick / 0.65)));
+  for (let i = 1; i <= rimLayers; i += 1) {
+    const zDepth = (i / rimLayers) * frontThick;
+    const layer = new THREE.Mesh(bentPlane(W, H, bend, -zDepth), rimMat);
+    layer.renderOrder = 3;
+    face.add(layer);
+  }
 
   const [ax, ay] = manifest.bridgeAnchor || [0.5, 0.45];
   const bridge = new THREE.Vector3((ax - 0.5) * W, (0.5 - ay) * H, 0);
 
   // Shadows sit on the skin, so they skip the depth test against the head occluder.
   const shadow = shadowTexture(tex.image);
-  const shadowMesh = new THREE.Mesh(
-    bentPlane(W * shadow.scaleX, H * shadow.scaleY, bend, -4),
-    new THREE.MeshBasicMaterial({ map: shadow.tex, transparent: true, opacity: 0.22, depthWrite: false, depthTest: false }),
-  );
+  const shadowMat = new THREE.MeshBasicMaterial({
+    map: shadow.tex,
+    transparent: true,
+    opacity: 0.22,
+    depthWrite: false,
+    depthTest: false,
+  });
+  const shadowMesh = new THREE.Mesh(bentPlane(W * shadow.scaleX, H * shadow.scaleY, bend, -4), shadowMat);
   shadowMesh.position.y = -2.2;
   shadowMesh.renderOrder = 1;
   face.add(shadowMesh);
 
   const blob = blobTexture();
-  const noseMat = new THREE.MeshBasicMaterial({ map: blob, transparent: true, opacity: 0.3, depthWrite: false, depthTest: false });
+  const noseMat = new THREE.MeshBasicMaterial({ map: blob, transparent: true, opacity: 0.28, depthWrite: false, depthTest: false });
   for (const side of [-1, 1]) {
     const pad = new THREE.Mesh(new THREE.PlaneGeometry(9, 15), noseMat);
     pad.position.set(bridge.x + side * 7.5, bridge.y - 9, -5);
@@ -286,24 +365,26 @@ export async function buildGlasses(manifest) {
   }
 
   const glareTex = glareTexture();
+  const glareMats = [];
   for (const lens of manifest.lenses || []) {
     const dark = lens.sunglass || (!lens.clear && (lens.opacity || 0) >= 0.62);
+    const baseOpacity = dark ? 0.22 : 0.36;
     const glareMat = new THREE.MeshBasicMaterial({
       map: glareTex,
       transparent: true,
-      opacity: dark ? 0.18 : 0.34,
+      opacity: baseOpacity,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
+    glareMat.userData.baseOpacity = baseOpacity;
     const mesh = lensGlare(lens, W, H, bend, glareMat);
     if (mesh) {
       mesh.renderOrder = 4;
       face.add(mesh);
+      glareMats.push(glareMat);
     }
   }
 
-  const templeBase = manifest.temple || {};
-  const hinge = manifest.hinge || { y: 0.32, heightMm: 5 };
   const pivots = [];
 
   function sideConfig(sideKey) {
@@ -337,7 +418,7 @@ export async function buildGlasses(manifest) {
     const pivot = new THREE.Group();
     const hingeX = W / 2 - Math.max(3.2, cfg.thick * 1.2);
     const t = hingeX / (W / 2);
-    pivot.position.set(side * hingeX, (0.5 - hinge.y) * H, -bend * t * t - cfg.thick * 0.35);
+    pivot.position.set(side * hingeX, (0.5 - hinge.y) * H, -bend * t * t - frontThick * 0.55);
     // Only the front carries the pantoscopic tilt; temples run back smoothly to the ears.
     pivot.rotation.x = -PANTO_TILT - TEMPLE_DROP;
     const arm = new THREE.Mesh(geo, armMat);
@@ -358,6 +439,10 @@ export async function buildGlasses(manifest) {
     bridge,
     face,
     pivots,
+    frontMat,
+    shadowMat,
+    noseMat,
+    glare: { tex: glareTex, mats: glareMats },
   };
   return root;
 }
@@ -374,7 +459,8 @@ export function createTryOn(canvas) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
   const scene = new THREE.Scene();
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8178, 1.55));
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8178, 1.55);
+  scene.add(hemi);
   const key = new THREE.DirectionalLight(0xffffff, 1.45);
   key.position.set(0.35, 0.7, 1);
   scene.add(key);
@@ -394,12 +480,13 @@ export function createTryOn(canvas) {
   bg.renderOrder = -10;
   scene.add(bg);
 
-  // Depth-only head: hides whatever part of the frame is behind the face (far temple,
-  // temple tips behind the ears) without ever clipping the near temple.
+  // Depth-only head: cranium ellipsoid + ear spheres + live MediaPipe face-contour mesh.
+  // Together they occlude the far temple right at the user's real brow/cheek silhouette
+  // without ever clipping the front lenses or the near temple.
   const head = new THREE.Group();
   head.visible = false;
   scene.add(head);
-  const hiddenMat = new THREE.MeshBasicMaterial({ colorWrite: false });
+  const hiddenMat = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide });
   const occluder = new THREE.Mesh(new THREE.SphereGeometry(1, 36, 24), hiddenMat);
   occluder.renderOrder = -2;
   occluder.position.set(0, -12, -92);
@@ -412,6 +499,29 @@ export function createTryOn(canvas) {
     head.add(ear);
     return ear;
   });
+
+  // Live MediaPipe face-contour depth mesh in scene space (1 center + 36 oval vertices).
+  const faceGeo = new THREE.BufferGeometry();
+  const facePos = new Float32Array((1 + FACE_OVAL.length) * 3);
+  const faceIdx = [];
+  for (let i = 0; i < FACE_OVAL.length; i += 1) {
+    faceIdx.push(0, 1 + i, 1 + ((i + 1) % FACE_OVAL.length));
+  }
+  faceGeo.setAttribute("position", new THREE.BufferAttribute(facePos, 3));
+  faceGeo.setIndex(faceIdx);
+  const faceOccluder = new THREE.Mesh(faceGeo, hiddenMat);
+  faceOccluder.renderOrder = -2;
+  faceOccluder.visible = false;
+  faceOccluder.frustumCulled = false;
+  scene.add(faceOccluder);
+
+  // Lightweight 24×18 offscreen sampler for real-time room light & colour-temperature estimation.
+  const lightCanvas = document.createElement("canvas");
+  lightCanvas.width = 24;
+  lightCanvas.height = 18;
+  const lightCtx = lightCanvas.getContext("2d", { willReadFrequently: true });
+  const lightState = { lastT: 0, luma: 0.6, r: 1, g: 1, b: 1, dirX: 0.35 };
+  let lightSource = null;
 
   let glasses = null;
   let mirror = true;
@@ -445,8 +555,11 @@ export function createTryOn(canvas) {
     my: new THREE.Vector3(),
     pos: new THREE.Vector3(),
     scl: new THREE.Vector3(),
+    view: new THREE.Vector3(),
+    pt: new THREE.Vector3(),
     m: new THREE.Matrix4(),
     q: new THREE.Quaternion(),
+    qInv: new THREE.Quaternion(),
   };
 
   function resize(width, height) {
@@ -462,6 +575,8 @@ export function createTryOn(canvas) {
   }
 
   function setSource(source, opts = {}) {
+    lightSource = source;
+    lightState.lastT = 0;
     mirror = opts.mirror ?? !!source.play;
     if (bgMat.map) bgMat.map.dispose();
     const tex = source.play ? new THREE.VideoTexture(source) : new THREE.CanvasTexture(source);
@@ -484,8 +599,12 @@ export function createTryOn(canvas) {
     glasses.userData.face.scale.x = mirror && mode === "live" ? -1 : 1;
     head.add(glasses);
     fit = { offsetY: 0, offsetZ: 0, scale: 1, ...(manifest.fit || {}) };
+    applyLighting();
     if (mode === "preview") posePreview(0);
-    else if (have) layout(lastLayout.zFront, lastLayout.faceHalf);
+    else if (have) {
+      layout(lastLayout.zFront, lastLayout.faceHalf);
+      updateGlare(head.quaternion);
+    }
     return glasses;
   }
 
@@ -498,6 +617,144 @@ export function createTryOn(canvas) {
     have = false;
     lastT = 0;
     head.visible = mode === "preview";
+    faceOccluder.visible = false;
+  }
+
+  /** Shift lens specular reflection dynamically with head yaw/pitch and room key-light side. */
+  function updateGlare(quat) {
+    const glare = glasses && glasses.userData.glare;
+    if (!glare) return;
+    tmp.view.set(0, 0, 1).applyQuaternion(tmp.qInv.copy(quat).invert());
+    const offX = THREE.MathUtils.clamp(-tmp.view.x * 0.55 - lightState.dirX * 0.16, -0.42, 0.42);
+    const offY = THREE.MathUtils.clamp(-tmp.view.y * 0.38, -0.32, 0.32);
+    glare.tex.offset.set(offX, offY);
+    const fresnel = 1 + Math.min(0.45, Math.abs(tmp.view.x) * 0.65);
+    const envBoost = mode === "preview" ? 1 : THREE.MathUtils.clamp(0.75 + lightState.luma * 0.45, 0.72, 1.2);
+    for (const mat of glare.mats) {
+      mat.opacity = Math.min(0.55, mat.userData.baseOpacity * fresnel * envBoost);
+    }
+  }
+
+  /** Estimate ambient brightness, colour temperature and key-light side from the video/photo. */
+  function estimateLight(lm, now) {
+    if (!lightSource || !lightCtx || (lightState.lastT && now - lightState.lastT < 250)) return;
+    const sw = lightSource.videoWidth || lightSource.naturalWidth || lightSource.width || 0;
+    const sh = lightSource.videoHeight || lightSource.naturalHeight || lightSource.height || 0;
+    if (sw < 16 || sh < 16) return;
+    try {
+      lightCtx.drawImage(lightSource, 0, 0, 24, 18);
+    } catch {
+      return;
+    }
+    const data = lightCtx.getImageData(0, 0, 24, 18).data;
+    const toScreenX = (p) => (mirror ? 1 - p.x : p.x);
+    const xA = toScreenX(lm[LM.cheekA]);
+    const xB = toScreenX(lm[LM.cheekB]);
+    const fx0 = Math.max(0, Math.floor(Math.min(xA, xB) * 24));
+    const fx1 = Math.min(23, Math.ceil(Math.max(xA, xB) * 24));
+    const fxMid = (fx0 + fx1) / 2;
+    const fy0 = Math.max(0, Math.floor(lm[LM.forehead].y * 18));
+    const fy1 = Math.min(17, Math.ceil(lm[LM.subnasal].y * 18));
+
+    let rSum = 0;
+    let gSum = 0;
+    let bSum = 0;
+    let count = 0;
+    let leftLuma = 0;
+    let leftN = 0;
+    let rightLuma = 0;
+    let rightN = 0;
+    for (let py = fy0; py <= fy1; py += 1) {
+      for (let px = fx0; px <= fx1; px += 1) {
+        const sx = mirror ? 23 - px : px;
+        const idx = (py * 24 + sx) * 4;
+        const r = data[idx] / 255;
+        const g = data[idx + 1] / 255;
+        const b = data[idx + 2] / 255;
+        const yL = 0.299 * r + 0.587 * g + 0.114 * b;
+        rSum += r;
+        gSum += g;
+        bSum += b;
+        count += 1;
+        if (px < fxMid) {
+          leftLuma += yL;
+          leftN += 1;
+        } else {
+          rightLuma += yL;
+          rightN += 1;
+        }
+      }
+    }
+    if (count < 4) return;
+    const avgR = rSum / count;
+    const avgG = gSum / count;
+    const avgB = bSum / count;
+    const avgLuma = THREE.MathUtils.clamp(0.299 * avgR + 0.587 * avgG + 0.114 * avgB, 0.2, 0.95);
+    const meanC = Math.max(0.08, (avgR + avgG + avgB) / 3);
+    const tintR = THREE.MathUtils.clamp(avgR / meanC, 0.88, 1.12);
+    const tintG = THREE.MathUtils.clamp(avgG / meanC, 0.9, 1.1);
+    const tintB = THREE.MathUtils.clamp(avgB / meanC, 0.86, 1.14);
+    const lDiff = rightN && leftN ? (rightLuma / rightN - leftLuma / leftN) * 3.2 : 0;
+    const targetDirX = THREE.MathUtils.clamp(lDiff, -0.85, 0.85);
+    const a = lightState.lastT ? 0.22 : 1;
+    lightState.luma += (avgLuma - lightState.luma) * a;
+    lightState.r += (tintR - lightState.r) * a;
+    lightState.g += (tintG - lightState.g) * a;
+    lightState.b += (tintB - lightState.b) * a;
+    lightState.dirX += (targetDirX - lightState.dirX) * a;
+    lightState.lastT = now;
+
+    applyLighting();
+  }
+
+  function applyLighting() {
+    if (mode === "preview") {
+      hemi.intensity = 1.55;
+      hemi.color.setRGB(1, 1, 1);
+      key.intensity = 1.45;
+      key.color.setRGB(1, 1, 1);
+      key.position.set(0.35, 0.7, 1);
+      if (glasses && glasses.userData.frontMat) glasses.userData.frontMat.color.setRGB(1, 1, 1);
+      return;
+    }
+    const { luma, r, g, b, dirX } = lightState;
+    hemi.intensity = 1.1 + luma * 0.8;
+    hemi.color.setRGB(0.55 + 0.45 * r, 0.55 + 0.45 * g, 0.55 + 0.45 * b);
+    key.intensity = 0.95 + luma * 0.9;
+    key.color.setRGB(r, g, b);
+    key.position.set(dirX, 0.65, 1);
+    if (glasses && glasses.userData.frontMat) {
+      const bright = THREE.MathUtils.clamp(0.84 + luma * 0.24, 0.85, 1.05);
+      glasses.userData.frontMat.color.setRGB(
+        bright * (0.78 + 0.22 * r),
+        bright * (0.78 + 0.22 * g),
+        bright * (0.78 + 0.22 * b),
+      );
+    }
+    if (glasses && glasses.userData.shadowMat) {
+      glasses.userData.shadowMat.opacity = THREE.MathUtils.clamp(0.14 + luma * 0.14, 0.14, 0.27);
+    }
+  }
+
+  /** Update the live MediaPipe face-contour depth occluder in scene space. */
+  function updateFaceOccluder(lm, origin, xAxis, zAxis, pxPerMm) {
+    const pos = faceGeo.attributes.position;
+    const pushBack = 4.5 * pxPerMm;
+    const sideInset = 5.5 * pxPerMm;
+    const p = tmp.pt;
+    point(lm, LM.bridge, p).addScaledVector(zAxis, -pushBack);
+    pos.setXYZ(0, p.x, p.y, p.z);
+    for (let i = 0; i < FACE_OVAL.length; i += 1) {
+      const idx = FACE_OVAL[i];
+      point(lm, idx, p).addScaledVector(zAxis, -pushBack);
+      if (SIDE_OVAL.has(idx)) {
+        const dx = (p.x - origin.x) * xAxis.x + (p.y - origin.y) * xAxis.y + (p.z - origin.z) * xAxis.z;
+        p.addScaledVector(xAxis, -Math.sign(dx) * sideInset);
+      }
+      pos.setXYZ(1 + i, p.x, p.y, p.z);
+    }
+    pos.needsUpdate = true;
+    faceOccluder.visible = true;
   }
 
   function resetCalibration() {
@@ -578,6 +835,7 @@ export function createTryOn(canvas) {
     if (!face) {
       if (now - lastSeen > LOST_FACE_MS) {
         head.visible = false;
+        faceOccluder.visible = false;
         have = false;
       }
       return false;
@@ -631,6 +889,9 @@ export function createTryOn(canvas) {
 
     const zFront = THREE.MathUtils.clamp(filters.zf.filter(bridgeZ, dt) * 0.5 + 2, 7, 13);
     layout(zFront, THREE.MathUtils.clamp(filters.ear.filter(faceHalf, dt), 60, 74));
+    updateFaceOccluder(lm, head.position, x, z, head.scale.x);
+    estimateLight(lm, now);
+    updateGlare(head.quaternion);
     return true;
   }
 
@@ -673,19 +934,25 @@ export function createTryOn(canvas) {
 
   function posePreview(angle) {
     head.visible = true;
+    faceOccluder.visible = false;
     head.position.set(0, 0, 0);
     head.scale.setScalar(1);
     head.quaternion.setFromEuler(new THREE.Euler(0.12, angle, 0));
-    if (glasses) layout(50, 66);
+    if (glasses) {
+      layout(50, 66);
+      updateGlare(head.quaternion);
+    }
   }
 
   function startPreview(clear = 0xf4f2ee) {
     mode = "preview";
     bg.visible = false;
     occluder.visible = false;
+    faceOccluder.visible = false;
     ears.forEach((ear) => (ear.visible = false));
     renderer.setClearColor(clear, 1);
     if (glasses) glasses.userData.face.scale.x = 1;
+    applyLighting();
     posePreview(0);
   }
 
@@ -693,8 +960,10 @@ export function createTryOn(canvas) {
     mode = "live";
     bg.visible = true;
     occluder.visible = true;
+    faceOccluder.visible = false;
     ears.forEach((ear) => (ear.visible = true));
     if (glasses) glasses.userData.face.scale.x = mirror ? -1 : 1;
+    applyLighting();
     resetTracking();
   }
 
