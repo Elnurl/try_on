@@ -10,6 +10,7 @@ Sizes        → "49-18-142" style numbers; lens width calibrates real frame wid
 from __future__ import annotations
 
 import colorsys
+import logging
 import os
 from dataclasses import dataclass, field
 from io import BytesIO
@@ -18,7 +19,8 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-PIPELINE_VERSION = 10
+PIPELINE_VERSION = 12
+log = logging.getLogger("vto.pipeline")
 MAX_SIDE = 1600
 DEFAULT_WIDTH_MM = 138.0
 DEFAULT_TEMPLE_MM = 145.0
@@ -50,6 +52,7 @@ class Asset:
     manifest: dict
     sides: dict[str, Image.Image] = field(default_factory=dict)
     temple_strips: dict[str, Image.Image] = field(default_factory=dict)
+    glb: bytes | None = None
 
 
 def load_image(data: bytes) -> Image.Image:
@@ -309,11 +312,11 @@ def _lens_is_sunglass(rgb: np.ndarray, interior: np.ndarray) -> bool:
     return float(np.mean(med)) < 72 and float(np.max(med)) < 110
 
 
-def _apply_lenses(px: np.ndarray) -> tuple[np.ndarray, list[dict], int]:
+def _apply_lenses(px: np.ndarray) -> tuple[np.ndarray, list[dict], list[np.ndarray], int]:
     h, w = px.shape[:2]
     out = px.astype(np.float32)
     blobs, split = _lens_blobs(px[..., 3])
-    lenses = []
+    items: list[tuple[dict, np.ndarray]] = []
     for blob in blobs:
         interior, clear = _lens_interior(blob, px, w)
         if interior.sum() < 0.01 * h * w:
@@ -343,25 +346,30 @@ def _apply_lenses(px: np.ndarray) -> tuple[np.ndarray, list[dict], int]:
         out[..., 3:4] = alpha * (1 - weight) + target_a * weight
         ys, xs = np.nonzero(interior)
         outer_x = np.nonzero(blob.any(axis=0))[0]
-        lenses.append(
-            {
-                "outerWidth": round(float(outer_x.max() - outer_x.min() + 1) / w, 4),
-                "center": [round(float(xs.mean()) / w, 4), round(float(ys.mean()) / h, 4)],
-                "box": [
-                    round(float(xs.min()) / w, 4),
-                    round(float(ys.min()) / h, 4),
-                    round(float(xs.max() - xs.min() + 1) / w, 4),
-                    round(float(ys.max() - ys.min() + 1) / h, 4),
-                ],
-                "polygon": _polygon(interior, w, h),
-                "clear": clear,
-                "sunglass": sunglass if not clear else False,
-                "tint": tint,
-                "opacity": opacity,
-            }
+        items.append(
+            (
+                {
+                    "outerWidth": round(float(outer_x.max() - outer_x.min() + 1) / w, 4),
+                    "center": [round(float(xs.mean()) / w, 4), round(float(ys.mean()) / h, 4)],
+                    "box": [
+                        round(float(xs.min()) / w, 4),
+                        round(float(ys.min()) / h, 4),
+                        round(float(xs.max() - xs.min() + 1) / w, 4),
+                        round(float(ys.max() - ys.min() + 1) / h, 4),
+                    ],
+                    "polygon": _polygon(interior, w, h),
+                    "clear": clear,
+                    "sunglass": sunglass if not clear else False,
+                    "tint": tint,
+                    "opacity": opacity,
+                },
+                interior,
+            )
         )
-    lenses.sort(key=lambda lens: lens["center"][0])
-    return np.clip(out, 0, 255).astype(np.uint8), lenses, split
+    items.sort(key=lambda pair: pair[0]["center"][0])
+    lenses = [pair[0] for pair in items]
+    interiors = [pair[1] for pair in items]
+    return np.clip(out, 0, 255).astype(np.uint8), lenses, interiors, split
 
 
 def _hinge(alpha: np.ndarray) -> tuple[float, float]:
@@ -644,7 +652,7 @@ def build_asset(front: Image.Image, sides: dict[str, Image.Image], sizes: Sizes)
     if w < 120 or w / max(h, 1) < 1.2:
         raise PipelineError("Ön şəkil düz öndən olmalıdır: eynək tam görünsün, yan bucaqdan yox.")
     px = _refine_alpha_edges(px)
-    px, lenses, split = _apply_lenses(px)
+    px, lenses, lens_interiors, split = _apply_lenses(px)
     if len(lenses) == 2:
         (wa, wb) = (lenses[0]["box"][2], lenses[1]["box"][2])
         mid = (lenses[0]["center"][0] + lenses[1]["center"][0]) / 2
@@ -731,11 +739,21 @@ def build_asset(front: Image.Image, sides: dict[str, Image.Image], sizes: Sizes)
         "background": bg_method,
         "warnings": warnings,
     }
+    glb_bytes: bytes | None = None
+    try:
+        from app.glb_gen import generate_eyewear_glb
+
+        glb_bytes = generate_eyewear_glb(px, lens_interiors, manifest, temple_strips)
+        if glb_bytes:
+            manifest["autoGlb"] = True
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Auto 3D GLB generation skipped: %s", exc)
     return Asset(
         front=Image.fromarray(px, "RGBA"),
         manifest=manifest,
         sides=side_images,
         temple_strips=temple_strips,
+        glb=glb_bytes,
     )
 
 

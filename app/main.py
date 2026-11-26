@@ -159,6 +159,8 @@ def public_manifest(m: dict, base: str) -> dict:
     if m.get("type") == "glb":
         out["model"] = f"{root}/model.glb?v={v}"
         return out
+    if m.get("autoGlb"):
+        out["model"] = f"{root}/model.glb?v={v}"
     out["texture"] = f"{root}/front.png?v={v}"
     out["photos"] = {name: f"{root}/photo-{name}.jpg?v={v}" for name in m.get("photos", [])}
     textures = {}

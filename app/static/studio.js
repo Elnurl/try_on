@@ -1,4 +1,4 @@
-import { createTryOn } from "./sdk/vto-core.js?v=14";
+import { createTryOn } from "./sdk/vto-core.js?v=15";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -118,10 +118,13 @@ async function showResult(m) {
   $("resultCard").hidden = false;
   $("resultTitle").textContent = `${m.name || m.sku} — hazırdır`;
   const isGlb = m.type === "glb";
+  const hasAutoGlb = Boolean(m.autoGlb && m.model);
   $("textureWrap").hidden = isGlb;
   $("previewNote").textContent = isGlb
     ? "Tam 3D GLB model — real millimetr ölçüsü və PBR işıqlandırma ilə göstərilir."
-    : "Ön çərçivə ön şəkildən; hər qol yan şəkildən (qalınlıq, rəng, uzunluq) götürülür.";
+    : hasAutoGlb
+      ? "Stok şəklindən avtomatik real 3D (.glb) model yaradıldı — bərk çərçivə, əyri PBR şüşə və simmetrik qollar."
+      : "Ön çərçivə ön şəkildən; hər qol yan şəkildən (qalınlıq, rəng, uzunluq) götürülür.";
   if (!isGlb) $("texture").src = m.texture;
   const widthNote = { lens: "linzadan ölçüldü", given: "daxil edildi", sizes: "ölçülərdən", default: "standart" }[m.widthSource] || "";
   if (isGlb) {
@@ -132,6 +135,7 @@ async function showResult(m) {
   } else {
     const lenses = m.lenses || [];
     $("stats").innerHTML = [
+      ...(hasAutoGlb ? [stat("Format", "Avto 3D (GLB)")] : []),
       stat(`Çərçivə eni (${widthNote})`, `${Math.round(m.widthMm)} mm`),
       stat(
         "Linzalar",
@@ -240,12 +244,16 @@ async function loadList() {
   for (const m of data.products) {
     const el = document.createElement("div");
     el.className = "item";
-    const badge = m.type === "glb" ? " · 3D GLB" : "";
+    const badge = m.type === "glb" ? " · 3D GLB" : m.autoGlb ? " · Avto 3D" : "";
+    const dlBtn = m.model
+      ? `<a class="btn small ghost" href="${escapeHtml(m.model)}" download="${escapeHtml(m.sku)}.glb">GLB</a>`
+      : "";
     el.innerHTML = `<img src="${escapeHtml(m.thumb)}" alt="" loading="lazy" />
       <div><b>${escapeHtml(m.name || m.sku)}</b><div class="muted">${escapeHtml(m.sku)} · ${Math.round(m.widthMm)} mm${badge}</div></div>
       <div class="actions">
         <button class="btn small" data-act="try">Yoxla</button>
         <button class="btn small ghost" data-act="view">Bax</button>
+        ${dlBtn}
         <button class="btn small danger" data-act="del">Sil</button>
       </div>`;
     el.querySelector('[data-act="try"]').onclick = () => window.EynekVTO.open({ store: m.store, sku: m.sku, cart: false });

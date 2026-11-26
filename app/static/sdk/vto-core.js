@@ -295,52 +295,130 @@ function blobTexture() {
 
 /** Load and normalise a real 3D .glb eyewear model into head-local millimetres. */
 async function buildGlbGlasses(manifest) {
-  const gltf = await getGltfLoader().loadAsync(manifest.model);
+  const [gltf, frontTex] = await Promise.all([
+    getGltfLoader().loadAsync(manifest.model),
+    manifest.autoGlb && manifest.texture ? loadTexture(manifest.texture).catch(() => null) : Promise.resolve(null),
+  ]);
   const model = gltf.scene;
   const W = manifest.widthMm || 138;
-
-  // Compute initial bounds; if the model was exported sideways (depth > width), rotate 90°.
-  model.updateMatrixWorld(true);
-  let box = new THREE.Box3().setFromObject(model);
-  let size = box.getSize(new THREE.Vector3());
-  if (size.z > size.x * 1.15) {
-    model.rotation.y = Math.PI / 2;
-    model.updateMatrixWorld(true);
-    box = new THREE.Box3().setFromObject(model);
-    size = box.getSize(new THREE.Vector3());
-  }
-  const scale = size.x > 1e-4 ? W / size.x : 1;
-  model.scale.multiplyScalar(scale);
-  model.updateMatrixWorld(true);
-  box = new THREE.Box3().setFromObject(model);
-  size = box.getSize(new THREE.Vector3());
-  const center = box.getCenter(new THREE.Vector3());
-
-  // Place nose bridge at origin (0, 0, 0) and front plane at z = 0 so temples run into -z.
-  const bridgeY = box.max.y - size.y * 0.42;
-  model.position.set(-center.x, -bridgeY, -box.max.z);
-
-  model.traverse((node) => {
-    if (!node.isMesh) return;
-    const mats = Array.isArray(node.material) ? node.material : [node.material];
-    let hasGlass = false;
-    for (const mat of mats) {
-      if (!mat) continue;
-      if ("envMapIntensity" in mat) mat.envMapIntensity = 1.1;
-      const isTransparent = mat.transparent || (mat.opacity !== undefined && mat.opacity < 0.98) || (mat.transmission && mat.transmission > 0.05);
-      if (isTransparent) {
-        hasGlass = true;
-        mat.transparent = true;
-        mat.depthWrite = false;
-      }
-    }
-    node.renderOrder = hasGlass ? 4 : 3;
-  });
+  const tLeft = model.getObjectByName("temple_left");
+  const tRight = model.getObjectByName("temple_right");
+  const isAuto = Boolean(manifest.autoGlb && tLeft && tRight);
 
   const root = new THREE.Group();
   const face = new THREE.Group();
+  const pivots = [];
+  let modelHeightMm = manifest.heightMm || W / (manifest.aspect || 2.8);
+  let bendMm = W * 0.055;
+  let straightMm = ((manifest.temple && manifest.temple.lengthMm) || 145) * 0.72;
+
+  model.updateMatrixWorld(true);
+  if (isAuto) {
+    // Auto-generated 3D GLB is already centred on the nose bridge (0,0,0) with front apex at z=0.
+    const frontNode = model.getObjectByName("front_frame") || model;
+    const fBox = new THREE.Box3().setFromObject(frontNode);
+    const fSize = fBox.getSize(new THREE.Vector3());
+    const scale = fSize.x > 1e-4 ? W / fSize.x : 1000;
+    model.scale.setScalar(scale);
+    modelHeightMm = fSize.y > 1e-4 ? fSize.y * scale : modelHeightMm;
+    face.rotation.x = PANTO_TILT;
+
+    for (const [pivot, side] of [
+      [tRight, -1],
+      [tLeft, 1],
+    ]) {
+      pivot.rotation.x = -PANTO_TILT - TEMPLE_DROP;
+      pivot.userData.side = side;
+      pivot.userData.hingeX = Math.abs(pivot.position.x) * scale;
+      pivots.push(pivot);
+    }
+  } else {
+    // External uploaded GLB: auto-orient sideways exports, scale to widthMm, align nose bridge.
+    let box = new THREE.Box3().setFromObject(model);
+    let size = box.getSize(new THREE.Vector3());
+    if (size.z > size.x * 1.15) {
+      model.rotation.y = Math.PI / 2;
+      model.updateMatrixWorld(true);
+      box = new THREE.Box3().setFromObject(model);
+      size = box.getSize(new THREE.Vector3());
+    }
+    const scale = size.x > 1e-4 ? W / size.x : 1;
+    model.scale.multiplyScalar(scale);
+    model.updateMatrixWorld(true);
+    box = new THREE.Box3().setFromObject(model);
+    size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const bridgeY = box.max.y - size.y * 0.42;
+    model.position.set(-center.x, -bridgeY, -box.max.z);
+    modelHeightMm = size.y || W / 2.8;
+    straightMm = Math.max(70, (size.z || 140) * 0.72);
+  }
+
+  model.traverse((node) => {
+    if (!node.isMesh) return;
+    const isPad = /nose_pad/i.test(node.name);
+    const isLensNode = /lens|glass/i.test(node.name);
+    const mats = Array.isArray(node.material) ? node.material : [node.material];
+    let hasGlass = false;
+    const nextMats = mats.map((mat) => {
+      if (!mat) return mat;
+      const isTransparent =
+        isLensNode ||
+        mat.transparent ||
+        (mat.opacity !== undefined && mat.opacity < 0.98) ||
+        (mat.transmission && mat.transmission > 0.05);
+      if (isTransparent && !isPad) {
+        hasGlass = true;
+        // Upgrade glass lenses to clearcoat PBR physical material for realistic curved studio reflections.
+        const phys = new THREE.MeshPhysicalMaterial({
+          color: mat.color ? mat.color.clone() : new THREE.Color(0xffffff),
+          map: mat.map || null,
+          transparent: true,
+          opacity: mat.opacity !== undefined ? mat.opacity : 0.25,
+          roughness: Math.min(mat.roughness ?? 0.08, 0.1),
+          metalness: mat.metalness ?? 0.1,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.05,
+          reflectivity: 0.92,
+          envMapIntensity: 1.45,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+        mat.dispose();
+        return phys;
+      }
+      if ("envMapIntensity" in mat) mat.envMapIntensity = isPad ? 0.4 : 1.05;
+      if (isPad) {
+        mat.transparent = true;
+        mat.depthWrite = false;
+      }
+      return mat;
+    });
+    node.material = Array.isArray(node.material) ? nextMats : nextMats[0];
+    node.renderOrder = hasGlass ? 4 : isPad ? 2 : 3;
+  });
+
   face.add(model);
   root.add(face);
+
+  // Soft cast shadow on the skin when front silhouette texture is available.
+  const skinShadows = new THREE.Group();
+  let shadowMat = null;
+  if (frontTex && frontTex.image) {
+    const shadow = shadowTexture(frontTex.image);
+    shadowMat = new THREE.MeshBasicMaterial({
+      map: shadow.tex,
+      transparent: true,
+      opacity: 0.2,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const [ax, ay] = manifest.bridgeAnchor || [0.5, 0.45];
+    const shadowMesh = new THREE.Mesh(bentPlane(W * shadow.scaleX, modelHeightMm * shadow.scaleY, bendMm, -4.2), shadowMat);
+    shadowMesh.position.set(-(ax - 0.5) * W, -(0.5 - ay) * modelHeightMm - 2.2, 0);
+    shadowMesh.renderOrder = 1;
+    skinShadows.add(shadowMesh);
+  }
 
   // Subtle nose-pad contact shadows ground the 3D frame onto the skin.
   const blob = blobTexture();
@@ -350,26 +428,34 @@ async function buildGlbGlasses(manifest) {
     pad.position.set(side * 7.5, -9, -5);
     pad.rotation.z = side * 0.35;
     pad.renderOrder = 1;
-    face.add(pad);
+    skinShadows.add(pad);
   }
+  face.add(skinShadows);
 
   root.userData = {
     isGlb: true,
     widthMm: W,
-    heightMm: size.y || W / 2.8,
-    bend: W * 0.055,
-    straightMm: Math.max(70, (size.z || 140) * 0.72),
+    heightMm: modelHeightMm,
+    bend: bendMm,
+    straightMm,
     bridge: new THREE.Vector3(0, 0, 0),
     face,
-    pivots: [],
+    pivots,
+    shadowMat,
     noseMat,
+    skinShadows,
   };
   return root;
 }
 
 export async function buildGlasses(manifest) {
-  if (manifest.type === "glb" && manifest.model) {
-    return buildGlbGlasses(manifest);
+  if ((manifest.type === "glb" || manifest.autoGlb) && manifest.model) {
+    try {
+      return await buildGlbGlasses(manifest);
+    } catch (err) {
+      if (manifest.type === "glb" || !manifest.texture) throw err;
+      // Fall back smoothly to 2.5D if an auto-generated GLB ever fails to load.
+    }
   }
   const templeSides = manifest.templeSides || {};
   const templeUrls = manifest.templeTextures || {};
@@ -704,6 +790,7 @@ export function createTryOn(canvas) {
     if (glasses) head.remove(glasses);
     glasses = next;
     glasses.userData.face.scale.x = mirror && mode === "live" ? -1 : 1;
+    if (glasses.userData.skinShadows) glasses.userData.skinShadows.visible = mode !== "preview";
     head.add(glasses);
     fit = { offsetY: 0, offsetZ: 0, scale: 1, ...(manifest.fit || {}) };
     applyLighting();
@@ -1023,10 +1110,8 @@ export function createTryOn(canvas) {
     const cz = 84;
     const zc = -92;
     let occA = sideHalf - 3;
-    if (u.isGlb) {
-      occA = Math.min(occA, (u.widthMm / 2) * s - 3);
-    } else if (u.pivots.length) {
-      // Apply the exact same symmetric splay angle to both temples.
+    if (u.pivots.length) {
+      // Apply the exact same symmetric splay angle to both temples (both 2.5D and auto-3D GLB).
       const hx = u.pivots[0].userData.hingeX * s;
       const targetX = Math.max(sideHalf + 1.5, hx + 1);
       const splay = THREE.MathUtils.clamp(Math.atan2(targetX - hx, reach), -0.04, 0.11);
@@ -1041,6 +1126,8 @@ export function createTryOn(canvas) {
         const ellipseW = Math.sqrt(Math.max(0.05, 1 - frac * frac));
         occA = Math.min(occA, (templeX - 3.5) / ellipseW);
       }
+    } else if (u.isGlb) {
+      occA = Math.min(occA, (u.widthMm / 2) * s - 3);
     }
     occluder.scale.set(Math.max(42, occA), 114, cz);
     for (const ear of ears) ear.position.set(ear.userData.side * (sideHalf + 5), -36, -104);
@@ -1065,7 +1152,10 @@ export function createTryOn(canvas) {
     faceOccluder.visible = false;
     ears.forEach((ear) => (ear.visible = false));
     renderer.setClearColor(clear, 1);
-    if (glasses) glasses.userData.face.scale.x = 1;
+    if (glasses) {
+      glasses.userData.face.scale.x = 1;
+      if (glasses.userData.skinShadows) glasses.userData.skinShadows.visible = false;
+    }
     applyLighting();
     posePreview(0);
   }
@@ -1076,7 +1166,10 @@ export function createTryOn(canvas) {
     occluder.visible = true;
     faceOccluder.visible = false;
     ears.forEach((ear) => (ear.visible = true));
-    if (glasses) glasses.userData.face.scale.x = mirror ? -1 : 1;
+    if (glasses) {
+      glasses.userData.face.scale.x = mirror ? -1 : 1;
+      if (glasses.userData.skinShadows) glasses.userData.skinShadows.visible = true;
+    }
     applyLighting();
     resetTracking();
   }

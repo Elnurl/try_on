@@ -172,6 +172,8 @@ def save_product(store_id: str, sku: str, meta: dict, asset: Asset, photos: dict
     for name, strip in asset.temple_strips.items():
         if name in {"left", "right"}:
             strip.save(tmp / f"temple-{name}.png", "PNG", optimize=True)
+    if asset.glb:
+        (tmp / "model.glb").write_bytes(asset.glb)
     manifest = {
         "version": 2,
         "store": store_id,
