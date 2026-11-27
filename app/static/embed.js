@@ -1,6 +1,6 @@
 import { strings, pickLang } from "./embed-i18n.js?v=13";
 import { createFaceTracker } from "./sdk/face-tracker.js?v=2";
-import { createTryOn } from "./sdk/vto-core.js?v=22";
+import { createTryOn } from "./sdk/vto-core.js?v=23";
 
 const TERMS_VERSION = "1";
 const TERMS_KEY = "eynek-vto:terms";
@@ -483,6 +483,7 @@ async function usePhoto(file) {
     photoFace = await tracker.detectImage(photo);
     if (!photoFace) throw new Error(T.noFace);
     mode = "photo";
+    hint("");
     stage.classList.add("contain");
     vto.resize(photo.width, photo.height);
     vto.setSource(photo, { mirror: false });

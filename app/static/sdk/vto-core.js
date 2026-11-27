@@ -819,6 +819,19 @@ export function createTryOn(canvas) {
   occluder.renderOrder = -2;
   head.add(occluder);
 
+  // Real face silhouette from MediaPipe's oval, in scene space. On a turned head it hides the
+  // far temple behind the actual cheek/brow; the near side is recessed so it never clips the
+  // near temple.
+  const faceGeo = new THREE.BufferGeometry();
+  const faceIdx = [];
+  for (let i = 0; i < FACE_OVAL.length; i += 1) faceIdx.push(0, 1 + i, 1 + ((i + 1) % FACE_OVAL.length));
+  faceGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array((1 + FACE_OVAL.length) * 3), 3));
+  faceGeo.setIndex(faceIdx);
+  const faceOccluder = new THREE.Mesh(faceGeo, hiddenMat);
+  faceOccluder.renderOrder = -2;
+  faceOccluder.visible = false;
+  faceOccluder.frustumCulled = false;
+  scene.add(faceOccluder);
   // Lightweight 24×18 offscreen sampler for real-time room light, colour-temp & camera black-level estimation.
   const lightCanvas = document.createElement("canvas");
   lightCanvas.width = 24;
@@ -957,6 +970,54 @@ export function createTryOn(canvas) {
     have = false;
     lastT = 0;
     head.visible = mode === "preview";
+    faceOccluder.visible = false;
+  }
+
+  /** Fit the face-silhouette occluder to the live landmarks (bridge moved to z = 0 like `head`). */
+  function updateFaceOccluder(lm, zAxis, pxPerMm) {
+    const pos = faceGeo.attributes.position;
+    const p = tmp.pt;
+    const bridgeZ = point(lm, LM.bridge, p).z;
+    const f = liveFocalPx();
+    // Landmarks are image positions; push each back along the camera ray to its depth so the
+    // silhouette still projects onto the real face contour under the perspective camera.
+    const lift = (q, depthScale = 1) => {
+      q.z = (q.z - bridgeZ) * depthScale;
+      const k = (f - q.z) / f;
+      q.x *= k;
+      q.y *= k;
+      return q;
+    };
+    const corePush = 3.5 * pxPerMm;
+    // Screen-right side recedes when the face turns right, so that is the far side.
+    const farSign = Math.sign(zAxis.x) || 1;
+    const turn = THREE.MathUtils.clamp((Math.abs(zAxis.x) - 0.06) / 0.2, 0, 1);
+    const cx = point(lm, LM.bridge, p).x;
+    lift(p).addScaledVector(zAxis, -corePush);
+    pos.setXYZ(0, p.x, p.y, p.z);
+    for (let i = 0; i < FACE_OVAL.length; i += 1) {
+      const idx = FACE_OVAL[i];
+      point(lm, idx, p);
+      const side = Math.sign(p.x - cx) || 1;
+      const far = side === farSign;
+      // A flat fan from the bridge to the far contour sits behind the far temple, while the
+      // real cheek bulges in front of it; shallower far-side depth restores that occlusion.
+      lift(p, far ? THREE.MathUtils.lerp(1, 0.5, turn) : 1);
+      if (SIDE_OVAL.has(idx)) {
+        const tight = far ? turn : 0;
+        const push = THREE.MathUtils.lerp(9.0, 3.5, tight) * pxPerMm;
+        // MediaPipe's far contour lands inside the visible temple skin on a turned head, so the
+        // far edge grows outward; the frame front is still in front of it.
+        const inset = THREE.MathUtils.lerp(10.0, -12.0, tight) * pxPerMm;
+        p.addScaledVector(zAxis, -push);
+        p.x -= side * inset;
+      } else {
+        p.addScaledVector(zAxis, -corePush);
+      }
+      pos.setXYZ(1 + i, p.x, p.y, p.z);
+    }
+    pos.needsUpdate = true;
+    faceOccluder.visible = mode !== "preview";
   }
 
   /** Shift lens specular reflection dynamically with head yaw/pitch and room key-light side. */
@@ -1178,6 +1239,7 @@ export function createTryOn(canvas) {
     if (!face) {
       if (now - lastSeen > LOST_FACE_MS) {
         head.visible = false;
+        faceOccluder.visible = false;
         have = false;
       }
       return false;
@@ -1233,6 +1295,7 @@ export function createTryOn(canvas) {
 
     const zFront = THREE.MathUtils.clamp(filters.zf.filter(bridgeZ, dt) * 0.5 + 2, 7, 13);
     layout(zFront, THREE.MathUtils.clamp(filters.ear.filter(faceHalf, dt), 60, 74));
+    updateFaceOccluder(lm, z, head.scale.x);
     estimateLight(lm, now);
     updateGlare(head.quaternion);
     return true;
@@ -1283,6 +1346,7 @@ export function createTryOn(canvas) {
     mode = "preview";
     bg.visible = false;
     occluder.visible = false;
+    faceOccluder.visible = false;
     renderer.setClearColor(clear, 1);
     if (glasses) {
       glasses.userData.face.scale.x = 1;
