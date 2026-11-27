@@ -49,7 +49,6 @@ const FACE_OVAL = [
   397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
   172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
 ];
-const SIDE_OVAL = new Set([284, 251, 389, 356, 454, 323, 361, 288, 21, 54, 127, 162, 234, 93, 132, 58]);
 
 export class OneEuro {
   constructor(minCutoff = 1, beta = 0, dCutoff = 1) {
@@ -161,8 +160,8 @@ function glareTexture() {
   const g1 = ctx.createLinearGradient(32, 16, 224, 240);
   g1.addColorStop(0.0, "rgba(255,255,255,0)");
   g1.addColorStop(0.22, "rgba(255,255,255,0)");
-  g1.addColorStop(0.32, "rgba(255,255,255,0.52)");
-  g1.addColorStop(0.41, "rgba(255,255,255,0.14)");
+  g1.addColorStop(0.32, "rgba(255,255,255,0.34)");
+  g1.addColorStop(0.41, "rgba(255,255,255,0.1)");
   g1.addColorStop(0.49, "rgba(255,255,255,0)");
   g1.addColorStop(0.64, "rgba(255,255,255,0)");
   g1.addColorStop(0.71, "rgba(255,255,255,0.22)");
@@ -510,7 +509,7 @@ async function buildGlbGlasses(manifest) {
     const byOff = -(0.5 - ay) * modelHeightMm;
     for (const lens of manifest.lenses || []) {
       const dark = lens.sunglass || (!lens.clear && (lens.opacity || 0) >= 0.55);
-      const baseOpacity = dark ? 0.24 : 0.34;
+      const baseOpacity = dark ? 0.18 : 0.22;
       const glareMat = new THREE.MeshBasicMaterial({
         map: glareTex,
         transparent: true,
@@ -658,7 +657,7 @@ export async function buildGlasses(manifest) {
   const glareMats = [];
   for (const lens of manifest.lenses || []) {
     const dark = lens.sunglass || (!lens.clear && (lens.opacity || 0) >= 0.62);
-    const baseOpacity = dark ? 0.22 : 0.36;
+    const baseOpacity = dark ? 0.18 : 0.22;
     const glareMat = new THREE.MeshBasicMaterial({
       map: glareTex,
       transparent: true,
@@ -979,10 +978,10 @@ export function createTryOn(canvas) {
     const p = tmp.pt;
     const bridgeZ = point(lm, LM.bridge, p).z;
     const f = liveFocalPx();
-    // Landmarks are image positions; push each back along the camera ray to its depth so the
-    // silhouette still projects onto the real face contour under the perspective camera.
-    const lift = (q, depthScale = 1) => {
-      q.z = (q.z - bridgeZ) * depthScale;
+    // Landmarks are image positions; move each along its camera ray to the wanted depth so the
+    // silhouette keeps projecting onto the real face contour under the perspective camera.
+    const lift = (q, depthScale, push) => {
+      q.z = (q.z - bridgeZ) * depthScale - push;
       const k = (f - q.z) / f;
       q.x *= k;
       q.y *= k;
@@ -993,27 +992,28 @@ export function createTryOn(canvas) {
     const farSign = Math.sign(zAxis.x) || 1;
     const turn = THREE.MathUtils.clamp((Math.abs(zAxis.x) - 0.06) / 0.2, 0, 1);
     const cx = point(lm, LM.bridge, p).x;
-    lift(p).addScaledVector(zAxis, -corePush);
+    let halfW = 1;
+    for (const idx of FACE_OVAL) halfW = Math.max(halfW, Math.abs(point(lm, idx, p).x - cx));
+    lift(point(lm, LM.bridge, p), 1, corePush);
     pos.setXYZ(0, p.x, p.y, p.z);
     for (let i = 0; i < FACE_OVAL.length; i += 1) {
       const idx = FACE_OVAL[i];
       point(lm, idx, p);
-      const side = Math.sign(p.x - cx) || 1;
+      const dx = p.x - cx;
+      const side = Math.sign(dx) || 1;
       const far = side === farSign;
+      // Forehead corners and hairline count as sides too: a temple seen from above (head tilted
+      // down) crosses them, and only the far side may ever hide it.
+      const lateral = THREE.MathUtils.smoothstep(Math.abs(dx) / halfW, 0.35, 0.65);
+      const tight = far ? turn : 0;
+      // MediaPipe's far contour lands inside the visible temple skin on a turned head, so the
+      // far edge grows outward; the frame front is still in front of it.
+      const sideInset = THREE.MathUtils.lerp(10.0, -12.0, tight);
+      p.x -= side * sideInset * lateral * pxPerMm;
+      const sidePush = THREE.MathUtils.lerp(30.0, 3.5, tight);
       // A flat fan from the bridge to the far contour sits behind the far temple, while the
       // real cheek bulges in front of it; shallower far-side depth restores that occlusion.
-      lift(p, far ? THREE.MathUtils.lerp(1, 0.5, turn) : 1);
-      if (SIDE_OVAL.has(idx)) {
-        const tight = far ? turn : 0;
-        const push = THREE.MathUtils.lerp(9.0, 3.5, tight) * pxPerMm;
-        // MediaPipe's far contour lands inside the visible temple skin on a turned head, so the
-        // far edge grows outward; the frame front is still in front of it.
-        const inset = THREE.MathUtils.lerp(10.0, -12.0, tight) * pxPerMm;
-        p.addScaledVector(zAxis, -push);
-        p.x -= side * inset;
-      } else {
-        p.addScaledVector(zAxis, -corePush);
-      }
+      lift(p, far ? THREE.MathUtils.lerp(1, 0.5, turn) : 1, THREE.MathUtils.lerp(3.5, sidePush, lateral) * pxPerMm);
       pos.setXYZ(1 + i, p.x, p.y, p.z);
     }
     pos.needsUpdate = true;
@@ -1031,7 +1031,7 @@ export function createTryOn(canvas) {
     const fresnel = 1 + Math.min(0.45, Math.abs(tmp.view.x) * 0.65);
     const envBoost = mode === "preview" ? 1 : THREE.MathUtils.clamp(0.75 + lightState.luma * 0.45, 0.72, 1.2);
     for (const mat of glare.mats) {
-      mat.opacity = Math.min(0.55, mat.userData.baseOpacity * fresnel * envBoost);
+      mat.opacity = Math.min(0.34, mat.userData.baseOpacity * fresnel * envBoost);
     }
   }
 
