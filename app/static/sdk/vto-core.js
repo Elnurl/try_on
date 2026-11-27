@@ -353,6 +353,52 @@ function buildHeadOccluder() {
   return geo;
 }
 
+/**
+ * Yaw that turns an uploaded model's front toward +z. Temple length is close to frame width, so
+ * the bounding box alone can't tell depth from width; the lenses can: they are thin along the
+ * depth axis and sit at the front end of it. Without lenses, the heavier front end decides.
+ */
+function glbFacingYaw(model) {
+  model.updateMatrixWorld(true);
+  const all = new THREE.Box3().setFromObject(model);
+  const glass = new THREE.Box3();
+  const v = new THREE.Vector3();
+  const sum = new THREE.Vector3();
+  let count = 0;
+  model.traverse((node) => {
+    if (!node.isMesh || !node.geometry.attributes.position) return;
+    const mats = Array.isArray(node.material) ? node.material : [node.material];
+    const isGlass =
+      /lens|glass/i.test(node.name) ||
+      mats.some((m) => m && (m.transparent || (m.opacity ?? 1) < 0.98 || (m.transmission ?? 0) > 0.05));
+    if (isGlass) glass.expandByObject(node);
+    const pos = node.geometry.attributes.position;
+    const stride = Math.max(1, Math.floor(pos.count / 4000));
+    for (let i = 0; i < pos.count; i += stride) {
+      sum.add(v.fromBufferAttribute(pos, i).applyMatrix4(node.matrixWorld));
+      count += 1;
+    }
+  });
+  const center = all.getCenter(new THREE.Vector3());
+  const allSize = all.getSize(new THREE.Vector3());
+  let depthIsX;
+  let front;
+  if (!glass.isEmpty()) {
+    const g = glass.getSize(new THREE.Vector3());
+    depthIsX = g.x < g.z;
+    const gc = glass.getCenter(new THREE.Vector3());
+    front = depthIsX ? gc.x - center.x : gc.z - center.z;
+  } else {
+    const mean = sum.divideScalar(Math.max(1, count));
+    const offX = (mean.x - center.x) / Math.max(1e-6, allSize.x);
+    const offZ = (mean.z - center.z) / Math.max(1e-6, allSize.z);
+    depthIsX = Math.abs(offX) > Math.abs(offZ);
+    front = depthIsX ? offX : offZ;
+  }
+  if (depthIsX) return front >= 0 ? -Math.PI / 2 : Math.PI / 2;
+  return front >= 0 ? 0 : Math.PI;
+}
+
 /** Load and normalise a real 3D .glb eyewear model into head-local millimetres. */
 async function buildGlbGlasses(manifest) {
   const [gltf, frontTex] = await Promise.all([
@@ -393,15 +439,11 @@ async function buildGlbGlasses(manifest) {
       pivots.push(pivot);
     }
   } else {
-    // External uploaded GLB: auto-orient sideways exports, scale to widthMm, align nose bridge.
+    // External uploaded GLB: turn the front to face +z, scale to widthMm, align nose bridge.
+    model.rotation.y = glbFacingYaw(model);
+    model.updateMatrixWorld(true);
     let box = new THREE.Box3().setFromObject(model);
     let size = box.getSize(new THREE.Vector3());
-    if (size.z > size.x * 1.15) {
-      model.rotation.y = Math.PI / 2;
-      model.updateMatrixWorld(true);
-      box = new THREE.Box3().setFromObject(model);
-      size = box.getSize(new THREE.Vector3());
-    }
     const scale = size.x > 1e-4 ? W / size.x : 1;
     model.scale.multiplyScalar(scale);
     model.updateMatrixWorld(true);
