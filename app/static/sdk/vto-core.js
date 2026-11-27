@@ -267,6 +267,59 @@ function templeGeometry(length, h0, h1, thick, side, metal) {
   return geo;
 }
 
+/**
+ * Temple extruded from its real outline in the seller's side photo (mm, hinge at u = 0), with
+ * the rectified photo projected onto it from the side: shape, hook, colour and logo as photographed.
+ */
+function cutTempleGeometry(cut, thick, side) {
+  const pts = cut.outline;
+  const [uMax, vMin, vMax] = cut.box;
+  const lead = [-1.6, pts[0][1], pts[0][2]];
+  const all = [lead, ...pts];
+  const shape = new THREE.Shape([
+    ...all.map(([u, vt]) => new THREE.Vector2(u, vt)),
+    ...all.map(([u, , vb]) => new THREE.Vector2(u, vb)).reverse(),
+  ]);
+  const heights = pts.slice(0, Math.max(2, pts.length >> 1)).map(([, vt, vb]) => vt - vb).sort((a, b) => a - b);
+  const h = heights[heights.length >> 1];
+  const bevel = Math.min(0.4, thick * 0.25, h * 0.2);
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: thick,
+    bevelEnabled: true,
+    bevelThickness: bevel,
+    bevelSize: bevel,
+    bevelOffset: -bevel,
+    bevelSegments: 2,
+    curveSegments: 1,
+  });
+  const pos = geo.attributes.position;
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < pos.count; i += 1) {
+    uv.setXY(i, pos.getX(i) / uMax, (pos.getY(i) - vMin) / (vMax - vMin));
+  }
+  geo.translate(0, 0, -thick / 2);
+  geo.rotateY(Math.PI / 2);
+  // The ear hook starts where the centre line leaves the straight run.
+  let straight = uMax * 0.74;
+  const dropAt = -Math.max(2.5, h * 0.6);
+  for (const [u, vt, vb] of pts) {
+    if ((vt + vb) / 2 < dropAt) {
+      straight = u;
+      break;
+    }
+  }
+  const hook = Math.max(8, uMax - straight);
+  for (let i = 0; i < pos.count; i += 1) {
+    const z = pos.getZ(i);
+    if (z < -straight) {
+      const f = THREE.MathUtils.clamp((-z - straight) / hook, 0, 1);
+      pos.setX(i, pos.getX(i) - side * 4.5 * f * f);
+    }
+  }
+  geo.computeVertexNormals();
+  return { geo, straight, length: uMax, height: h };
+}
+
 /** Map a straight-section pattern/logo strip cleanly onto the smooth 3D temple. */
 function templeTexture(tex, straightMm, heightMm) {
   const t = tex.clone();
@@ -604,15 +657,16 @@ export async function buildGlasses(manifest) {
   }
   const templeSides = manifest.templeSides || {};
   const templeUrls = manifest.templeTextures || {};
-  const [tex, ...sideTex] = await Promise.all([
+  const cutUrls = manifest.templeCuts || {};
+  const sideTexture = (urls, side, ok) =>
+    ok && urls[side] ? loadTexture(urls[side]).catch(() => null) : Promise.resolve(null);
+  const [tex, stripL, stripR, cutL, cutR] = await Promise.all([
     loadTexture(manifest.texture),
-    ...["left", "right"].map((side) =>
-      templeSides[side] && templeUrls[side]
-        ? loadTexture(templeUrls[side]).catch(() => null)
-        : Promise.resolve(null),
-    ),
+    ...["left", "right"].map((side) => sideTexture(templeUrls, side, templeSides[side])),
+    ...["left", "right"].map((side) => sideTexture(cutUrls, side, templeSides[side] && templeSides[side].cut)),
   ]);
-  const photoTemples = { left: sideTex[0], right: sideTex[1] };
+  const photoTemples = { left: stripL, right: stripR };
+  const cutTemples = { left: cutL, right: cutR };
   const W = manifest.widthMm || 138;
   const H = manifest.heightMm || W / (manifest.aspect || 2.8);
   const bend = W * 0.055;
@@ -737,8 +791,10 @@ export async function buildGlasses(manifest) {
     const own = templeSides[sideKey] || {};
     const cfg = own.rimMm != null ? own : { ...(templeSides[other] || {}), ...own };
     const source = photoTemples[sideKey] ? sideKey : photoTemples[other] ? other : null;
+    const cutKey = cutTemples[sideKey] ? sideKey : cutTemples[other] ? other : null;
+    const cut = cutKey ? { ...templeSides[cutKey].cut, tex: cutTemples[cutKey] } : null;
     const color = cfg.color || templeBase.color || manifest.frameColor || "#222222";
-    return { metal: symMetal, h0: symH0, h1: symH1, thick: symThick, length: symLength, color, source };
+    return { metal: symMetal, h0: symH0, h1: symH1, thick: symThick, length: symLength, color, source, cut };
   }
 
   const templeFadeUniform = { value: 1.0 };
@@ -756,17 +812,32 @@ export async function buildGlasses(manifest) {
   for (const side of [-1, 1]) {
     const sideKey = side > 0 ? "left" : "right";
     const cfg = sideConfig(sideKey);
-    const straightLen = cfg.length * 0.74;
-    const map = cfg.source ? templeTexture(photoTemples[cfg.source], straightLen, (cfg.h0 + cfg.h1) / 2) : null;
+    const real = cfg.cut ? cutTempleGeometry(cfg.cut, cfg.thick, side) : null;
+    const straightLen = real ? real.straight : cfg.length * 0.74;
+    let map = null;
+    if (real) {
+      map = cfg.cut.tex.clone();
+      map.wrapS = THREE.ClampToEdgeWrapping;
+      map.wrapT = THREE.ClampToEdgeWrapping;
+      map.needsUpdate = true;
+    } else if (cfg.source) {
+      map = templeTexture(photoTemples[cfg.source], straightLen, (cfg.h0 + cfg.h1) / 2);
+    }
     const armMat = new THREE.MeshStandardMaterial({
-      color: map ? new THREE.Color(0.84, 0.84, 0.84) : new THREE.Color(cfg.color),
+      color: real ? new THREE.Color(1, 1, 1) : map ? new THREE.Color(0.84, 0.84, 0.84) : new THREE.Color(cfg.color),
       map,
-      roughness: cfg.metal ? 0.26 : 0.36,
-      metalness: cfg.metal ? 0.68 : 0.08,
+      // The photo already carries the temple's own highlights, so it stays mostly diffuse.
+      roughness: real ? 0.5 : cfg.metal ? 0.26 : 0.36,
+      metalness: real ? 0.05 : cfg.metal ? 0.68 : 0.08,
     });
-    attachTempleFade(armMat, -straightLen * 0.94, -straightLen * 1.18, templeFadeUniform);
+    if (real) {
+      // Fade only inside the ear hook so the visible run keeps its real end shape up to the ear.
+      attachTempleFade(armMat, -straightLen * 0.98, -(straightLen + (real.length - straightLen) * 0.75), templeFadeUniform);
+    } else {
+      attachTempleFade(armMat, -straightLen * 0.94, -straightLen * 1.18, templeFadeUniform);
+    }
     liftMats.push(armMat);
-    const geo = templeGeometry(cfg.length, cfg.h0, cfg.h1, cfg.thick, side, cfg.metal);
+    const geo = real ? real.geo : templeGeometry(cfg.length, cfg.h0, cfg.h1, cfg.thick, side, cfg.metal);
     const pivot = new THREE.Group();
     const hingeX = W / 2 - Math.max(3.2, cfg.thick * 1.2);
     const t = hingeX / (W / 2);

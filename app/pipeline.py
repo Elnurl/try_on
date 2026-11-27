@@ -19,7 +19,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-PIPELINE_VERSION = 17
+PIPELINE_VERSION = 18
 log = logging.getLogger("vto.pipeline")
 MAX_SIDE = 1600
 DEFAULT_WIDTH_MM = 138.0
@@ -52,6 +52,7 @@ class Asset:
     manifest: dict
     sides: dict[str, Image.Image] = field(default_factory=dict)
     temple_strips: dict[str, Image.Image] = field(default_factory=dict)
+    temple_cuts: dict[str, Image.Image] = field(default_factory=dict)
     glb: bytes | None = None
 
 
@@ -595,10 +596,93 @@ def _temple_profile(px: np.ndarray, frame_h_mm: float, temple_mm: float) -> dict
     return {
         "side": "left" if tip_right else "right",
         "texture": texture,
+        "cut": _temple_cut(px, runs, tip_right, sy, temple_mm),
         "mask": core_mask,
         "hingeMm": hinge_mm,
         "midMm": mid_mm,
     }
+
+
+CUT_PX_PER_MM = 8.0
+CUT_MAX_W = 1400
+
+
+def _temple_cut(
+    px: np.ndarray, runs: list[tuple[int, int, int]], tip_right: bool, sy: float, temple_mm: float
+) -> tuple[Image.Image, dict] | None:
+    """Rectified cut-out of the near temple: its real outline, ear hook and surface.
+
+    Heights in a 3/4 shot are true and only the length is foreshortened, so the camera slope of
+    the straight run is sheared away (heights kept) and the length is stretched until the arc
+    matches the temple size on the frame. Returns the texture and its outline in mm.
+    """
+    n = len(runs)
+    if n < 40:
+        return None
+    xs = np.array([r[0] for r in runs], np.float32)
+    tops = np.array([r[1] for r in runs], np.float32)
+    bots = np.array([r[2] for r in runs], np.float32)
+    mids = (tops + bots) / 2
+    d = np.abs(xs - xs[0])
+    k = max(8, int(n * 0.6))
+    slope, base = np.polyfit(d[:k], mids[:k], 1)
+    line = base + slope * d
+    vc = _smooth((line - mids) * sy, 7)
+    du, dv = np.diff(d), np.diff(vc)
+
+    def arc(sx: float) -> float:
+        return float(np.hypot(du * sx, dv).sum())
+
+    lo, hi = sy, sy * 5
+    if arc(hi) < temple_mm:
+        return None
+    if arc(lo) < temple_mm:
+        for _ in range(40):
+            mid = (lo + hi) / 2
+            lo, hi = (mid, hi) if arc(mid) < temple_mm else (lo, mid)
+    sx = lo
+
+    vt = _smooth((line - tops) * sy + 0.15, 7)
+    vb = _smooth((line - bots) * sy - 0.15, 7)
+    u = d * sx
+    u_max = float(u[-1])
+    v_min, v_max = float(vb.min()) - 0.6, float(vt.max()) + 0.6
+    r = min(CUT_PX_PER_MM, CUT_MAX_W / max(u_max, 1.0))
+    tw, th = int(np.ceil(u_max * r)) + 1, int(np.ceil((v_max - v_min) * r)) + 1
+
+    arm = np.zeros(px.shape[:2], np.uint8)
+    for x, top, bot in runs:
+        arm[top : bot + 1, x] = 255
+    # The traced runs (holes filled) are the temple: white logos that background removal made
+    # transparent stay in. Premultiplied, so sampling never drags the backdrop into the edges.
+    src = px.astype(np.float32)
+    src[..., 3] = arm
+    src[..., :3] *= src[..., 3:4] / 255.0
+
+    uu, vv = np.meshgrid(np.arange(tw, dtype=np.float32) / r, v_max - np.arange(th, dtype=np.float32) / r)
+    dd = uu / sx
+    map_x = (xs[0] + (dd if tip_right else -dd)).astype(np.float32)
+    map_y = (base + slope * dd - vv / sy).astype(np.float32)
+    tex = cv2.remap(src, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+
+    # The outline is the silhouette; the texture must be solid all the way to it so the
+    # extruded walls never sample transparent anti-aliased edge pixels.
+    idx = np.linspace(0, n - 1, min(n, 72)).round().astype(int)
+    outline = [[round(float(u[i]), 2), round(float(vt[i]), 2), round(float(vb[i]), 2)] for i in idx]
+    poly = [(p[0] * r, (v_max - p[1]) * r) for p in outline] + [(p[0] * r, (v_max - p[2]) * r) for p in outline[::-1]]
+    inside = np.zeros((th, tw), np.uint8)
+    cv2.fillPoly(inside, [np.round(np.array(poly)).astype(np.int32)], 255)
+    inside = cv2.dilate(inside, np.ones((5, 5), np.uint8))
+    a = tex[..., 3:4]
+    rgb = np.clip(tex[..., :3] * 255.0 / np.maximum(a, 1.0), 0, 255).astype(np.uint8)
+    edge = max(3, int(round(r * 0.7))) | 1
+    solid = cv2.erode((tex[..., 3] > 200).astype(np.uint8), np.ones((edge, edge), np.uint8)) > 0
+    if solid.sum() < 50:
+        return None
+    rgb = cv2.inpaint(np.ascontiguousarray(rgb), (~solid).astype(np.uint8) * 255, 4, cv2.INPAINT_TELEA)
+    out = np.dstack([rgb, inside])
+    info = {"outline": outline, "box": [round(u_max, 2), round(v_min, 2), round(v_max, 2)]}
+    return Image.fromarray(out, "RGBA"), info
 
 
 def _temple_thick(hinge_mm: float, finish: str) -> float:
@@ -624,6 +708,8 @@ def analyze_side(img: Image.Image, frame_h_mm: float, temple_mm: float) -> tuple
         )
         if found["texture"] is not None:
             info["texture"] = found["texture"]
+        if found["cut"] is not None:
+            info["cutImage"], info["cut"] = found["cut"]
     else:
         info["source"] = "photo-color"
     return Image.fromarray(px, "RGBA"), info
@@ -683,16 +769,19 @@ def build_asset(front: Image.Image, sides: dict[str, Image.Image], sizes: Sizes)
         side_images[name] = cut
         analysed.append((name, info))
     # The photo's orientation tells which temple it shows; the upload label only breaks ties.
-    side_info, temple_strips = {}, {}
+    side_info, temple_strips, temple_cuts = {}, {}, {}
     for name, info in sorted(analysed, key=lambda item: item[1].get("side") != item[0]):
         side = info.pop("side", None) or name
         texture = info.pop("texture", None)
+        cut_image = info.pop("cutImage", None)
         if side in side_info:
             continue
         side_info[side] = info
         if texture is not None:
             temple_strips[side] = texture
             info["texture"] = f"temple-{side}.png"
+        if cut_image is not None:
+            temple_cuts[side] = cut_image
     temple_colors = [i["color"] for i in side_info.values() if i["color"]]
     edge = np.zeros((h, w), bool)
     band = max(3, int(w * 0.04))
@@ -715,7 +804,7 @@ def build_asset(front: Image.Image, sides: dict[str, Image.Image], sizes: Sizes)
 
     temple_sides = {}
     for name, info in side_info.items():
-        keys = ("color", "finish", "rimMm", "tipMm", "thickMm", "lengthMm", "source", "texture")
+        keys = ("color", "finish", "rimMm", "tipMm", "thickMm", "lengthMm", "source", "texture", "cut")
         temple_sides[name] = {k: info[k] for k in keys if k in info}
     if len(temple_sides) == 1:
         warnings.append("temple_one_side")
@@ -759,6 +848,7 @@ def build_asset(front: Image.Image, sides: dict[str, Image.Image], sizes: Sizes)
         manifest=manifest,
         sides=side_images,
         temple_strips=temple_strips,
+        temple_cuts=temple_cuts,
         glb=glb_bytes,
     )
 

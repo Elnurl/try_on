@@ -60,7 +60,7 @@ DEMO = ROOT / "demo"
 MAX_UPLOAD = 15 * 1024 * 1024
 MAX_GLB = 25 * 1024 * 1024
 ASSET_FILE_RE = re.compile(
-    r"^(front|thumb)\.png$|^model\.glb$|^photo-(front|left|right)\.jpg$|^temple-(left|right)\.png$"
+    r"^(front|thumb)\.png$|^model\.glb$|^photo-(front|left|right)\.jpg$|^temple-(cut-)?(left|right)\.png$"
 )
 
 mimetypes.add_type("application/javascript", ".mjs")
@@ -166,12 +166,16 @@ def public_manifest(m: dict, base: str) -> dict:
         out["model"] = f"{root}/model.glb?v={v}"
     out["texture"] = f"{root}/front.png?v={v}"
     out["photos"] = {name: f"{root}/photo-{name}.jpg?v={v}" for name in m.get("photos", [])}
-    textures = {}
+    textures, cuts = {}, {}
     for side, info in (m.get("templeSides") or {}).items():
         if side in ("left", "right") and info.get("texture"):
             textures[side] = f"{root}/temple-{side}.png?v={v}"
+        if side in ("left", "right") and info.get("cut"):
+            cuts[side] = f"{root}/temple-cut-{side}.png?v={v}"
     if textures:
         out["templeTextures"] = textures
+    if cuts:
+        out["templeCuts"] = cuts
     return out
 
 
